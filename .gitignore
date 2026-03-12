@@ -1,0 +1,29 @@
+# =========================
+# Secrets & Credentials (CRITICAL)
+# =========================
+.env
+firebase_credentials.json
+
+# =========================
+# Virtual Environments
+# =========================
+venv/
+env/
+.venv/
+
+# =========================
+# Python & Flask
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+instance/
+.webassets-cache
+
+# =========================
+# OS & IDE Files
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
