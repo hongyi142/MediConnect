@@ -22,7 +22,8 @@ db = firestore.client()
 # Set up the Flask application
 app = Flask(__name__)
 
-@app.route('/payments', methods=['POST'])
+# Create payment record
+@app.route('/payment/create', methods=['POST'])
 def create_payment():
     try:
         # Extract JSON data from the request
@@ -62,6 +63,71 @@ def create_payment():
         # Catch database write failures or any other unexpected errors
         return jsonify({
             "error": "An error occurred while creating the payment record",
+            "details": str(e)
+        }), 500
+
+# Update payment status
+@app.route('/payment/<paymentID>', methods=['PUT'])
+def update_payment(paymentID):
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid or missing JSON payload"}), 400
+
+        status = data.get('status')
+        if not status:
+            return jsonify({"error": "Missing required field: 'status'."}), 400
+
+        valid_statuses = ['pending', 'paid', 'failed']
+        if status not in valid_statuses:
+            return jsonify({
+                "error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+            }), 400
+
+        # Retrieve the document from Firestore
+        payment_ref = db.collection('Payment').document(paymentID)
+        doc = payment_ref.get()
+
+        if not doc.exists:
+            return jsonify({"error": "Payment record not found."}), 404
+
+        # Update the status field
+        payment_ref.update({"status": status})
+
+        return jsonify({
+            "message": "Payment status updated successfully",
+            "documentID": paymentID,
+            "status": status
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": "An error occurred while updating the payment record",
+            "details": str(e)
+        }), 500
+
+# Get payment status
+@app.route('/payment/<paymentID>', methods=['GET'])
+def get_payment(paymentID):
+    try:
+        # Retrieve the document from Firestore
+        payment_ref = db.collection('Payment').document(paymentID)
+        doc = payment_ref.get()
+
+        if not doc.exists:
+            return jsonify({"error": "Payment record not found."}), 404
+
+        # Retrieve only the status field
+        payment_status = doc.to_dict().get('status')
+        
+        return jsonify({
+            "documentID": paymentID,
+            "status": payment_status
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": "An error occurred while fetching the payment record",
             "details": str(e)
         }), 500
 
