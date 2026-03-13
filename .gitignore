@@ -27,3 +27,4 @@ instance/
 Thumbs.db
 .vscode/
 .idea/
+.agent/
