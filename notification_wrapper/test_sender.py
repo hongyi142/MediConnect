@@ -19,21 +19,21 @@ def send_test_message():
 
     # 3. Create JSON payload
     email_message = {
-        "receiver": "bobtan09081965@gmail.com",
+        "receiver": "testuser@gmail.com",
         "subject": "System Integration Test",
         "content": "Hello! This email message went through RabbitMQ.",
         "channel": "email",
     }
     sms_message = {
-        "mobile": "+97685872",
+        "mobile": "92345678",
         "message": "Hello! This SMS message went through RabbitMQ.",
         "channel": "sms",
     }
     both_message = {
-        "receiver": "bobtan09081965@gmail.com",
+        "receiver": "testuser@gmail.com",
         "subject": "System Integration Test (Both)",
         "content": "This message was sent through email and SMS via RabbitMQ.",
-        "mobile": "97685872",
+        "mobile": "92345678",
         "message": "BOTH channel test.",
         "channel": "both",
     }
