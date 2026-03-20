@@ -14,12 +14,59 @@ load_dotenv()
 # Extract essential environment variables
 RABBITMQ_URL = os.getenv("RABBITMQ_URL")
 SMU_API_URL = os.getenv("SMU_API_URL")
+SMU_SMS_API_URL = os.getenv("SMU_SMS_API_URL")
 SMU_X_CONTACTS_KEY = os.getenv("SMU_X_CONTACTS_KEY")
 
 if not all([RABBITMQ_URL, SMU_API_URL, SMU_X_CONTACTS_KEY]):
     raise ValueError("Missing essential environment variables: RABBITMQ_URL, SMU_API_URL, or SMU_X_CONTACTS_KEY")
+if not SMU_SMS_API_URL and "SendEmail" in SMU_API_URL:
+    SMU_SMS_API_URL = SMU_API_URL.replace("SendEmail", "SendSMS")
 
-def callback(ch, method, properties, body):
+
+def post_to_smu(url, payload):
+    headers = {
+        "Content-Type": "application/json",
+        "X-Contacts-Key": SMU_X_CONTACTS_KEY,
+    }
+    return requests.post(url, json=payload, headers=headers, timeout=10)
+
+
+def send_email(message):
+    email_payload = message.get("emailPayload")
+    if not email_payload:
+        receiver = message.get("receiver")
+        subject = message.get("subject")
+        content = message.get("content")
+        if not all([receiver, subject, content]):
+            return False, "Email fields missing (receiver, subject, content)"
+        email_payload = {
+            "emailAddress": receiver,
+            "emailSubject": subject,
+            "emailBody": content,
+        }
+    response = post_to_smu(SMU_API_URL, email_payload)
+    return response.status_code in [200, 201, 202], f"Email status={response.status_code}, body={response.text}"
+
+
+def send_sms(message):
+    if not SMU_SMS_API_URL:
+        return False, "SMU_SMS_API_URL not configured"
+    sms_payload = message.get("smsPayload")
+    if not sms_payload:
+        phone = message.get("phoneNumber")
+        sms_text = message.get("smsMessage")
+        if not all([phone, sms_text]):
+            return False, "SMS fields missing (phoneNumber, smsMessage)"
+        # phone_field = os.environ.get("SMS_PHONE_FIELD", "mobile")
+        # message_field = os.environ.get("SMS_MESSAGE_FIELD", "message")
+        sms_payload = {
+            "mobile": phone,
+            "message": sms_text,
+        }
+    response = post_to_smu(SMU_SMS_API_URL, sms_payload)
+    return response.status_code in [200, 201, 202], f"SMS status={response.status_code}, body={response.text}"
+
+def callback(ch, method, body):
     """
     Callback triggered when a message is received from the queue.
     Performs a fire-and-forget HTTP POST to the SMU API.
@@ -27,40 +74,26 @@ def callback(ch, method, properties, body):
     try:
         # 1. Parse the incoming JSON message
         message = json.loads(body.decode('utf-8'))
-        receiver = message.get("receiver")
-        subject = message.get("subject")
-        content = message.get("content")
+        channel = (message.get("channel") or "email").lower()
+        logging.info(f"Processing message with channel='{channel}'")
 
-        if not all([receiver, subject, content]):
-            logging.warning(f"Invalid message format received: {message}")
-            # The finally block will handle the basic_ack
-            return
+        ok_email = True
+        ok_sms = True
+        details = []
 
-        logging.info(f"Processing notification for: {receiver}")
+        if channel in ("email", "both"):
+            ok_email, detail = send_email(message)
+            details.append(detail)
 
-        # 2. Map the JSON to the SMU API's expected format
-        payload = {
-            "emailAddress": receiver,
-            "emailSubject": subject,
-            "emailBody": content
-        }
+        if channel in ("sms", "both"):
+            ok_sms, detail = send_sms(message)
+            details.append(detail)
 
-        # 3. Add necessary Headers
-        headers = {
-            "Content-Type": "application/json",
-            "X-Contacts-Key": SMU_X_CONTACTS_KEY
-        }
-
-        # 4. Trigger HTTP POST
-        response = requests.post(SMU_API_URL, json=payload, headers=headers)
-        
-        if response.status_code in [200, 201, 202]:
-            logging.info(f"Successfully notified {receiver}. Status: {response.status_code}")
-            # Acknowledge the message since it was successful
+        if ok_email and ok_sms:
+            logging.info("Notification succeeded: %s", " | ".join(details))
             ch.basic_ack(delivery_tag=method.delivery_tag)
         else:
-            logging.error(f"Failed to notify {receiver}. Status: {response.status_code}, Response: {response.text}")
-            # Requeue the message: nack with requeue=True puts it back in the queue
+            logging.error("Notification failed: %s", " | ".join(details))
             logging.info("Requeueing the message for retry...")
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
