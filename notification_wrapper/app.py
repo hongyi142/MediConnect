@@ -75,7 +75,7 @@ def notify_email():
     subject = body.get("subject")
     content = body.get("content")
     if not receiver or not subject or not content:
-        return jsonify({"error": "receiver, subject and content are required"}), 400
+        return jsonify({"error": "Provide receiver, subject and content."}), 400
     send_email(receiver, subject, content)
     return jsonify({"message": "Email sent", "receiver": receiver})
 
@@ -84,10 +84,10 @@ def notify_email():
 def notify_sms():
     body = request.get_json(silent=True) or {}
     sms_payload = body.get("smsPayload")
-    phone_number = body.get("mobile") or body.get("phoneNumber") or body.get("phone")
-    sms_message = body.get("smsMessage") or body.get("message")
+    phone_number = body.get("mobile")
+    sms_message = body.get("message")
     if not sms_payload and (not phone_number or not sms_message):
-        return jsonify({"error": "Provide smsPayload or mobile/phoneNumber/phone + message/smsMessage"}), 400
+        return jsonify({"error": "Provide smsPayload or mobile + message."}), 400
     send_sms(phone_number=phone_number, sms_message=sms_message, sms_payload=sms_payload)
     return jsonify({"message": "SMS sent", "phoneNumber": phone_number})
 
@@ -105,15 +105,15 @@ def notify_send():
         send_email(receiver, subject, content)
         email_sent = True
 
-    phone_number = body.get("mobile") or body.get("phoneNumber") or body.get("phone")
-    sms_message = body.get("smsMessage") or body.get("message")
+    phone_number = body.get("mobile")
+    sms_message = body.get("message")
     sms_payload = body.get("smsPayload")
     if sms_payload or (phone_number and sms_message):
         send_sms(phone_number=phone_number, sms_message=sms_message, sms_payload=sms_payload)
         sms_sent = True
 
     if not email_sent and not sms_sent:
-        return jsonify({"error": "No valid email or SMS payload provided"}), 400
+        return jsonify({"error": "No valid email or SMS payload provided."}), 400
     return jsonify({"emailSent": email_sent, "smsSent": sms_sent})
 
 
