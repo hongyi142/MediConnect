@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: mediconnect-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - mediconnect_net
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  payment_atomic:
+    build:
+      context: ./payment_atomic
+    container_name: payment_atomic_api
+    ports:
+      - "5000:5000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    # Note: Requires FIREBASE_CRED_PATH pointing to an attached volume in production
+    networks:
+      - mediconnect_net
+
+  payment_wrapper:
+    build:
+      context: ./payment_wrapper
+    container_name: payment_wrapper_api
+    ports:
+      - "5001:5001"
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - ./payment_wrapper/.env # Load external API keys like Stripe safely
+    networks:
+      - mediconnect_net
+
+  process_payment:
+    build:
+      context: ./process_payment_composite
+    container_name: process_payment_api
+    ports:
+      - "5002:5002"
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Overriding env variables for internal Docker DNS routing
+      - RABBITMQ_URL=amqp://rabbitmq/
+      - PAYMENT_WRAPPER_URL=http://payment_wrapper:5001
+      - PAYMENT_ATOMIC_URL=http://payment_atomic:5000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      payment_atomic:
+        condition: service_started
+      payment_wrapper:
+        condition: service_started
+    networks:
+      - mediconnect_net
+
+  notification_worker:
+    build:
+      context: ./notification_wrapper
+    container_name: notification_worker
+    # No ports exposed as this is a background worker pulling from the queue
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RABBITMQ_URL=amqp://rabbitmq/ 
+    env_file:
+      - ./notification_wrapper/.env # Load SMU keys 
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - mediconnect_net
+
+networks:
+  mediconnect_net:
+    driver: bridge

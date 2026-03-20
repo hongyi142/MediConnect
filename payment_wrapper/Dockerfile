@@ -16,5 +16,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code
 COPY . .
 
-# Run the RabbitMQ worker
-CMD ["python", "worker.py"]
+# Run the Flask app
+CMD ["python", "app.py"]
