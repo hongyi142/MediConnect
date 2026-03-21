@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import firebase_admin
 from firebase_admin import credentials, firestore
 from dotenv import load_dotenv  
-from datetime import datetime
+from datetime import datetime, timezone
 import os, json
 
 load_dotenv()
@@ -29,7 +29,7 @@ def create_delivery():
         "patientPhone": data["patientPhone"],
         "patientEmail": data["patientEmail"],
         "status": "pending",   # pending → assigned → completed
-        "createdAt": datetime.utcnow().isoformat()
+        "createdAt": datetime.now(timezone.utc).isoformat()
     }
     doc_ref.set(delivery)
     return jsonify({"code": 201, "data": delivery}), 201
@@ -51,7 +51,7 @@ def update_delivery(delivery_id):
 def mark_delivered(delivery_id):
     db.collection("deliveries").document(delivery_id).update({
         "status": "completed",
-        "completedAt": datetime.now(datetime.timezone.utc).isoformat()
+        "completedAt": datetime.now(timezone.utc).isoformat()
     })
     return jsonify({"code": 200, "message": "Marked as delivered"})
 
