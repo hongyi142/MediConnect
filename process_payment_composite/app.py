@@ -138,13 +138,26 @@ def verify_and_handoff():
             channel = connection.channel()
 
             exchange_name = 'service_exchange'
+            refund_exchange = 'refund_exchange'
+            queue_name = 'delivery_queue'
             routing_key = 'delivery.assign'
 
-            # Ensure exchange exists
+            # Ensure exchanges exist
             channel.exchange_declare(exchange=exchange_name, exchange_type='direct', durable=True)
+            channel.exchange_declare(exchange=refund_exchange, exchange_type='direct', durable=True)
+
+            # Declare the delivery_queue with DLX arguments
+            arguments = {
+                'x-dead-letter-exchange': refund_exchange,
+                'x-message-ttl': 10000  # 10 seconds for testing
+            }
+            channel.queue_declare(queue=queue_name, durable=True, arguments=arguments)
+            channel.queue_bind(queue=queue_name, exchange=exchange_name, routing_key=routing_key)
 
             msg_payload = {
                 "orderID": order_id,
+                "session_id": session_id,
+                "documentID": document_id,
                 "patientID": patient_id,
                 "patientName": patient_name,
                 "patientAddress": patient_address,

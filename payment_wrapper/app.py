@@ -92,5 +92,41 @@ def get_payment_status(session_id):
             "details": str(e)
         }), 500
 
+@app.route('/payment/refund', methods=['POST'])
+def process_refund():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid or missing JSON payload"}), 400
+
+        session_id = data.get('session_id')
+        if not session_id:
+            return jsonify({"error": "Missing required field: 'session_id'."}), 400
+
+        # Retrieve the session to get the payment intent
+        session = stripe.checkout.Session.retrieve(session_id)
+        payment_intent = session.payment_intent
+
+        if not payment_intent:
+            return jsonify({"error": "No payment intent found for this session."}), 400
+
+        # Create the refund
+        stripe.Refund.create(payment_intent=payment_intent)
+
+        return jsonify({
+            "message": "Refund processed successfully"
+        }), 200
+
+    except stripe.error.StripeError as e:
+        return jsonify({
+            "error": "A Stripe error occurred while processing the refund",
+            "details": str(e)
+        }), 400
+    except Exception as e:
+        return jsonify({
+            "error": "An internal server error occurred",
+            "details": str(e)
+        }), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)

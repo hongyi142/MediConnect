@@ -78,7 +78,7 @@ def update_payment(paymentID):
         if not status:
             return jsonify({"error": "Missing required field: 'status'."}), 400
 
-        valid_statuses = ['pending', 'paid', 'failed']
+        valid_statuses = ['pending', 'paid', 'failed', 'refunded']
         if status not in valid_statuses:
             return jsonify({
                 "error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
