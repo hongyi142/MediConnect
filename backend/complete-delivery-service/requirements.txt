@@ -1,0 +1,6 @@
+flask
+flask-cors
+firebase-admin
+qrcode[pil]
+requests
+pika

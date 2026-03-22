@@ -12,29 +12,29 @@ services:
       retries: 5
 
   delivery:
-    build: ./delivery
+    build: ./backend/delivery-service
     ports:
       - "5000:5000"
     volumes:
       - ./serviceAccountKey.json:/app/serviceAccountKey.json
 
   rider:
-    build: ./rider
+    build: ./backend/rider-service
     ports:
       - "5001:5001"
     volumes:
       - ./serviceAccountKey.json:/app/serviceAccountKey.json
 
   assign_delivery:
-    build: ./assign_delivery
+    build: ./backend/assign-delivery-service
     ports:
       - "5002:5002"
+    env_file:
+      - ./backend/assign-delivery-service/.env
     environment:
       DELIVERY_URL: http://delivery:5000
-      RIDER_URL:    http://rider:5001
+      RIDER_URL: http://rider:5001
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-    volumes:
-      - ./serviceAccountKey.json:/app/serviceAccountKey.json
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -44,7 +44,7 @@ services:
         condition: service_started
 
   complete_delivery:
-    build: ./complete_delivery
+    build: ./backend/complete-delivery-service
     ports:
       - "5004:5004"
     environment:
@@ -52,8 +52,6 @@ services:
       RIDER_URL:    http://rider:5001
       ORDER_URL:    http://order:5003   # P3's service
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-    volumes:
-      - ./serviceAccountKey.json:/app/serviceAccountKey.json
     depends_on:
       - rabbitmq
       - delivery
