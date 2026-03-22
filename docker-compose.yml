@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # management UI
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      retries: 5
+
+  delivery:
+    build: ./delivery
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json
+
+  rider:
+    build: ./rider
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json
+
+  assign_delivery:
+    build: ./assign_delivery
+    ports:
+      - "5002:5002"
+    environment:
+      DELIVERY_URL: http://delivery:5000
+      RIDER_URL:    http://rider:5001
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    volumes:
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      delivery:
+        condition: service_started
+      rider:
+        condition: service_started
+
+  complete_delivery:
+    build: ./complete_delivery
+    ports:
+      - "5004:5004"
+    environment:
+      DELIVERY_URL: http://delivery:5000
+      RIDER_URL:    http://rider:5001
+      ORDER_URL:    http://order:5003   # P3's service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    volumes:
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json
+    depends_on:
+      - rabbitmq
+      - delivery
+      - rider

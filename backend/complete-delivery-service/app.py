@@ -2,8 +2,10 @@ import os, io, json, base64, requests
 from flask import Flask, request, jsonify
 import qrcode
 import pika
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 DELIVERY_URL = os.environ.get("DELIVERY_URL", "http://delivery:5000")
 RIDER_URL    = os.environ.get("RIDER_URL",    "http://rider:5001")

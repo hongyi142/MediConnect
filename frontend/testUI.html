@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P5 Service Tester — MediConnect</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f4f3ef;
+    --surface: #ffffff;
+    --border: #dddbd4;
+    --text: #1a1916;
+    --muted: #7a7873;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --success: #16a34a;
+    --success-light: #f0fdf4;
+    --error: #dc2626;
+    --error-light: #fef2f2;
+    --warning: #d97706;
+    --warning-light: #fffbeb;
+  }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+
+  header {
+    max-width: 860px;
+    margin: 0 auto 40px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1.5px solid var(--text);
+    padding-bottom: 16px;
+  }
+
+  header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+
+  header span {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .grid {
+    max-width: 860px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .card.full { grid-column: 1 / -1; }
+
+  .card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .method-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--accent-light);
+    color: var(--accent);
+  }
+
+  .card-body { padding: 20px; }
+
+  .endpoint {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-radius: 6px;
+  }
+
+  .field { margin-bottom: 14px; }
+
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input:focus { border-color: var(--accent); }
+
+  button {
+    width: 100%;
+    padding: 10px;
+    background: var(--text);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: opacity 0.15s;
+  }
+
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .response-box {
+    margin-top: 16px;
+    border-radius: 6px;
+    overflow: hidden;
+    display: none;
+  }
+
+  .response-box.visible { display: block; }
+
+  .response-status {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .response-status.ok   { background: var(--success-light); color: var(--success); }
+  .response-status.err  { background: var(--error-light);   color: var(--error);   }
+  .response-status.warn { background: var(--warning-light); color: var(--warning); }
+
+  .response-body {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 14px;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .qr-section {
+    display: none;
+    margin-top: 16px;
+    text-align: center;
+    padding: 20px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px dashed var(--border);
+  }
+
+  .qr-section.visible { display: block; }
+  .qr-section img { max-width: 180px; border-radius: 4px; }
+  .qr-section p {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  .hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .port-config {
+    max-width: 860px;
+    margin: 0 auto 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .port-config span {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .port-config input {
+    width: 120px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .port-group { display: flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>MediConnect — P5 Tester</h1>
+  <span>composite service test UI</span>
+</header>
+
+<div class="port-config">
+  <span>Ports</span>
+  <div class="port-group">
+    <label style="margin:0;white-space:nowrap">Assign Delivery</label>
+    <input type="text" id="port-assign" value="5002" style="width:80px">
+  </div>
+  <div class="port-group">
+    <label style="margin:0;white-space:nowrap">Complete Delivery</label>
+    <input type="text" id="port-complete" value="5004" style="width:80px">
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- ACCEPT DELIVERY -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Accept Delivery</span>
+      <span class="method-badge">POST</span>
+    </div>
+    <div class="card-body">
+      <div class="endpoint" id="ep-accept">/accept-delivery</div>
+      <div class="field">
+        <label>Delivery ID</label>
+        <input type="text" id="accept-deliveryId" placeholder="e.g. abc123xyz">
+      </div>
+      <div class="field">
+        <label>Rider ID</label>
+        <input type="text" id="accept-riderId" placeholder="e.g. rider789">
+      </div>
+      <button onclick="acceptDelivery()">Send Request</button>
+      <div class="response-box" id="res-accept">
+        <div class="response-status" id="res-accept-status"></div>
+        <div class="response-body" id="res-accept-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREPARE DELIVERY (QR) -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Prepare Delivery</span>
+      <span class="method-badge">POST</span>
+    </div>
+    <div class="card-body">
+      <div class="endpoint">/prepare-delivery</div>
+      <div class="field">
+        <label>Delivery ID</label>
+        <input type="text" id="prepare-deliveryId" placeholder="e.g. abc123xyz">
+      </div>
+      <div class="field">
+        <label>Patient ID</label>
+        <input type="text" id="prepare-patientId" placeholder="e.g. patient456">
+      </div>
+      <button onclick="prepareDelivery()">Generate QR Code</button>
+      <div class="qr-section" id="qr-display">
+        <img id="qr-img" src="" alt="QR Code">
+        <p id="qr-delivery-id"></p>
+      </div>
+      <div class="response-box" id="res-prepare">
+        <div class="response-status" id="res-prepare-status"></div>
+        <div class="response-body" id="res-prepare-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPLETE DELIVERY -->
+  <div class="card full">
+    <div class="card-header">
+      <span class="card-title">Complete Delivery</span>
+      <span class="method-badge">POST</span>
+    </div>
+    <div class="card-body">
+      <div class="endpoint">/complete-delivery</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="field">
+          <label>Delivery ID</label>
+          <input type="text" id="complete-deliveryId" placeholder="e.g. abc123xyz">
+          <p class="hint">← auto-filled from Prepare Delivery</p>
+        </div>
+        <div class="field">
+          <label>Rider ID</label>
+          <input type="text" id="complete-riderId" placeholder="e.g. rider789">
+        </div>
+      </div>
+      <button onclick="completeDelivery()" style="max-width:200px">Complete Delivery</button>
+      <div class="response-box" id="res-complete">
+        <div class="response-status" id="res-complete-status"></div>
+        <div class="response-body" id="res-complete-body"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function getBase(service) {
+    const port = service === 'assign'
+      ? document.getElementById('port-assign').value
+      : document.getElementById('port-complete').value;
+    return `http://localhost:${port}`;
+  }
+
+  function showResponse(prefix, status, data, isError) {
+    const box    = document.getElementById(`res-${prefix}`);
+    const badge  = document.getElementById(`res-${prefix}-status`);
+    const body   = document.getElementById(`res-${prefix}-body`);
+    box.classList.add('visible');
+    badge.className = `response-status ${isError ? 'err' : 'ok'}`;
+    badge.textContent = `${status} ${isError ? '✗ Error' : '✓ Success'}`;
+    body.textContent  = JSON.stringify(data, null, 2);
+  }
+
+  async function post(url, payload) {
+    const res  = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    return { status: res.status, data, ok: res.ok };
+  }
+
+  async function acceptDelivery() {
+    const deliveryID = document.getElementById('accept-deliveryId').value.trim();
+    const riderID    = document.getElementById('accept-riderId').value.trim();
+    if (!deliveryID || !riderID) return alert('Fill in both fields');
+    try {
+      const { status, data, ok } = await post(`${getBase('assign')}/accept-delivery`, { deliveryID, riderID });
+      showResponse('accept', status, data, !ok);
+    } catch (e) {
+      showResponse('accept', 'Error', { message: e.message + ' — is assign_delivery running?' }, true);
+    }
+  }
+
+  async function prepareDelivery() {
+    const deliveryID = document.getElementById('prepare-deliveryId').value.trim();
+    const patientID  = document.getElementById('prepare-patientId').value.trim();
+    if (!deliveryID || !patientID) return alert('Fill in both fields');
+    try {
+      const { status, data, ok } = await post(`${getBase('complete')}/prepare-delivery`, { deliveryID, patientID });
+      showResponse('prepare', status, { code: data.code, deliveryID: data.deliveryID, qrCode: '<<base64 image>>' }, !ok);
+      if (ok && data.qrCode) {
+        document.getElementById('qr-img').src      = `data:image/png;base64,${data.qrCode}`;
+        document.getElementById('qr-delivery-id').textContent = `deliveryID: ${data.deliveryID}`;
+        document.getElementById('qr-display').classList.add('visible');
+        // auto-fill complete delivery
+        document.getElementById('complete-deliveryId').value = deliveryID;
+      }
+    } catch (e) {
+      showResponse('prepare', 'Error', { message: e.message + ' — is complete_delivery running?' }, true);
+    }
+  }
+
+  async function completeDelivery() {
+    const deliveryID = document.getElementById('complete-deliveryId').value.trim();
+    const riderID    = document.getElementById('complete-riderId').value.trim();
+    if (!deliveryID || !riderID) return alert('Fill in both fields');
+    try {
+      const { status, data, ok } = await post(`${getBase('complete')}/complete-delivery`, { deliveryID, riderID });
+      showResponse('complete', status, data, !ok);
+    } catch (e) {
+      showResponse('complete', 'Error', { message: e.message + ' — is complete_delivery running?' }, true);
+    }
+  }
+</script>
+</body>
+</html>
