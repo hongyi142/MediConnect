@@ -35,6 +35,9 @@ def start_worker():
                 order_id = msg_payload.get('orderID')
                 session_id = msg_payload.get('session_id')
                 document_id = msg_payload.get('documentID')
+                patient_name = msg_payload.get('patientName')
+                patient_email = msg_payload.get('patientEmail')
+                amount = msg_payload.get('amount')
                 
                 print(f"Dead letter received for order {order_id}. Initiating refund saga...")
 
@@ -52,6 +55,26 @@ def start_worker():
                 atomic_payload = {"status": "refunded"}
                 atomic_resp = requests.put(f"{PAYMENT_ATOMIC_URL}/payment/{document_id}", json=atomic_payload)
                 atomic_resp.raise_for_status()
+
+                # --- NEW: Publish async event to notification_queue ---
+                if patient_email and patient_name and amount:
+                    notification_payload = {
+                        "event_type": "payment_refunded",
+                        "patientEmail": patient_email,
+                        "patientName": patient_name,
+                        "orderID": order_id,
+                        "amount": amount
+                    }
+                    
+                    ch.basic_publish(
+                        exchange='service_exchange', 
+                        routing_key='notification',
+                        body=json.dumps(notification_payload),
+                        properties=pika.BasicProperties(
+                            delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE
+                        )
+                    )
+                # -----------------------------------------------------------------
 
                 print(f"Saga Reversal Complete: Order {order_id} refunded.")
                 

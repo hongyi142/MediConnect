@@ -110,8 +110,10 @@ def verify_and_handoff():
         patient_id = data.get('patientID')
         patient_name = data.get('patientName')
         patient_address = data.get('patientAddress')
+        patient_email = data.get('patientEmail')
+        amount = data.get('amount')
 
-        if not all([session_id, document_id, order_id, patient_id, patient_name, patient_address]):
+        if not all([session_id, document_id, order_id, patient_id, patient_name, patient_address, patient_email, amount]):
             return jsonify({"error": "Missing required fields for verification"}), 400
 
         # Step 1: Verify Payment Status via Payment Wrapper
@@ -161,6 +163,8 @@ def verify_and_handoff():
                 "patientID": patient_id,
                 "patientName": patient_name,
                 "patientAddress": patient_address,
+                "patientEmail": patient_email,
+                "amount": amount,
                 "status": "payment_verified"
             }
 
@@ -172,6 +176,24 @@ def verify_and_handoff():
                     delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE
                 )
             )
+
+            # --- NEW: Publish async event to notification_queue ---
+            notification_payload = {
+                "event_type": "payment_successful",
+                "patientEmail": patient_email,
+                "patientName": patient_name,
+                "orderID": order_id
+            }
+            
+            channel.basic_publish(
+                exchange='service_exchange', 
+                routing_key='notification',
+                body=json.dumps(notification_payload),
+                properties=pika.BasicProperties(
+                    delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE
+                )
+            )
+            # -----------------------------------------------------------------
             
             connection.close()
         except pika.exceptions.AMQPError as e:
