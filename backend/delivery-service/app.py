@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS #REMOVE ONCE TESTING IS DONE
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime, timezone
 
 app = Flask(__name__)
+CORS(app) #REMOVE ONCE TESIING IS DONE
 
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)

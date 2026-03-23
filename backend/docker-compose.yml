@@ -12,25 +12,21 @@ services:
       retries: 5
 
   delivery:
-    build: ./backend/delivery-service
+    build: ./delivery-service
     ports:
       - "5000:5000"
-    volumes:
-      - ./serviceAccountKey.json:/app/serviceAccountKey.json
 
   rider:
-    build: ./backend/rider-service
+    build: ./rider-service
     ports:
       - "5001:5001"
-    volumes:
-      - ./serviceAccountKey.json:/app/serviceAccountKey.json
 
   assign_delivery:
-    build: ./backend/assign-delivery-service
+    build: ./assign-delivery-service
     ports:
       - "5002:5002"
     env_file:
-      - ./backend/assign-delivery-service/.env
+      - ./assign-delivery-service/.env
     environment:
       DELIVERY_URL: http://delivery:5000
       RIDER_URL: http://rider:5001
@@ -44,7 +40,7 @@ services:
         condition: service_started
 
   complete_delivery:
-    build: ./backend/complete-delivery-service
+    build: ./complete-delivery-service
     ports:
       - "5004:5004"
     environment:
