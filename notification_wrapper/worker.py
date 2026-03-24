@@ -66,7 +66,7 @@ def send_sms(message):
     response = post_to_smu(SMU_SMS_API_URL, sms_payload)
     return response.status_code in [200, 201, 202], f"SMS status={response.status_code}, body={response.text}"
 
-def callback(ch, method, body):
+def callback(ch, method, properties, body):
     """
     Callback triggered when a message is received from the queue.
     Performs a fire-and-forget HTTP POST to the SMU API.
@@ -74,6 +74,25 @@ def callback(ch, method, body):
     try:
         # 1. Parse the incoming JSON message
         message = json.loads(body.decode('utf-8'))
+
+        # Event-driven template engine for payment notifications.
+        event_type = message.get("event_type")
+        if event_type:
+            patient_name = message.get("patientName", "Customer")
+            order_id = message.get("orderID", "Unknown")
+            
+            if event_type == "payment_successful":
+                message["receiver"] = message.get("patientEmail")
+                message["subject"] = "MediConnect: Payment Successful"
+                message["content"] = f"Hi {patient_name}, your payment for order {order_id} was successful. We are preparing your medication for delivery."
+                message["channel"] = "email"
+            elif event_type == "payment_refunded":
+                amount = message.get("amount", 0)
+                refund_amount_str = f"{amount / 100:.2f}"
+                message["receiver"] = message.get("patientEmail")
+                message["subject"] = "MediConnect: Order Refunded"
+                message["content"] = f"Hi {patient_name}, unfortunately we could not find an available rider for order {order_id}. Your payment of ${refund_amount_str} has been fully refunded."
+                message["channel"] = "email"
         channel = (message.get("channel") or "email").lower()
         logging.info(f"Processing message with channel='{channel}'")
 

@@ -28,3 +28,8 @@ env/
 # Logs / temp
 *.log
 /tmp/
+*$py.class
+instance/
+.webassets-cache
+Thumbs.db
+.agent/
