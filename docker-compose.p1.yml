@@ -1,0 +1,48 @@
+services:
+  patient-service:
+    build: ./patient-service
+    container_name: patient-service
+    env_file:
+      - .env
+    ports:
+      - "5030:5030"
+    volumes:
+      - ./config.py:/app/config.py:ro
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+
+  doctor-service:
+    build: ./doctor-service
+    container_name: doctor-service
+    env_file:
+      - .env
+    ports:
+      - "5031:5031"
+    volumes:
+      - ./config.py:/app/config.py:ro
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+
+  appointment-service:
+    build: ./appointment-service
+    container_name: appointment-service
+    env_file:
+      - .env
+    ports:
+      - "5032:5032"
+    volumes:
+      - ./config.py:/app/config.py:ro
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+
+  book-appointment:
+    build: ./book-appointment
+    container_name: book-appointment
+    env_file:
+      - .env
+    ports:
+      - "5033:5033"
+    volumes:
+      - ./config.py:/app/config.py:ro
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+    depends_on:
+      - patient-service
+      - doctor-service
+      - appointment-service

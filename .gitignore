@@ -13,17 +13,33 @@ application_default_credentials.json
 # Python
 __pycache__/
 *.py[cod]
+*.so
+.Python
 *.egg-info/
 dist/
 build/
 venv/
 .venv/
 env/
+ENV/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+.installed.cfg
+*.egg
 
 # IDE
 .vscode/
 .idea/
 *.swp
+*.swo
 .DS_Store
 
 # Logs / temp
@@ -34,3 +50,6 @@ instance/
 .webassets-cache
 Thumbs.db
 .agent/
+
+# Docker
+.dockerignore
