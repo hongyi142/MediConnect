@@ -12,6 +12,8 @@ load_dotenv()
 PAYMENT_WRAPPER_URL = os.getenv("PAYMENT_WRAPPER_URL", "http://127.0.0.1:5001")
 PAYMENT_ATOMIC_URL = os.getenv("PAYMENT_ATOMIC_URL", "http://127.0.0.1:5000")
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://localhost/")
+ORDER_URL = os.getenv("ORDER_URL", "https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI")
+PATIENT_URL = os.getenv("PATIENT_URL", "http://patient-service:5030")
 
 app = Flask(__name__)
 CORS(app)
@@ -29,16 +31,29 @@ def initiate_checkout():
             return jsonify({"error": "Invalid JSON payload"}), 400
 
         order_id = data.get('orderID')
-        item_name = data.get('item_name')
-        amount = data.get('amount')
-        
-        # We process these to ensure they exist, though not strictly required strictly for phase 1 API calls directly
         patient_id = data.get('patientID')
-        patient_name = data.get('patientName')
-        patient_address = data.get('patientAddress')
 
-        if not all([order_id, item_name, amount]):
-            return jsonify({"error": "Missing required fields: orderID, item_name, amount"}), 400
+        if not all([order_id, patient_id]):
+            return jsonify({"error": "Missing required fields: orderID, patientID"}), 400
+
+        # Step 0: Fetch Order Details from External Outsystems API
+        try:
+            order_response = requests.get(f"{ORDER_URL}/GetOrderDetails?OrderId={order_id}", timeout=10)
+            if order_response.status_code == 404:
+                return jsonify({"error": f"Order {order_id} not found"}), 404
+            order_response.raise_for_status()
+            
+            order_data = order_response.json()
+            total_amount = order_data.get("TotalAmount")
+            
+            if total_amount is None:
+                return jsonify({"error": "Order TotalAmount is missing from Response"}), 502
+
+            # Convert to cents
+            amount = int(float(total_amount) * 100)
+            item_name = f"Medical Order #{order_id}"
+        except requests.exceptions.RequestException as e:
+            return jsonify({"error": f"Failed communicating with Order Service: {str(e)}"}), 503
 
         # Step 1: Call Payment Wrapper to create Stripe Session
         wrapper_payload = {
@@ -108,13 +123,36 @@ def verify_and_handoff():
         document_id = data.get('documentID')
         order_id = data.get('orderID')
         patient_id = data.get('patientID')
-        patient_name = data.get('patientName')
-        patient_address = data.get('patientAddress')
-        patient_email = data.get('patientEmail')
-        amount = data.get('amount')
 
-        if not all([session_id, document_id, order_id, patient_id, patient_name, patient_address, patient_email, amount]):
+        if not all([session_id, document_id, order_id, patient_id]):
             return jsonify({"error": "Missing required fields for verification"}), 400
+
+        # Step 0A: Fetch Patient Data Dynamically
+        try:
+            patient_response = requests.get(f"{PATIENT_URL}/patient/{patient_id}", timeout=10)
+            if patient_response.status_code == 404:
+                return jsonify({"error": f"Patient {patient_id} not found"}), 404
+            patient_response.raise_for_status()
+            
+            patient_data = patient_response.json()
+            patient_name = patient_data.get("name", "Unknown")
+            patient_address = patient_data.get("address", "Unknown")
+            patient_email = patient_data.get("email", "Unknown")
+        except requests.exceptions.RequestException as e:
+            return jsonify({"error": f"Failed communicating with Patient Service: {str(e)}"}), 503
+
+        # Step 0B: Fetch Order Data dynamically to get accurate amount for MQ handoff
+        try:
+            order_response = requests.get(f"{ORDER_URL}/GetOrderDetails?OrderId={order_id}", timeout=10)
+            if order_response.status_code == 404:
+                return jsonify({"error": f"Order {order_id} not found"}), 404
+            order_response.raise_for_status()
+            
+            order_data = order_response.json()
+            total_amount = order_data.get("TotalAmount", 0)
+            amount = int(float(total_amount) * 100)
+        except requests.exceptions.RequestException as e:
+            return jsonify({"error": f"Failed communicating with Order Service: {str(e)}"}), 503
 
         # Step 1: Verify Payment Status via Payment Wrapper
         status_response = requests.get(f"{PAYMENT_WRAPPER_URL}/payment/status/{session_id}", timeout=10)

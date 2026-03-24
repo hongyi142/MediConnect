@@ -3,7 +3,7 @@ services:
   frontend:
     build: ./frontend
     ports: ["8080:8080"]
-    env_file: ./frontend/.env
+    # env_file: ./frontend/.env
     depends_on:
       - start-consultation
       - complete-consultation
@@ -97,6 +97,8 @@ services:
       - RABBITMQ_URL=amqp://rabbitmq/
       - PAYMENT_WRAPPER_URL=http://payment_wrapper:5001
       - PAYMENT_ATOMIC_URL=http://payment_atomic:5000
+      - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
+      - PATIENT_URL=http://patient-service:5030
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -117,6 +119,8 @@ services:
       - RABBITMQ_URL=amqp://rabbitmq/
       - PAYMENT_WRAPPER_URL=http://payment_wrapper:5001
       - PAYMENT_ATOMIC_URL=http://payment_atomic:5000
+      - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
+      - PATIENT_URL=http://patient-service:5030
     depends_on:
       rabbitmq:
         condition: service_healthy
