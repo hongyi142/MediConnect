@@ -3,10 +3,14 @@ from datetime import datetime
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from config import init_firestore
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:8080", "http://frontend:8080", "*"])
+cred = credentials.Certificate("serviceAccountKey.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 ALLOWED_STATUS = {"pending", "confirmed", "cancelled"}
 
@@ -31,12 +35,6 @@ def to_json(data):
         if out.get(key) and hasattr(out[key], "isoformat"):
             out[key] = out[key].isoformat()
     return out
-
-
-try:
-    db = init_firestore()
-except Exception:
-    db = None
 
 
 @app.errorhandler(Exception)
