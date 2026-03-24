@@ -10,42 +10,42 @@ services:
       - consultation-service
 
   consultation-service:
-    build: ./consultation-service
+    build: ./backend/consultation-service
     ports: ["5004:5004"]
-    env_file: ./consultation-service/.env
+    env_file: ./backend/consultation-service/.env
 
   mc-service:
-    build: ./mc-service
+    build: ./backend/mc-service
     ports: ["5010:5010"]
-    env_file: ./mc-service/.env
+    env_file: ./backend/mc-service/.env
 
   twilio-wrapper:
-    build: ./twilio-wrapper
+    build: ./backend/twilio-wrapper
     ports: ["5020:5020"]
-    env_file: ./twilio-wrapper/.env
+    env_file: ./backend/twilio-wrapper/.env
 
   openai-wrapper:
-    build: ./openai-wrapper
+    build: ./backend/openai-wrapper
     ports: ["5021:5021"]
-    env_file: ./openai-wrapper/.env
+    env_file: ./backend/openai-wrapper/.env
 
   notification-wrapper:
-    build: ./notification_wrapper
+    build: ./backend/notification_wrapper
     ports: ["5011:5011"]
-    env_file: ./notification_wrapper/.env
+    env_file: ./backend/notification_wrapper/.env
 
   start-consultation:
-    build: ./start-consultation
+    build: ./backend/start-consultation-composite
     ports: ["5013:5013"]
-    env_file: ./start-consultation/.env
+    env_file: ./backend/start-consultation-composite/.env
     depends_on:
       - consultation-service
       - twilio-wrapper
 
   complete-consultation:
-    build: ./complete-consultation
+    build: ./backend/complete-consultation-composite
     ports: ["5014:5014"]
-    env_file: ./complete-consultation/.env
+    env_file: ./backend/complete-consultation-composite/.env
     depends_on:
       - consultation-service
       - openai-wrapper
@@ -66,7 +66,7 @@ services:
 
   payment_atomic:
     build:
-      context: ./payment_atomic
+      context: ./backend/payment_atomic
     container_name: payment_atomic_api
     ports:
       - "5000:5000"
@@ -76,18 +76,18 @@ services:
 
   payment_wrapper:
     build:
-      context: ./payment_wrapper
+      context: ./backend/payment_wrapper
     container_name: payment_wrapper_api
     ports:
       - "5001:5001"
     environment:
       - PYTHONUNBUFFERED=1
     env_file:
-      - ./payment_wrapper/.env # Load external API keys like Stripe safely
+      - ./backend/payment_wrapper/.env # Load external API keys like Stripe safely
 
   process_payment:
     build:
-      context: ./process_payment_composite
+      context: ./backend/process_payment_composite
     container_name: process_payment_api
     ports:
       - "5002:5002"
@@ -107,7 +107,7 @@ services:
 
   process_payment_worker:
     build:
-      context: ./process_payment_composite
+      context: ./backend/process_payment_composite
     container_name: process_payment_worker
     command: ["python", "refund_worker.py"]
     # No ports exposed as this is a background worker pulling from the queue
@@ -127,7 +127,7 @@ services:
 
   notification_worker:
     build:
-      context: ./notification_wrapper
+      context: ./backend/notification_wrapper
     container_name: notification_worker
     command: ["python", "worker.py"]
     # No ports exposed as this is a background worker pulling from the queue
@@ -135,7 +135,55 @@ services:
       - PYTHONUNBUFFERED=1
       - RABBITMQ_URL=amqp://rabbitmq/ 
     env_file:
-      - ./notification_wrapper/.env # Load SMU keys 
+      - ./backend/notification_wrapper/.env # Load SMU keys 
     depends_on:
       rabbitmq:
         condition: service_healthy
+
+  patient-service:
+    build: ./backend/patient-service
+    container_name: patient-service
+    env_file:
+      - .env
+    ports:
+      - "5030:5030"
+    volumes:
+      - ./config.py:/app/config.py:ro
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+
+  doctor-service:
+    build: ./backend/doctor-service
+    container_name: doctor-service
+    env_file:
+      - .env
+    ports:
+      - "5031:5031"
+    volumes:
+      - ./config.py:/app/config.py:ro
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+
+  appointment-service:
+    build: ./backend/appointment-service
+    container_name: appointment-service
+    env_file:
+      - .env
+    ports:
+      - "5032:5032"
+    volumes:
+      - ./config.py:/app/config.py:ro
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+
+  book-appointment:
+    build: ./backend/book-appointment
+    container_name: book-appointment
+    env_file:
+      - .env
+    ports:
+      - "5033:5033"
+    volumes:
+      - ./config.py:/app/config.py:ro
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+    depends_on:
+      - patient-service
+      - doctor-service
+      - appointment-service
