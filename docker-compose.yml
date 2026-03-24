@@ -3,7 +3,7 @@ services:
   frontend:
     build: ./frontend
     ports: ["8080:8080"]
-    # env_file: ./frontend/.env
+    env_file: ./frontend/.env
     depends_on:
       - start-consultation
       - complete-consultation
