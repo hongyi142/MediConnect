@@ -1,0 +1,30 @@
+# Environment variables
+.env
+.env.*
+
+# Firebase credentials
+firebase_credentials.json
+serviceAccountKey.json
+**/firebase_credentials.json
+**/serviceAccountKey.json
+application_default_credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Logs / temp
+*.log
+/tmp/
