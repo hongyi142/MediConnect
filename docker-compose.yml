@@ -1,0 +1,7 @@
+services:
+  inventory:
+    build: ./inventory
+    env_file:
+      - ./inventory/.env
+    ports:
+      - "${PORT}:${PORT}" # Uses the 5005 from your .env

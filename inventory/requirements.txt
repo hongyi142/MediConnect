@@ -1,0 +1,4 @@
+flask
+firebase-admin
+google-cloud-firestore
+python-dotenv
