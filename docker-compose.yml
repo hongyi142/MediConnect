@@ -1,0 +1,53 @@
+version: "3.8"
+services:
+  frontend:
+    build: ./frontend
+    ports: ["8080:8080"]
+    env_file: ./frontend/.env
+    depends_on:
+      - start-consultation
+      - complete-consultation
+      - consultation-service
+
+  consultation-service:
+    build: ./consultation-service
+    ports: ["5004:5004"]
+    env_file: ./consultation-service/.env
+
+  mc-service:
+    build: ./mc-service
+    ports: ["5010:5010"]
+    env_file: ./mc-service/.env
+
+  twilio-wrapper:
+    build: ./twilio-wrapper
+    ports: ["5020:5020"]
+    env_file: ./twilio-wrapper/.env
+
+  openai-wrapper:
+    build: ./openai-wrapper
+    ports: ["5021:5021"]
+    env_file: ./openai-wrapper/.env
+
+  notification-wrapper:
+    build: ./notification_wrapper
+    ports: ["5011:5011"]
+    env_file: ./notification_wrapper/.env
+
+  start-consultation:
+    build: ./start-consultation
+    ports: ["5013:5013"]
+    env_file: ./start-consultation/.env
+    depends_on:
+      - consultation-service
+      - twilio-wrapper
+
+  complete-consultation:
+    build: ./complete-consultation
+    ports: ["5014:5014"]
+    env_file: ./complete-consultation/.env
+    depends_on:
+      - consultation-service
+      - openai-wrapper
+      - mc-service
+      - notification-wrapper
