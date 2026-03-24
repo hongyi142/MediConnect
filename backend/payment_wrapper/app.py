@@ -29,9 +29,14 @@ def create_checkout_session():
         amount = data.get('amount')
         currency = data.get('currency', 'sgd')
 
-        if not all([order_id, item_name, amount]):
+        if order_id is None or item_name is None or amount is None:
             return jsonify({
                 "error": "Missing required fields. Please provide 'order_id', 'item_name', and 'amount'."
+            }), 400
+            
+        if amount <= 0:
+            return jsonify({
+                "error": "Invalid amount. Stripe requires the total amount to be greater than $0."
             }), 400
 
         # Create Stripe Checkout Session
