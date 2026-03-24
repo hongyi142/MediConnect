@@ -1,0 +1,217 @@
+import os, threading, json, requests
+from flask import Flask, request, jsonify
+import pika
+import googlemaps
+from flask_cors import CORS
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = Flask(__name__)
+CORS(app)
+
+DELIVERY_URL     = os.environ.get("DELIVERY_URL", "http://delivery:5000")
+RIDER_URL        = os.environ.get("RIDER_URL",    "http://rider:5001")
+RABBITMQ_URL     = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
+GOOGLE_MAPS_KEY  = os.environ.get("GOOGLE_MAPS_API_KEY")
+
+gmaps = googlemaps.Client(key=GOOGLE_MAPS_KEY)
+
+# ── Geolocation helpers ─────────────────────────────────────────────────────
+
+def find_nearest_rider(patient_address, available_riders, radius_km=1):
+    """
+    Given a patient address and list of available riders (each with lat/lng),
+    returns the single nearest rider within radius_km, or None if none found.
+    """
+    # Filter riders that have location set
+    riders_with_location = [
+        r for r in available_riders
+        if r.get("latitude") and r.get("longitude")
+    ]
+
+    if not riders_with_location:
+        print("[Assign Delivery] No riders with location data found")
+        return None
+
+    # Build origins list from rider coordinates
+    origins = [
+        (r["latitude"], r["longitude"])
+        for r in riders_with_location
+    ]
+
+    # Call Google Maps Distance Matrix API
+    result = gmaps.distance_matrix(
+        origins=origins,
+        destinations=[patient_address],
+        mode="driving",
+        units="metric"
+    )
+
+    nearest_rider  = None
+    nearest_metres = float("inf")
+
+    for i, row in enumerate(result["rows"]):
+        element = row["elements"][0]
+
+        # Skip if no route found
+        if element["status"] != "OK":
+            continue
+
+        distance_m = element["distance"]["value"]  # in metres
+        distance_km = distance_m / 1000
+
+        print(f"[Assign Delivery] Rider {riders_with_location[i]['name']} "
+              f"is {distance_km:.2f}km away")
+
+        if distance_km <= radius_km and distance_m < nearest_metres:
+            nearest_metres = distance_m
+            nearest_rider  = riders_with_location[i]
+
+    if nearest_rider:
+        print(f"[Assign Delivery] Nearest rider: {nearest_rider['name']} "
+              f"({nearest_metres/1000:.2f}km)")
+    else:
+        print(f"[Assign Delivery] No riders within {radius_km}km")
+
+    return nearest_rider
+
+# ── AMQP setup ──────────────────────────────────────────────────────────────
+
+def get_channel():
+    params = pika.URLParameters(RABBITMQ_URL)
+    conn   = pika.BlockingConnection(params)
+    return conn, conn.channel()
+
+def broadcast_to_riders(delivery_data):
+    """Fallback — broadcast to all riders if no nearby rider found."""
+    conn, ch = get_channel()
+    ch.exchange_declare(exchange="delivery.available", exchange_type="fanout", durable=True)
+    ch.basic_publish(
+        exchange="delivery.available",
+        routing_key="",
+        body=json.dumps(delivery_data),
+        properties=pika.BasicProperties(delivery_mode=2)
+    )
+    conn.close()
+
+def notify_patient(payload):
+    conn, ch = get_channel()
+    ch.queue_declare(queue="delivery.assigned", durable=True)
+    ch.basic_publish(
+        exchange="",
+        routing_key="delivery.assigned",
+        body=json.dumps(payload),
+        properties=pika.BasicProperties(delivery_mode=2)
+    )
+    conn.close()
+
+def on_order_paid(ch, method, properties, body):
+    order = json.loads(body)
+    print(f"[Assign Delivery] Received paid order: {order['orderID']}")
+
+    # 1. Create delivery record
+    resp = requests.post(f"{DELIVERY_URL}/delivery", json={
+        "orderID":        order["orderID"],
+        "patientName":    order["patientName"],
+        "patientAddress": order["patientAddress"],
+        "patientPhone":   order["patientPhone"],
+        "patientEmail":   order["patientEmail"],
+    })
+    delivery = resp.json()["data"]
+
+    # 2. Get all available riders
+    riders_resp      = requests.get(f"{RIDER_URL}/rider/free")
+    available_riders = riders_resp.json().get("data", [])
+
+    # 3. Find nearest rider within 1km
+    nearest = find_nearest_rider(order["patientAddress"], available_riders, radius_km=1)
+
+    if nearest:
+        # Auto-assign nearest rider
+        print(f"[Assign Delivery] Auto-assigning {nearest['name']}")
+        requests.put(f"{DELIVERY_URL}/delivery/{delivery['deliveryID']}", json={
+            "riderID":   nearest["riderID"],
+            "riderName": nearest["name"],
+            "status":    "assigned"
+        })
+        requests.put(f"{RIDER_URL}/rider/{nearest['riderID']}", json={"status": "delivering"})
+        notify_patient({
+            "email":   order["patientEmail"],
+            "phone":   order["patientPhone"],
+            "message": f"Rider {nearest['name']} has been assigned to your delivery!"
+        })
+    else:
+        # Fallback — broadcast to all riders manually
+        print("[Assign Delivery] No nearby rider — broadcasting to all")
+        broadcast_to_riders({
+            "deliveryID":     delivery["deliveryID"],
+            "patientAddress": delivery["patientAddress"],
+            "orderID":        delivery["orderID"],
+        })
+
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+def start_amqp_listener():
+    import time
+    while True:
+        try:
+            conn, ch = get_channel()
+            ch.queue_declare(queue="order.paid", durable=True)
+            ch.basic_qos(prefetch_count=1)
+            ch.basic_consume(queue="order.paid", on_message_callback=on_order_paid)
+            print("[Assign Delivery] Listening on order.paid ...")
+            ch.start_consuming()
+        except Exception as e:
+            print(f"[Assign Delivery] AMQP error: {e} — retrying in 5s")
+            time.sleep(5)
+
+# ── HTTP endpoints ───────────────────────────────────────────────────────────
+
+@app.route("/accept-delivery", methods=["POST"])
+def accept_delivery():
+    """Manual fallback — rider accepts from broadcast."""
+    data        = request.get_json()
+    delivery_id = data["deliveryID"]
+    rider_id    = data["riderID"]
+
+    rider = requests.get(f"{RIDER_URL}/rider/{rider_id}").json()["data"]
+
+    requests.put(f"{DELIVERY_URL}/delivery/{delivery_id}", json={
+        "riderID":   rider_id,
+        "riderName": rider["name"],
+        "status":    "assigned"
+    })
+    requests.put(f"{RIDER_URL}/rider/{rider_id}", json={"status": "delivering"})
+
+    delivery = requests.get(f"{DELIVERY_URL}/delivery/{delivery_id}").json()["data"]
+    notify_patient({
+        "email":   delivery["patientEmail"],
+        "phone":   delivery["patientPhone"],
+        "message": f"Your rider {rider['name']} is on the way!"
+    })
+
+    return jsonify({"code": 200, "message": "Rider assigned"}), 200
+
+@app.route("/nearest-rider", methods=["POST"])
+def nearest_rider():
+    """
+    Test endpoint — given an address, returns nearest available rider.
+    Body: { "address": "123 Orchard Road, Singapore" }
+    """
+    data    = request.get_json()
+    address = data.get("address")
+
+    riders_resp      = requests.get(f"{RIDER_URL}/rider/free")
+    available_riders = riders_resp.json().get("data", [])
+
+    nearest = find_nearest_rider(address, available_riders, radius_km=1)
+
+    if nearest:
+        return jsonify({"code": 200, "data": nearest})
+    return jsonify({"code": 404, "message": "No riders within 1km"}), 404
+
+if __name__ == "__main__":
+    t = threading.Thread(target=start_amqp_listener, daemon=True)
+    t.start()
+    app.run(host="0.0.0.0", port=5002, debug=False)

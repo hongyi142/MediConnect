@@ -8,5 +8,6 @@ Jeniffer Joyce
 Lee Hong Yi
 Seann Khoo
 
-
+cd to backend then docker-compose up --build
+once done, docker compose down
 

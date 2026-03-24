@@ -1,0 +1,6 @@
+flask
+flask-cors
+pika
+requests
+googlemaps
+python-dotenv
