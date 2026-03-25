@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Schedule - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <h1 class="page-title">My Schedule</h1>
+    <div class="card">
+        <div class="cal-header">
+            <button class="btn btn-secondary btn-sm" onclick="changeWeek(-1)">&larr; Previous</button>
+            <h2 id="week-label"></h2>
+            <button class="btn btn-secondary btn-sm" onclick="changeWeek(1)">Next &rarr;</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <p class="text-muted text-sm mt-2">Schedule management is visual only. Contact admin to update availability in the system.</p>
+    </div>
+</div>
+
+<style>
+    .page-container{max-width:960px;margin:0 auto;padding:2rem 1.5rem}
+    .page-title{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0 0 1.5rem}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+    .cal-header h2{font-size:1rem;font-weight:600;color:#1e293b;margin:0}
+    .cal-grid{display:grid;grid-template-columns:60px repeat(7,1fr);gap:1px;background:#e2e8f0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-size:.75rem}
+    .cal-cell{background:#fff;padding:.375rem;min-height:48px;text-align:center;display:flex;align-items:center;justify-content:center}
+    .cal-header-cell{background:#f8fafc;font-weight:600;color:#64748b;padding:.5rem}
+    .cal-time{background:#f8fafc;font-size:.6875rem;color:#64748b;font-weight:500}
+    .cal-cell.today{background:#f0fdfa}
+    .cal-cell:hover{background:#f0fdfa;cursor:pointer}
+    .btn{padding:.5rem 1rem;border-radius:8px;font-weight:600;font-size:.8125rem;cursor:pointer;border:none;min-height:36px;transition:all .15s}
+    .btn-secondary{background:#fff;color:#0d9488;border:1px solid #0d9488}
+    .btn-sm{padding:.375rem .75rem}
+    .text-muted{color:#64748b}.text-sm{font-size:.8125rem}.mt-2{margin-top:.5rem}
+</style>
+
+<script>
+    var currentWeekStart = null;
+
+    fbAuth.onAuthStateChanged(async function(u) {
+        if (!u) { location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(u.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "doctor") { location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage(user);
+    });
+
+    function initPage(user) {
+        var now = new Date();
+        currentWeekStart = new Date(now);
+        currentWeekStart.setDate(now.getDate() - now.getDay() + 1);
+        renderWeek();
+    }
+
+    function changeWeek(dir) {
+        currentWeekStart.setDate(currentWeekStart.getDate() + dir * 7);
+        renderWeek();
+    }
+
+    function renderWeek() {
+        var days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+        var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        var end = new Date(currentWeekStart);
+        end.setDate(end.getDate() + 6);
+        document.getElementById("week-label").textContent =
+            currentWeekStart.getDate() + " " + months[currentWeekStart.getMonth()] + " - " +
+            end.getDate() + " " + months[end.getMonth()] + " " + end.getFullYear();
+
+        var today = new Date().toDateString();
+        var html = '<div class="cal-cell cal-header-cell"></div>';
+        for (var d = 0; d < 7; d++) {
+            var day = new Date(currentWeekStart);
+            day.setDate(day.getDate() + d);
+            var isToday = day.toDateString() === today;
+            html += '<div class="cal-cell cal-header-cell' + (isToday ? ' today' : '') + '">' + days[d] + '<br>' + day.getDate() + '</div>';
+        }
+        for (var h = 9; h < 17; h++) {
+            for (var m = 0; m < 60; m += 30) {
+                html += '<div class="cal-cell cal-time">' + h.toString().padStart(2,"0") + ':' + m.toString().padStart(2,"0") + '</div>';
+                for (var d = 0; d < 7; d++) {
+                    var day = new Date(currentWeekStart);
+                    day.setDate(day.getDate() + d);
+                    var isToday = day.toDateString() === today;
+                    html += '<div class="cal-cell' + (isToday ? ' today' : '') + '"></div>';
+                }
+            }
+        }
+        document.getElementById("cal-grid").innerHTML = html;
+    }
+</script>
+{% endblock %}

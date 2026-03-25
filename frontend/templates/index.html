@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}MediConnect - Healthcare at Your Fingertips{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <div class="hero-content">
+        <div class="hero-logo">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <span>MediConnect</span>
+        </div>
+        <h1 class="hero-title">Healthcare at your fingertips.</h1>
+        <p class="hero-subtitle">Book consultations, get prescriptions, and receive medications &mdash; all from home.</p>
+        <div class="hero-actions">
+            <a href="/auth/login" class="btn btn-hero-primary">Login</a>
+            <a href="/auth/signup" class="btn btn-hero-secondary">Sign Up</a>
+        </div>
+        <p class="hero-note">Sign up is for patients only. Doctors and riders contact your administrator.</p>
+        <div class="hero-features">
+            <div class="hero-feature">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>
+                <span>Video Consultations</span>
+            </div>
+            <div class="hero-feature">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><path d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25m-2.25 0h-2.25m4.5 0V6a.75.75 0 00-.75-.75H6.75A.75.75 0 006 6v6.75"/></svg>
+                <span>Medication Delivery</span>
+            </div>
+            <div class="hero-feature">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+                <span>Digital MCs</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    body{margin:0;padding:0}
+    .hero{min-height:100vh;background:linear-gradient(135deg,#0d9488 0%,#0f766e 100%);display:flex;align-items:center;justify-content:center;text-align:center;padding:2rem}
+    .hero-content{max-width:600px}
+    .hero-logo{display:flex;align-items:center;justify-content:center;gap:.75rem;margin-bottom:2rem}
+    .hero-logo span{font-size:2rem;font-weight:700;color:#fff}
+    .hero-title{font-size:2.5rem;font-weight:700;color:#fff;margin:0 0 1rem}
+    .hero-subtitle{font-size:1.125rem;color:rgba(255,255,255,.85);margin:0 0 2.5rem;line-height:1.6}
+    .hero-actions{display:flex;gap:1rem;justify-content:center;margin-bottom:1.5rem}
+    .btn-hero-primary{background:#fff;color:#0d9488;padding:.75rem 2rem;border-radius:8px;font-weight:600;text-decoration:none;font-size:1rem;transition:transform .15s,box-shadow .15s}
+    .btn-hero-primary:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
+    .btn-hero-secondary{background:transparent;color:#fff;padding:.75rem 2rem;border-radius:8px;font-weight:600;text-decoration:none;font-size:1rem;border:2px solid rgba(255,255,255,.6);transition:border-color .15s,background .15s}
+    .btn-hero-secondary:hover{border-color:#fff;background:rgba(255,255,255,.1)}
+    .hero-note{font-size:.8125rem;color:rgba(255,255,255,.55);margin-bottom:3rem}
+    .hero-features{display:flex;gap:2.5rem;justify-content:center;flex-wrap:wrap}
+    .hero-feature{display:flex;flex-direction:column;align-items:center;gap:.5rem;color:rgba(255,255,255,.9);font-size:.875rem;font-weight:500}
+    @media(max-width:640px){.hero-title{font-size:1.75rem}.hero-actions{flex-direction:column}.hero-features{gap:1.5rem}}
+</style>
+{% endblock %}

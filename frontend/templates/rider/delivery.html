@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}Active Delivery - MediConnect{% endblock %}
+
+{% block extra_head %}
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="delivery-card">
+        <div class="delivery-header">
+            <h1>Active Delivery</h1>
+            <span class="status-badge" id="delivery-status">Loading...</span>
+        </div>
+
+        <!-- Delivery Stepper -->
+        <div class="stepper" id="stepper">
+            <div class="step active" id="step-1"><div class="step-dot"></div><div class="step-label">Accepted</div></div>
+            <div class="step-line" id="line-1"></div>
+            <div class="step" id="step-2"><div class="step-dot"></div><div class="step-label">Picked Up</div></div>
+            <div class="step-line" id="line-2"></div>
+            <div class="step" id="step-3"><div class="step-dot"></div><div class="step-label">In Transit</div></div>
+            <div class="step-line" id="line-3"></div>
+            <div class="step" id="step-4"><div class="step-dot"></div><div class="step-label">Delivered</div></div>
+        </div>
+
+        <!-- Delivery Info -->
+        <div class="info-section" id="delivery-info"><p class="text-muted">Loading delivery details...</p></div>
+
+        <!-- QR Scanner Section -->
+        <div class="scanner-section" id="scanner-section">
+            <h3>Scan QR to Complete Delivery</h3>
+            <p class="text-muted text-sm">Ask the patient to show their delivery QR code.</p>
+            <div id="qr-reader" style="display:none"></div>
+            <button class="btn btn-primary btn-block" id="scan-btn" onclick="startScanner()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.375rem"><path d="M3 7V5a2 2 0 012-2h2m10 0h2a2 2 0 012 2v2m0 10v2a2 2 0 01-2 2h-2M3 17v2a2 2 0 002 2h2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+                Open Scanner
+            </button>
+            <div id="scan-error" class="alert-err" style="display:none"></div>
+        </div>
+
+        <!-- Manual Complete (fallback) -->
+        <div class="manual-section" id="manual-section" style="display:none">
+            <button class="btn btn-secondary btn-block" onclick="manualComplete()">Complete Without QR</button>
+            <p class="text-muted text-sm" style="text-align:center;margin-top:.375rem">Use only if QR scanning is unavailable.</p>
+        </div>
+
+        <!-- Success Overlay -->
+        <div class="success-overlay" id="success-overlay" style="display:none">
+            <div class="success-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <h2>Delivery Complete!</h2>
+            <p class="text-muted">The patient has confirmed receipt.</p>
+            <button class="btn btn-primary" onclick="backToDashboard()">Back to Dashboard</button>
+        </div>
+
+        <div class="back-link">
+            <a href="/rider/dashboard" class="btn btn-secondary btn-block">Back to Dashboard</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container{max-width:560px;margin:0 auto;padding:2rem 1.5rem}
+    .delivery-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .delivery-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem}
+    .delivery-header h1{font-size:1.25rem;font-weight:600;color:#1e293b;margin:0}
+    .status-badge{padding:.25rem .75rem;border-radius:999px;font-size:.75rem;font-weight:600;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
+    .stepper{display:flex;align-items:center;margin-bottom:1.5rem;padding:0 .5rem}
+    .step{display:flex;flex-direction:column;align-items:center;flex:0 0 auto}
+    .step-dot{width:24px;height:24px;border-radius:50%;background:#e2e8f0;border:2px solid #e2e8f0;transition:all .3s}
+    .step.active .step-dot{background:#0d9488;border-color:#0d9488}
+    .step.done .step-dot{background:#16a34a;border-color:#16a34a}
+    .step-label{font-size:.625rem;color:#64748b;margin-top:.25rem;white-space:nowrap;font-weight:500}
+    .step.active .step-label,.step.done .step-label{color:#1e293b;font-weight:600}
+    .step-line{flex:1;height:2px;background:#e2e8f0;margin:0 .25rem;margin-bottom:1rem}
+    .step-line.done{background:#16a34a}
+    .info-section{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;margin-bottom:1rem}
+    .info-section h4{font-size:.875rem;font-weight:600;color:#1e293b;margin:0 0 .5rem}
+    .info-row{display:flex;justify-content:space-between;padding:.25rem 0;font-size:.8125rem}
+    .info-row .label{color:#64748b}.info-row .value{color:#1e293b;font-weight:500}
+    .text-muted{color:#64748b;font-size:.875rem;margin:0}.text-sm{font-size:.8125rem}
+    .scanner-section{margin:1.25rem 0;text-align:center}
+    .scanner-section h3{font-size:.9375rem;font-weight:600;color:#1e293b;margin:0 0 .25rem}
+    #qr-reader{margin:1rem auto;max-width:320px;border-radius:8px;overflow:hidden}
+    .btn{padding:.625rem 1.25rem;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer;border:none;min-height:44px;transition:all .15s;display:inline-flex;align-items:center;justify-content:center}
+    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .btn-secondary{background:#fff;color:#0d9488;border:1px solid #0d9488;text-decoration:none}
+    .btn-block{width:100%}
+    .alert-err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.5rem;border-radius:8px;font-size:.8125rem;margin-top:.75rem}
+    .manual-section{margin:1rem 0}
+    .success-overlay{text-align:center;padding:2rem 0}
+    .success-icon{margin-bottom:1rem}
+    .success-overlay h2{font-size:1.25rem;font-weight:600;color:#1e293b;margin:0 0 .5rem}
+    .back-link{margin-top:1rem}
+    @media(max-width:400px){.step-label{font-size:.5625rem}}
+</style>
+
+<script>
+    var deliveryData = null, scanner = null, pollTimer = null;
+
+    fbAuth.onAuthStateChanged(async function(u) {
+        if (!u) { location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(u.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "rider") { location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage(user);
+    });
+
+    async function initPage(user) {
+        var raw = sessionStorage.getItem("activeDelivery");
+        if (!raw) { location.href = "/rider/dashboard"; return; }
+        var data = JSON.parse(raw);
+        await loadDelivery(data.deliveryID);
+        pollTimer = setInterval(function() { loadDelivery(data.deliveryID); }, 10000);
+    }
+
+    async function loadDelivery(deliveryID) {
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.deliveryUrl + "/delivery/" + deliveryID, { headers: { "Authorization": "Bearer " + token } });
+            if (!res.ok) throw new Error("Not found");
+            deliveryData = await res.json();
+            deliveryData.deliveryID = deliveryID;
+            renderDelivery();
+        } catch(e) {
+            document.getElementById("delivery-info").innerHTML = '<p style="color:#b91c1c">Could not load delivery details.</p>';
+        }
+    }
+
+    function renderDelivery() {
+        var d = deliveryData;
+        var status = d.status || "accepted";
+        document.getElementById("delivery-status").textContent = status.charAt(0).toUpperCase() + status.slice(1);
+
+        // Update stepper
+        var steps = ["accepted", "picked_up", "in_transit", "delivered"];
+        var currentIdx = steps.indexOf(status);
+        if (currentIdx === -1) currentIdx = 0;
+        for (var i = 1; i <= 4; i++) {
+            var el = document.getElementById("step-" + i);
+            el.className = "step" + (i - 1 < currentIdx ? " done" : i - 1 === currentIdx ? " active" : "");
+        }
+        for (var j = 1; j <= 3; j++) {
+            document.getElementById("line-" + j).className = "step-line" + (j <= currentIdx ? " done" : "");
+        }
+
+        document.getElementById("delivery-info").innerHTML =
+            '<h4>Delivery Details</h4>' +
+            '<div class="info-row"><span class="label">Delivery ID</span><span class="value">' + (d.deliveryID || "") + '</span></div>' +
+            '<div class="info-row"><span class="label">Patient</span><span class="value">' + (d.patientName || d.PatientName || "—") + '</span></div>' +
+            '<div class="info-row"><span class="label">Address</span><span class="value">' + (d.address || d.patientAddress || d.Address || "—") + '</span></div>' +
+            '<div class="info-row"><span class="label">Order ID</span><span class="value">' + (d.orderID || d.OrderId || "—") + '</span></div>';
+
+        if (status === "delivered" || status === "completed") {
+            showSuccess();
+        }
+    }
+
+    function startScanner() {
+        var readerDiv = document.getElementById("qr-reader");
+        readerDiv.style.display = "";
+        document.getElementById("scan-btn").style.display = "none";
+        document.getElementById("manual-section").style.display = "";
+        document.getElementById("scan-error").style.display = "none";
+
+        scanner = new Html5Qrcode("qr-reader");
+        scanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            function(decoded) {
+                scanner.stop().then(function() {
+                    completeDelivery(decoded);
+                });
+            },
+            function() {}
+        ).catch(function(err) {
+            document.getElementById("scan-error").textContent = "Camera access denied or not available.";
+            document.getElementById("scan-error").style.display = "";
+            document.getElementById("manual-section").style.display = "";
+        });
+    }
+
+    async function completeDelivery(qrData) {
+        var cfg = document.getElementById("svc-config").dataset;
+        var errDiv = document.getElementById("scan-error");
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.completeDeliveryUrl + "/complete-delivery", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({ deliveryID: deliveryData.deliveryID, riderID: window.currentUser.linkedID })
+            });
+            var data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message || "Failed");
+            showSuccess();
+        } catch(e) {
+            errDiv.textContent = e.message || "Could not complete delivery.";
+            errDiv.style.display = "";
+        }
+    }
+
+    function manualComplete() {
+        completeDelivery(null);
+    }
+
+    function showSuccess() {
+        if (pollTimer) clearInterval(pollTimer);
+        sessionStorage.removeItem("activeDelivery");
+        document.getElementById("scanner-section").style.display = "none";
+        document.getElementById("manual-section").style.display = "none";
+        document.getElementById("back-link") && (document.querySelector(".back-link").style.display = "none");
+        document.getElementById("success-overlay").style.display = "";
+    }
+
+    function backToDashboard() {
+        location.href = "/rider/dashboard";
+    }
+</script>
+{% endblock %}

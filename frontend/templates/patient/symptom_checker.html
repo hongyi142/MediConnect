@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Symptom Checker - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <h1 class="page-title">AI Symptom Checker</h1>
+    <div class="two-col">
+        <div class="col-left">
+            <div class="card">
+                <h2>Select Your Symptoms</h2>
+                <div class="symptom-tags" id="symptom-options"></div>
+                <div class="selected-area" id="selected-area"></div>
+                <div class="form-group mt-3">
+                    <label>Additional Details</label>
+                    <textarea id="extra-text" maxlength="500" rows="3" placeholder="Describe any additional symptoms..."></textarea>
+                    <small class="text-muted"><span id="char-count">0</span>/500</small>
+                </div>
+                <button class="btn btn-primary btn-block" id="check-btn" onclick="checkSymptoms()">Check Symptoms</button>
+            </div>
+        </div>
+        <div class="col-right">
+            <div class="card" id="result-card">
+                <div class="placeholder-state" id="placeholder">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"/></svg>
+                    <p>Your AI assessment will appear here.</p>
+                </div>
+                <div id="result-content" style="display:none">
+                    <div class="urgency-banner" id="urgency-banner"></div>
+                    <h3 id="result-spec"></h3>
+                    <details class="mt-2"><summary class="text-sm font-medium">Reasoning</summary><p id="result-reasoning" class="text-sm text-muted mt-1"></p></details>
+                    <div class="advice-card mt-2" id="result-advice"></div>
+                    <button class="btn btn-primary btn-block mt-3" id="book-btn" style="display:none" onclick="bookFromResult()">Book Appointment</button>
+                </div>
+                <p class="disclaimer">General guidance only. Not a medical diagnosis.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container{max-width:1000px;margin:0 auto;padding:2rem 1.5rem}
+    .page-title{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0 0 1.5rem}
+    .two-col{display:grid;grid-template-columns:55% 45%;gap:1.5rem}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .card h2{font-size:1.0625rem;font-weight:600;margin:0 0 1rem;color:#1e293b}
+    .symptom-tags{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem}
+    .symptom-tag{padding:.375rem .875rem;border-radius:999px;border:1px solid #e2e8f0;background:#fff;font-size:.8125rem;cursor:pointer;transition:all .15s;color:#1e293b}
+    .symptom-tag.active{background:#0d9488;color:#fff;border-color:#0d9488}
+    .symptom-tag:hover:not(.active){border-color:#0d9488;color:#0d9488}
+    .selected-area{display:flex;flex-wrap:wrap;gap:.375rem;min-height:1rem}
+    .sel-badge{background:#f0fdfa;border:1px solid #99f6e4;color:#0f766e;border-radius:999px;padding:.125rem .625rem;font-size:.75rem;display:inline-flex;align-items:center;gap:.375rem}
+    .sel-badge button{background:none;border:none;cursor:pointer;color:#0f766e;padding:0;font-size:.875rem}
+    .form-group{margin-bottom:1rem}
+    .form-group label{display:block;font-size:.875rem;font-weight:500;margin-bottom:.375rem;color:#1e293b}
+    textarea{width:100%;padding:.625rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.875rem;resize:vertical;box-sizing:border-box;font-family:inherit}
+    textarea:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.15)}
+    .btn{padding:.625rem 1.25rem;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer;border:none;min-height:44px;transition:all .15s}
+    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .btn-block{width:100%}
+    .placeholder-state{text-align:center;padding:2rem 1rem;color:#94a3b8}
+    .placeholder-state p{margin-top:.75rem}
+    .urgency-banner{padding:.75rem;border-radius:8px;font-weight:600;font-size:.875rem;margin-bottom:1rem}
+    .urgency-teleconsult{background:#f0fdfa;color:#0d9488;border:1px solid #99f6e4}
+    .urgency-visit{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
+    .urgency-emergency{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+    .advice-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:.75rem;font-size:.8125rem;color:#64748b}
+    .disclaimer{font-size:.75rem;color:#94a3b8;text-align:center;margin-top:1rem;font-style:italic}
+    .text-muted{color:#64748b}.text-sm{font-size:.8125rem}.mt-1{margin-top:.25rem}.mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}
+    .font-medium{font-weight:500}
+    details summary{cursor:pointer}
+    @media(max-width:768px){.two-col{grid-template-columns:1fr}}
+</style>
+
+<script>
+    var selectedSymptoms = [];
+    var SYMPTOMS = ["Fever","Cough","Sore Throat","Headache","Runny Nose","Fatigue","Nausea","Vomiting","Diarrhoea","Chest Pain","Shortness of Breath","Rash","Joint Pain","Back Pain","Dizziness","Eye Irritation","Ear Pain"];
+
+    fbAuth.onAuthStateChanged(async function(firebaseUser) {
+        if (!firebaseUser) { window.location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(firebaseUser.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); window.location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "patient") { window.location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage();
+    });
+
+    function initPage() {
+        var container = document.getElementById("symptom-options");
+        container.innerHTML = SYMPTOMS.map(function(s) {
+            return '<button class="symptom-tag" onclick="toggleSymptom(this,\'' + s + '\')">' + s + '</button>';
+        }).join("");
+        document.getElementById("extra-text").addEventListener("input", function() {
+            document.getElementById("char-count").textContent = this.value.length;
+        });
+    }
+
+    function toggleSymptom(btn, symptom) {
+        var idx = selectedSymptoms.indexOf(symptom);
+        if (idx >= 0) { selectedSymptoms.splice(idx, 1); btn.classList.remove("active"); }
+        else { selectedSymptoms.push(symptom); btn.classList.add("active"); }
+        renderSelected();
+    }
+
+    function renderSelected() {
+        var area = document.getElementById("selected-area");
+        area.innerHTML = selectedSymptoms.map(function(s) {
+            return '<span class="sel-badge">' + s + '<button onclick="removeSymptom(\'' + s + '\')">&times;</button></span>';
+        }).join("");
+    }
+
+    function removeSymptom(s) {
+        selectedSymptoms = selectedSymptoms.filter(function(x) { return x !== s; });
+        document.querySelectorAll(".symptom-tag").forEach(function(btn) {
+            if (btn.textContent === s) btn.classList.remove("active");
+        });
+        renderSelected();
+    }
+
+    async function checkSymptoms() {
+        var text = document.getElementById("extra-text").value.trim();
+        var parts = [];
+        if (selectedSymptoms.length) parts.push(selectedSymptoms.join(", "));
+        if (text) parts.push(text);
+        if (!parts.length) { alert("Please select at least one symptom."); return; }
+
+        var btn = document.getElementById("check-btn");
+        btn.disabled = true; btn.textContent = "Analysing...";
+
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.openaiUrl + "/openai/symptom-check", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({ symptoms: parts.join(". ") })
+            });
+            if (!res.ok) throw new Error("Analysis failed");
+            var data = await res.json();
+
+            document.getElementById("placeholder").style.display = "none";
+            var content = document.getElementById("result-content");
+            content.style.display = "";
+
+            var banner = document.getElementById("urgency-banner");
+            var urgency = (data.urgency || "teleconsult").toLowerCase();
+            banner.className = "urgency-banner urgency-" + urgency;
+            banner.textContent = urgency === "emergency" ? "Seek immediate medical attention" :
+                urgency === "visit" ? "In-person visit recommended" : "Teleconsultation recommended";
+
+            document.getElementById("result-spec").textContent = "Recommended: " + (data.specialisation || "General Practice");
+            document.getElementById("result-reasoning").textContent = data.reasoning || "";
+            document.getElementById("result-advice").textContent = data.advice || "";
+
+            if (urgency !== "emergency") {
+                document.getElementById("book-btn").style.display = "";
+                window._symptomResult = { specialisation: data.specialisation };
+            }
+        } catch(e) {
+            alert("Could not complete analysis. Please try again.");
+        }
+        btn.disabled = false; btn.textContent = "Check Symptoms";
+    }
+
+    function bookFromResult() {
+        sessionStorage.setItem("symptomResult", JSON.stringify(window._symptomResult));
+        window.location.href = "/patient/book";
+    }
+</script>
+{% endblock %}

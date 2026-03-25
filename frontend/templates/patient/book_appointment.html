@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Book Appointment - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <h1 class="page-title">Book Appointment</h1>
+    <div id="ai-banner" class="ai-banner" style="display:none"></div>
+    <div class="two-col">
+        <div class="col-left">
+            <div class="card">
+                <h2>Appointment Details</h2>
+                <div class="form-group">
+                    <label>Specialisation</label>
+                    <select id="spec-select">
+                        <option value="">No Preference</option>
+                        <option>General Practice</option><option>Dermatology</option><option>Cardiology</option>
+                        <option>Orthopaedics</option><option>ENT</option><option>Ophthalmology</option>
+                        <option>Gastroenterology</option><option>Neurology</option><option>Psychiatry</option>
+                        <option>Gynaecology</option><option>Paediatrics</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1"><label>Date *</label><input type="date" id="appt-date" required></div>
+                    <div class="form-group flex-1">
+                        <label>Time *</label>
+                        <select id="appt-time" required>
+                            <option value="">Select time</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group"><label>Reason for Visit *</label><textarea id="appt-reason" maxlength="300" rows="3" required placeholder="Briefly describe your concern"></textarea></div>
+                <div id="book-error" class="alert alert-error" style="display:none"></div>
+                <button class="btn btn-primary btn-block" id="book-btn" onclick="bookAppt()">Book Appointment</button>
+            </div>
+        </div>
+        <div class="col-right">
+            <div class="card" id="patient-card">
+                <h2>Your Profile</h2>
+                <div id="profile-info"><p class="text-muted">Loading...</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container{max-width:960px;margin:0 auto;padding:2rem 1.5rem}
+    .page-title{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0 0 1rem}
+    .two-col{display:grid;grid-template-columns:55% 45%;gap:1.5rem}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .card h2{font-size:1.0625rem;font-weight:600;margin:0 0 1rem;color:#1e293b}
+    .form-group{margin-bottom:1rem}
+    .form-group label{display:block;font-size:.875rem;font-weight:500;margin-bottom:.375rem;color:#1e293b}
+    input,select,textarea{width:100%;padding:.625rem .75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.875rem;box-sizing:border-box;min-height:44px;font-family:inherit}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.15)}
+    textarea{resize:vertical}
+    .form-row{display:flex;gap:1rem}
+    .flex-1{flex:1}
+    .btn{padding:.625rem 1.25rem;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer;border:none;min-height:44px;transition:all .15s}
+    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .btn-block{width:100%}
+    .alert-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.75rem;border-radius:8px;font-size:.875rem}
+    .ai-banner{background:#f0fdfa;border:1px solid #99f6e4;color:#0d9488;padding:.75rem 1rem;border-radius:8px;margin-bottom:1rem;font-size:.875rem;font-weight:500}
+    .allergy-badge{display:inline-block;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:999px;padding:.125rem .5rem;font-size:.75rem;margin:.125rem}
+    .history-badge{display:inline-block;background:#f0fdfa;border:1px solid #99f6e4;color:#0f766e;border-radius:999px;padding:.125rem .5rem;font-size:.75rem;margin:.125rem}
+    .profile-field{margin-bottom:.75rem}
+    .profile-field .label{font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px}
+    .profile-field .value{font-size:.875rem;color:#1e293b;font-weight:500}
+    .text-muted{color:#64748b}
+    @media(max-width:768px){.two-col{grid-template-columns:1fr}.form-row{flex-direction:column;gap:.5rem}}
+</style>
+
+<script>
+    fbAuth.onAuthStateChanged(async function(u) {
+        if (!u) { location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(u.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "patient") { location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage(user);
+    });
+
+    function initPage(user) {
+        var cfg = document.getElementById("svc-config").dataset;
+
+        // Time slots 09:00-17:00
+        var sel = document.getElementById("appt-time");
+        for (var h = 9; h < 17; h++) {
+            for (var m = 0; m < 60; m += 30) {
+                var t = h.toString().padStart(2,"0") + ":" + m.toString().padStart(2,"0");
+                var opt = document.createElement("option"); opt.value = t; opt.textContent = t;
+                sel.appendChild(opt);
+            }
+        }
+
+        // Min date = tomorrow
+        var tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+        document.getElementById("appt-date").min = tmr.toISOString().split("T")[0];
+
+        // Check AI recommendation
+        var sr = sessionStorage.getItem("symptomResult");
+        if (sr) {
+            try {
+                var result = JSON.parse(sr);
+                if (result.specialisation) {
+                    document.getElementById("spec-select").value = result.specialisation;
+                    var banner = document.getElementById("ai-banner");
+                    banner.textContent = "AI recommends: " + result.specialisation;
+                    banner.style.display = "";
+                }
+            } catch(e) {}
+            sessionStorage.removeItem("symptomResult");
+        }
+
+        // Load patient info
+        loadProfile(cfg, user);
+    }
+
+    async function loadProfile(cfg, user) {
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.patientUrl + "/patient/" + user.linkedID, { headers: { "Authorization": "Bearer " + token } });
+            if (!res.ok) throw new Error();
+            var p = await res.json();
+            var allergies = (p.allergies || []).map(function(a) { return '<span class="allergy-badge">' + a + '</span>'; }).join(" ") || "None";
+            var history = (p.pastHistory || []).map(function(h) { return '<span class="history-badge">' + h + '</span>'; }).join(" ") || "None";
+            document.getElementById("profile-info").innerHTML =
+                '<div class="profile-field"><div class="label">Name</div><div class="value">' + (p.name || user.name) + '</div></div>' +
+                '<div class="profile-field"><div class="label">Allergies</div><div>' + allergies + '</div></div>' +
+                '<div class="profile-field"><div class="label">Medical History</div><div>' + history + '</div></div>';
+        } catch(e) {
+            document.getElementById("profile-info").innerHTML = '<p class="text-muted">Could not load profile.</p>';
+        }
+    }
+
+    async function bookAppt() {
+        var date = document.getElementById("appt-date").value;
+        var time = document.getElementById("appt-time").value;
+        var reason = document.getElementById("appt-reason").value.trim();
+        var spec = document.getElementById("spec-select").value;
+        var errDiv = document.getElementById("book-error");
+        errDiv.style.display = "none";
+
+        if (!date || !time || !reason) { errDiv.textContent = "Please fill all required fields."; errDiv.style.display = ""; return; }
+
+        var btn = document.getElementById("book-btn");
+        btn.disabled = true; btn.textContent = "Booking...";
+        var cfg = document.getElementById("svc-config").dataset;
+
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var body = { patientID: window.currentUser.linkedID, dateTime: date + "T" + time + ":00" };
+            if (spec) body.specialisation = spec;
+
+            var res = await fetch(cfg.bookAppointmentUrl + "/book-appointment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify(body)
+            });
+            var data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message || "Booking failed");
+
+            if (typeof showToast === "function") showToast("Appointment booked successfully!");
+            setTimeout(function() { location.href = "/patient/appointments"; }, 2000);
+        } catch(e) {
+            errDiv.textContent = e.message;
+            errDiv.style.display = "";
+            btn.disabled = false; btn.textContent = "Book Appointment";
+        }
+    }
+</script>
+{% endblock %}

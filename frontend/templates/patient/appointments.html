@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}My Appointments - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <h1 class="page-title">My Appointments</h1>
+    <div class="tab-bar">
+        <button class="tab active" onclick="switchTab('upcoming',this)">Upcoming</button>
+        <button class="tab" onclick="switchTab('past',this)">Past</button>
+    </div>
+    <div id="upcoming-tab"></div>
+    <div id="past-tab" style="display:none"></div>
+    <div id="loading" class="text-center text-muted py-4">Loading appointments...</div>
+</div>
+
+<style>
+    .page-container{max-width:720px;margin:0 auto;padding:2rem 1.5rem}
+    .page-title{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0 0 1rem}
+    .tab-bar{display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:1.5rem}
+    .tab{padding:.625rem 1.25rem;background:none;border:none;font-size:.875rem;font-weight:500;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+    .tab.active{color:#0d9488;border-bottom-color:#0d9488}
+    .appt-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.25rem;margin-bottom:.75rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+    .appt-left{display:flex;align-items:center;gap:1rem;flex:1}
+    .date-block{width:52px;height:52px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.75rem;font-weight:600}
+    .date-block .day{font-size:1.125rem}
+    .date-block.confirmed{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
+    .date-block.pending{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
+    .date-block.cancelled{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+    .appt-details .time{font-weight:600;color:#1e293b;font-size:.9375rem}
+    .appt-details .meta{font-size:.8125rem;color:#64748b;margin-top:.125rem}
+    .status-badge{display:inline-block;padding:.125rem .5rem;border-radius:999px;font-size:.6875rem;font-weight:500;text-transform:capitalize}
+    .status-confirmed{background:#f0fdf4;color:#16a34a}.status-pending{background:#fffbeb;color:#b45309}.status-cancelled{background:#fef2f2;color:#b91c1c}
+    .btn{padding:.5rem 1rem;border-radius:8px;font-weight:600;font-size:.8125rem;cursor:pointer;border:none;min-height:36px;transition:all .15s}
+    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .btn-disabled{background:#e2e8f0;color:#94a3b8;cursor:not-allowed}
+    .empty-state{text-align:center;padding:3rem 1rem;color:#94a3b8}
+    .text-center{text-align:center}.text-muted{color:#64748b}.py-4{padding:2rem 0}
+</style>
+
+<script>
+    var allAppts = [];
+
+    fbAuth.onAuthStateChanged(async function(u) {
+        if (!u) { location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(u.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "patient") { location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage(user);
+    });
+
+    async function initPage(user) {
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.apptUrl + "/appointment/patient/" + user.linkedID, { headers: { "Authorization": "Bearer " + token } });
+            if (!res.ok) throw new Error();
+            var data = await res.json();
+            allAppts = data.appointments || data || [];
+        } catch(e) { allAppts = []; }
+        document.getElementById("loading").style.display = "none";
+        renderTabs();
+    }
+
+    function renderTabs() {
+        var now = new Date();
+        var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        var upcoming = allAppts.filter(function(a) { return new Date(a.dateTime) >= now && a.status !== "cancelled"; })
+            .sort(function(a,b) { return new Date(a.dateTime) - new Date(b.dateTime); });
+        var past = allAppts.filter(function(a) { return new Date(a.dateTime) < now || a.status === "cancelled"; })
+            .sort(function(a,b) { return new Date(b.dateTime) - new Date(a.dateTime); });
+
+        document.getElementById("upcoming-tab").innerHTML = upcoming.length ? upcoming.map(function(a) { return renderCard(a, months, true); }).join("") : '<div class="empty-state">No upcoming appointments.</div>';
+        document.getElementById("past-tab").innerHTML = past.length ? past.map(function(a) { return renderCard(a, months, false); }).join("") : '<div class="empty-state">No past appointments.</div>';
+    }
+
+    function renderCard(a, months, showActions) {
+        var d = new Date(a.dateTime);
+        var id = a.appointmentID || a.id;
+        var action = "";
+        if (showActions && a.status === "confirmed") {
+            action = '<button class="btn btn-primary" onclick="joinAppt(\'' + id + '\')">Join</button>';
+        } else if (showActions && a.status === "pending") {
+            action = '<button class="btn btn-disabled" disabled>Awaiting Doctor</button>';
+        }
+        return '<div class="appt-card"><div class="appt-left"><div class="date-block ' + a.status + '"><span class="day">' + d.getDate() + '</span><span>' + months[d.getMonth()] + '</span></div>' +
+            '<div class="appt-details"><div class="time">' + d.getHours().toString().padStart(2,"0") + ':' + d.getMinutes().toString().padStart(2,"0") + '</div>' +
+            '<div class="meta"><span class="status-badge status-' + a.status + '">' + a.status + '</span></div></div></div>' + action + '</div>';
+    }
+
+    function switchTab(tab, btn) {
+        document.querySelectorAll(".tab").forEach(function(t) { t.classList.remove("active"); });
+        btn.classList.add("active");
+        document.getElementById("upcoming-tab").style.display = tab === "upcoming" ? "" : "none";
+        document.getElementById("past-tab").style.display = tab === "past" ? "" : "none";
+    }
+
+    function joinAppt(id) {
+        sessionStorage.setItem("apptID", id);
+        location.href = "/patient/join";
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Payment - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <h1 class="page-title">Payment</h1>
+    <div class="two-col">
+        <div class="col-left">
+            <div class="card">
+                <h2>Order Summary</h2>
+                <div id="order-details"><p class="text-muted">Loading...</p></div>
+            </div>
+        </div>
+        <div class="col-right">
+            <div class="card">
+                <h2>Complete Payment</h2>
+                <div class="total-display" id="total-display"></div>
+                <p class="text-sm text-muted mb-3">You will be redirected to Stripe for secure payment.</p>
+                <div id="pay-error" class="alert alert-error" style="display:none"></div>
+                <button class="btn btn-primary btn-block" id="pay-btn" onclick="initiatePayment()">Pay Now</button>
+                <p class="text-xs text-muted mt-2 text-center">Powered by Stripe. Test mode enabled.</p>
+            </div>
+
+            <div class="card mt-3" id="verify-card" style="display:none">
+                <div class="text-center">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <h2 class="mt-2">Payment Successful!</h2>
+                    <p class="text-muted">Redirecting to order status...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container{max-width:900px;margin:0 auto;padding:2rem 1.5rem}
+    .page-title{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0 0 1.5rem}
+    .two-col{display:grid;grid-template-columns:55% 45%;gap:1.5rem}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .card h2{font-size:1.0625rem;font-weight:600;margin:0 0 1rem;color:#1e293b}
+    .total-display{font-size:2rem;font-weight:700;color:#0d9488;margin-bottom:1rem}
+    .med-table{width:100%;border-collapse:collapse;font-size:.8125rem}
+    .med-table th{text-align:left;padding:.5rem;border-bottom:2px solid #e2e8f0;color:#64748b;font-weight:500}
+    .med-table td{padding:.5rem;border-bottom:1px solid #f1f5f9;color:#1e293b}
+    .med-table .total-row td{border-top:2px solid #e2e8f0;font-weight:600;color:#1e293b}
+    .btn{padding:.75rem 1.5rem;border-radius:8px;font-weight:600;font-size:.9375rem;cursor:pointer;border:none;min-height:44px;transition:all .15s}
+    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .btn-block{width:100%}
+    .alert-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.75rem;border-radius:8px;font-size:.875rem;margin-bottom:1rem}
+    .text-muted{color:#64748b}.text-sm{font-size:.8125rem}.text-xs{font-size:.75rem}.text-center{text-align:center}
+    .mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}.mb-3{margin-bottom:.75rem}
+    @media(max-width:768px){.two-col{grid-template-columns:1fr}}
+</style>
+
+<script>
+    var orderData = null;
+
+    fbAuth.onAuthStateChanged(async function(u) {
+        if (!u) { location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(u.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "patient") { location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage(user);
+    });
+
+    function initPage(user) {
+        // Check if returning from Stripe
+        var params = new URLSearchParams(window.location.search);
+        var sessionId = params.get("session_id");
+        if (sessionId) { verifyPayment(sessionId); return; }
+
+        var raw = sessionStorage.getItem("completionData") || sessionStorage.getItem("orderData");
+        if (!raw) { location.href = "/patient/dashboard"; return; }
+
+        try { orderData = JSON.parse(raw); } catch(e) { location.href = "/patient/dashboard"; return; }
+        renderOrder();
+    }
+
+    function renderOrder() {
+        var meds = orderData.medications || [];
+        var total = orderData.totalAmount || 0;
+
+        var rows = meds.map(function(m) {
+            var sub = ((m.qty || m.Quantity || 1) * (m.unitPrice || m.UnitPrice || 0)).toFixed(2);
+            return '<tr><td>' + (m.medicationName || m.MedicationId || "Medication") + '</td><td>' + (m.qty || m.Quantity || 1) + '</td><td>$' + (m.unitPrice || m.UnitPrice || 0).toFixed(2) + '</td><td>$' + sub + '</td></tr>';
+        }).join("");
+
+        document.getElementById("order-details").innerHTML =
+            '<div style="margin-bottom:.75rem"><span style="color:#64748b;font-size:.8125rem">Order ID:</span> <strong>' + (orderData.orderID || "N/A") + '</strong></div>' +
+            '<table class="med-table"><thead><tr><th>Medication</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + rows +
+            '<tr class="total-row"><td colspan="3">Total</td><td>$' + Number(total).toFixed(2) + '</td></tr></tbody></table>';
+
+        document.getElementById("total-display").textContent = "SGD $" + Number(total).toFixed(2);
+    }
+
+    async function initiatePayment() {
+        var btn = document.getElementById("pay-btn");
+        var errDiv = document.getElementById("pay-error");
+        errDiv.style.display = "none";
+        btn.disabled = true; btn.textContent = "Redirecting to Stripe...";
+
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.processPaymentUrl + "/api/checkout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({ orderID: orderData.orderID, patientID: window.currentUser.linkedID })
+            });
+            var data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message || "Payment failed");
+
+            // Store for verification
+            sessionStorage.setItem("paymentSession", JSON.stringify({
+                session_id: data.session_id,
+                documentID: data.documentID,
+                orderID: orderData.orderID,
+                patientID: window.currentUser.linkedID
+            }));
+
+            // Redirect to Stripe
+            window.location.href = data.checkout_url;
+        } catch(e) {
+            errDiv.textContent = e.message;
+            errDiv.style.display = "";
+            btn.disabled = false; btn.textContent = "Pay Now";
+        }
+    }
+
+    async function verifyPayment(sessionId) {
+        var cfg = document.getElementById("svc-config").dataset;
+        var paySession = JSON.parse(sessionStorage.getItem("paymentSession") || "{}");
+
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.processPaymentUrl + "/api/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    documentID: paySession.documentID,
+                    orderID: paySession.orderID,
+                    patientID: paySession.patientID || window.currentUser.linkedID
+                })
+            });
+            if (!res.ok) throw new Error("Verification failed");
+
+            document.getElementById("verify-card").style.display = "";
+            document.querySelector(".col-left").style.display = "none";
+            document.querySelector(".col-right .card:first-child").style.display = "none";
+
+            sessionStorage.removeItem("paymentSession");
+            setTimeout(function() { location.href = "/patient/order-status"; }, 2500);
+        } catch(e) {
+            document.getElementById("pay-error").textContent = "Payment verification failed. Contact support.";
+            document.getElementById("pay-error").style.display = "";
+        }
+    }
+</script>
+{% endblock %}

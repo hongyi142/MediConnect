@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Join Consultation - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="join-card">
+        <h1>Join Consultation</h1>
+        <div id="appt-info" class="info-section"></div>
+        <div id="patient-info" class="info-section"></div>
+        <div class="media-check">
+            <h3>Camera &amp; Microphone Check</h3>
+            <div class="media-preview">
+                <video id="preview-video" autoplay muted playsinline></video>
+                <div class="media-status">
+                    <div id="cam-status" class="status-item"><span class="dot grey"></span> Camera</div>
+                    <div id="mic-status" class="status-item"><span class="dot grey"></span> Microphone</div>
+                </div>
+            </div>
+        </div>
+        <div id="join-error" class="alert alert-error" style="display:none"></div>
+        <button class="btn btn-primary btn-block" id="join-btn" onclick="startConsultation()">Join Consultation</button>
+    </div>
+</div>
+
+<style>
+    .page-container{max-width:640px;margin:0 auto;padding:2rem 1.5rem}
+    .join-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:2rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .join-card h1{font-size:1.375rem;font-weight:600;color:#1e293b;margin:0 0 1.5rem}
+    .info-section{border:1px solid #e2e8f0;border-radius:8px;padding:1rem;margin-bottom:1rem}
+    .info-section h4{font-size:.875rem;font-weight:600;color:#1e293b;margin:0 0 .5rem}
+    .info-row{display:flex;justify-content:space-between;font-size:.8125rem;padding:.25rem 0}
+    .info-row .label{color:#64748b}.info-row .value{color:#1e293b;font-weight:500}
+    .allergy-badge{display:inline-block;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:999px;padding:.0625rem .5rem;font-size:.75rem;margin:.0625rem}
+    .status-badge{display:inline-block;padding:.125rem .5rem;border-radius:999px;font-size:.6875rem;font-weight:500}
+    .status-confirmed{background:#f0fdf4;color:#16a34a}.status-pending{background:#fffbeb;color:#b45309}
+    .media-check{margin-bottom:1.5rem}
+    .media-check h3{font-size:.9375rem;font-weight:600;color:#1e293b;margin:0 0 .75rem}
+    .media-preview{display:flex;gap:1rem;align-items:center}
+    .media-preview video{width:200px;height:150px;border-radius:8px;background:#1e293b;object-fit:cover}
+    .media-status{display:flex;flex-direction:column;gap:.5rem}
+    .status-item{display:flex;align-items:center;gap:.5rem;font-size:.8125rem;color:#1e293b}
+    .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+    .dot.green{background:#16a34a}.dot.grey{background:#94a3b8}.dot.red{background:#ef4444}
+    .btn{padding:.75rem 1.5rem;border-radius:8px;font-weight:600;font-size:.9375rem;cursor:pointer;border:none;min-height:44px;transition:all .15s}
+    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .btn-block{width:100%}
+    .alert-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.75rem;border-radius:8px;font-size:.875rem;margin-bottom:1rem}
+</style>
+
+<script>
+    var apptData = null, mediaStream = null;
+
+    fbAuth.onAuthStateChanged(async function(u) {
+        if (!u) { location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(u.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "patient") { location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage(user);
+    });
+
+    async function initPage(user) {
+        var apptID = sessionStorage.getItem("apptID");
+        if (!apptID) { location.href = "/patient/appointments"; return; }
+
+        var cfg = document.getElementById("svc-config").dataset;
+        var token = await fbAuth.currentUser.getIdToken();
+
+        try {
+            var res = await fetch(cfg.apptUrl + "/appointment/" + apptID, { headers: { "Authorization": "Bearer " + token } });
+            if (!res.ok) throw new Error();
+            apptData = await res.json();
+
+            document.getElementById("appt-info").innerHTML =
+                '<h4>Appointment</h4>' +
+                '<div class="info-row"><span class="label">ID</span><span class="value">' + (apptData.appointmentID || apptID) + '</span></div>' +
+                '<div class="info-row"><span class="label">Date/Time</span><span class="value">' + new Date(apptData.dateTime).toLocaleString() + '</span></div>' +
+                '<div class="info-row"><span class="label">Status</span><span class="status-badge status-' + apptData.status + '">' + apptData.status + '</span></div>';
+        } catch(e) {
+            document.getElementById("appt-info").innerHTML = '<p style="color:#b91c1c">Could not load appointment.</p>';
+        }
+
+        try {
+            var pres = await fetch(cfg.patientUrl + "/patient/" + user.linkedID, { headers: { "Authorization": "Bearer " + token } });
+            var pdata = await pres.json();
+            var allergies = (pdata.allergies || []).map(function(a) { return '<span class="allergy-badge">' + a + '</span>'; }).join(" ") || "None";
+            document.getElementById("patient-info").innerHTML =
+                '<h4>Patient Information</h4>' +
+                '<div class="info-row"><span class="label">Name</span><span class="value">' + (pdata.name || user.name) + '</span></div>' +
+                '<div class="info-row"><span class="label">NRIC</span><span class="value">' + (pdata.NRIC || "N/A") + '</span></div>' +
+                '<div class="info-row"><span class="label">Allergies</span><span>' + allergies + '</span></div>';
+        } catch(e) {}
+
+        // Media check
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById("preview-video").srcObject = mediaStream;
+            document.querySelector("#cam-status .dot").className = "dot green";
+            document.querySelector("#mic-status .dot").className = "dot green";
+        } catch(e) {
+            document.querySelector("#cam-status .dot").className = "dot red";
+            document.querySelector("#mic-status .dot").className = "dot red";
+        }
+    }
+
+    async function startConsultation() {
+        if (!apptData) { return; }
+        var btn = document.getElementById("join-btn");
+        var errDiv = document.getElementById("join-error");
+        errDiv.style.display = "none";
+        btn.disabled = true; btn.textContent = "Connecting...";
+
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            if (mediaStream) { mediaStream.getTracks().forEach(function(t) { t.stop(); }); }
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.startConsultationUrl + "/start-consultation", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({
+                    apptID: apptData.appointmentID || sessionStorage.getItem("apptID"),
+                    patientID: window.currentUser.linkedID,
+                    doctorID: apptData.doctorID
+                })
+            });
+            var data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message || "Failed to start consultation");
+            sessionStorage.setItem("consultationData", JSON.stringify(data));
+            location.href = "/patient/consultation";
+        } catch(e) {
+            errDiv.textContent = e.message;
+            errDiv.style.display = "";
+            btn.disabled = false; btn.textContent = "Join Consultation";
+        }
+    }
+</script>
+{% endblock %}

@@ -1,14 +1,4 @@
-version: "3.8"
 services:
-  frontend:
-    build: ./frontend
-    ports: ["8080:8080"]
-    env_file: ./frontend/.env
-    depends_on:
-      - start-consultation
-      - complete-consultation
-      - consultation-service
-
   consultation-service:
     build: ./backend/consultation-service
     ports: ["5004:5004"]
@@ -72,7 +62,7 @@ services:
       - "5000:5000"
     environment:
       - PYTHONUNBUFFERED=1
-    # Note: Requires FIREBASE_CRED_PATH pointing to an attached volume in production
+      - FIREBASE_CRED_PATH=./serviceAccountKey.json
 
   payment_wrapper:
     build:
@@ -149,30 +139,96 @@ services:
     container_name: patient-service
     ports:
       - "5030:5030"
-    volumes:
-      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
 
   doctor-service:
     build: ./backend/doctor-service
     container_name: doctor-service
     ports:
       - "5031:5031"
-    volumes:
-      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
 
   appointment-service:
     build: ./backend/appointment-service
     container_name: appointment-service
     ports:
       - "5032:5032"
-    volumes:
-      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
 
   book-appointment:
     build: ./backend/book-appointment
     container_name: book-appointment
     ports:
       - "5033:5033"
+    depends_on:
+      - patient-service
+      - doctor-service
+      - appointment-service
+
+  inventory-service:
+    build: ./backend/inventory
+    container_name: inventory-service
+    ports:
+      - "5005:5005"
+
+  delivery-service:
+    build: ./backend/delivery-service
+    container_name: delivery-service
+    ports:
+      - "5040:5000"
+
+  rider-service:
+    build: ./backend/rider-service
+    container_name: rider-service
+    ports:
+      - "5041:5001"
+
+  assign-delivery:
+    build: ./backend/assign-delivery-service
+    container_name: assign-delivery
+    ports:
+      - "5042:5002"
+    depends_on:
+      - delivery-service
+      - rider-service
+
+  complete-delivery:
+    build: ./backend/complete-delivery-service
+    container_name: complete-delivery
+    ports:
+      - "5043:5004"
+    depends_on:
+      - delivery-service
+
+  frontend:
+    build: ./frontend
+    container_name: mediconnect-frontend
+    ports:
+      - "8080:8080"
+    environment:
+      - PATIENT_SERVICE_URL=http://localhost:5030
+      - DOCTOR_SERVICE_URL=http://localhost:5031
+      - APPT_SERVICE_URL=http://localhost:5032
+      - BOOK_APPOINTMENT_URL=http://localhost:5033
+      - CONSULTATION_SERVICE_URL=http://localhost:5004
+      - START_CONSULTATION_URL=http://localhost:5013
+      - COMPLETE_CONSULTATION_URL=http://localhost:5014
+      - INV_SERVICE_URL=http://localhost:5005
+      - MC_SERVICE_URL=http://localhost:5010
+      - TWILIO_WRAPPER_URL=http://localhost:5020
+      - OPENAI_WRAPPER_URL=http://localhost:5021
+      - NOTIFICATION_WRAPPER_URL=http://localhost:5011
+      - PAYMENT_SERVICE_URL=http://localhost:5000
+      - PAYMENT_WRAPPER_URL=http://localhost:5001
+      - PROCESS_PAYMENT_URL=http://localhost:5002
+      - DELIVERY_SERVICE_URL=http://localhost:5040
+      - RIDER_SERVICE_URL=http://localhost:5041
+      - ASSIGN_DELIVERY_URL=http://localhost:5042
+      - COMPLETE_DELIVERY_URL=http://localhost:5043
+      - ORDER_SERVICE_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
+      - FIREBASE_API_KEY=AIzaSyCGGxpmbhezNBNs2M_jwLr6myVpbSerBpE
+      - FIREBASE_AUTH_DOMAIN=mediconnect-b50d2.firebaseapp.com
+      - FIREBASE_PROJECT_ID=mediconnect-b50d2
+      - FIREBASE_STORAGE_BUCKET=mediconnect-b50d2.firebasestorage.app
+      - FIREBASE_MESSAGING_SENDER_ID=400332937391
+      - FIREBASE_APP_ID=1:400332937391:web:3ea04d60d579933b0c1ebb
     depends_on:
       - patient-service
       - doctor-service

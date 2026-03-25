@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Order Status - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <h1 class="page-title">Order &amp; Delivery Status</h1>
+    <div class="two-col">
+        <div class="col-left">
+            <div class="card">
+                <h2>Delivery Progress</h2>
+                <div class="stepper" id="stepper">
+                    <div class="step-row" data-step="placed"><div class="step-indicator done"></div><div class="step-content"><div class="step-title">Order Placed</div><div class="step-desc">Your order has been created</div></div></div>
+                    <div class="step-row" data-step="paid"><div class="step-indicator"></div><div class="step-content"><div class="step-title">Payment Confirmed</div><div class="step-desc">Payment processed successfully</div></div></div>
+                    <div class="step-row" data-step="assigned"><div class="step-indicator"></div><div class="step-content"><div class="step-title">Rider Assigned</div><div class="step-desc">A rider is picking up your order</div></div></div>
+                    <div class="step-row" data-step="enroute"><div class="step-indicator"></div><div class="step-content"><div class="step-title">Out for Delivery</div><div class="step-desc">Your rider is on the way</div></div></div>
+                    <div class="step-row" data-step="delivered"><div class="step-indicator"></div><div class="step-content"><div class="step-title">Delivered</div><div class="step-desc">Order delivered successfully</div></div></div>
+                </div>
+                <div id="rider-card" class="rider-card" style="display:none">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="1.5"><path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+                    <span id="rider-name">Your rider is on the way!</span>
+                </div>
+                <div id="qr-section" style="display:none" class="qr-section">
+                    <h3>Delivery QR Code</h3>
+                    <p class="text-sm text-muted">Show this QR to your rider upon delivery.</p>
+                    <div id="qr-display" class="qr-display"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-right">
+            <div class="card">
+                <h2>Order Details</h2>
+                <div id="order-summary"><p class="text-muted">Loading...</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container{max-width:960px;margin:0 auto;padding:2rem 1.5rem}
+    .page-title{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0 0 1.5rem}
+    .two-col{display:grid;grid-template-columns:60% 40%;gap:1.5rem}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .card h2{font-size:1.0625rem;font-weight:600;margin:0 0 1rem;color:#1e293b}
+    .stepper{padding:0 .5rem}
+    .step-row{display:flex;gap:1rem;position:relative;padding-bottom:1.5rem}
+    .step-row:last-child{padding-bottom:0}
+    .step-row::before{content:"";position:absolute;left:11px;top:24px;width:2px;height:calc(100% - 24px);background:#e2e8f0}
+    .step-row:last-child::before{display:none}
+    .step-row.active::before{background:linear-gradient(to bottom,#0d9488,#e2e8f0)}
+    .step-indicator{width:24px;height:24px;border-radius:50%;border:2px solid #e2e8f0;background:#fff;flex-shrink:0;position:relative;z-index:1;display:flex;align-items:center;justify-content:center}
+    .step-indicator.done{border-color:#0d9488;background:#0d9488}
+    .step-indicator.done::after{content:"\2713";color:#fff;font-size:.75rem;font-weight:700}
+    .step-indicator.current{border-color:#0d9488;box-shadow:0 0 0 4px rgba(13,148,136,.2)}
+    .step-title{font-size:.875rem;font-weight:600;color:#1e293b}
+    .step-desc{font-size:.75rem;color:#94a3b8;margin-top:.125rem}
+    .step-row.active .step-title{color:#0d9488}
+    .rider-card{display:flex;align-items:center;gap:.75rem;background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:.75rem 1rem;margin-top:1rem;color:#0d9488;font-weight:500;font-size:.875rem}
+    .qr-section{text-align:center;margin-top:1.5rem;padding-top:1rem;border-top:1px solid #e2e8f0}
+    .qr-section h3{font-size:.9375rem;font-weight:600;color:#1e293b;margin:0 0 .25rem}
+    .qr-display{margin:.75rem auto;max-width:200px}
+    .qr-display img{width:100%;border-radius:8px}
+    .order-row{display:flex;justify-content:space-between;padding:.375rem 0;font-size:.8125rem;border-bottom:1px solid #f1f5f9}
+    .order-row .label{color:#64748b}.order-row .value{color:#1e293b;font-weight:500}
+    .text-muted{color:#64748b}.text-sm{font-size:.8125rem}
+    @media(max-width:768px){.two-col{grid-template-columns:1fr}}
+</style>
+
+<script>
+    var pollTimer = null;
+
+    fbAuth.onAuthStateChanged(async function(u) {
+        if (!u) { location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(u.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "patient") { location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage(user);
+    });
+
+    function initPage(user) {
+        var completionData = sessionStorage.getItem("completionData");
+        if (completionData) {
+            try {
+                var data = JSON.parse(completionData);
+                renderOrderSummary(data);
+            } catch(e) {}
+        } else {
+            document.getElementById("order-summary").innerHTML = '<p class="text-muted">No order data available.</p>';
+        }
+
+        // Try to get delivery info
+        var deliveryID = sessionStorage.getItem("deliveryID");
+        if (deliveryID) {
+            pollDelivery(deliveryID);
+            pollTimer = setInterval(function() { pollDelivery(deliveryID); }, 10000);
+        } else {
+            updateStepper("placed");
+        }
+    }
+
+    function renderOrderSummary(data) {
+        var html = '<div class="order-row"><span class="label">Order ID</span><span class="value">' + (data.orderID || "N/A") + '</span></div>';
+        if (data.totalAmount) html += '<div class="order-row"><span class="label">Total</span><span class="value">$' + Number(data.totalAmount).toFixed(2) + '</span></div>';
+        if (data.mcIssued) html += '<div class="order-row"><span class="label">MC Issued</span><span class="value">Yes</span></div>';
+        document.getElementById("order-summary").innerHTML = html;
+    }
+
+    async function pollDelivery(deliveryID) {
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.deliveryUrl + "/delivery/" + deliveryID, { headers: { "Authorization": "Bearer " + token } });
+            if (!res.ok) return;
+            var result = await res.json();
+            var d = result.data || result;
+            var status = (d.status || "").toLowerCase();
+
+            if (status === "delivered" || status === "completed") {
+                updateStepper("delivered");
+                if (pollTimer) clearInterval(pollTimer);
+            } else if (status === "delivering" || status === "enroute") {
+                updateStepper("enroute");
+            } else if (d.riderID || d.riderName) {
+                updateStepper("assigned");
+                document.getElementById("rider-card").style.display = "flex";
+                if (d.riderName) document.getElementById("rider-name").textContent = d.riderName + " is on the way!";
+            } else {
+                updateStepper("paid");
+            }
+
+            if (d.qrCode) {
+                document.getElementById("qr-section").style.display = "";
+                document.getElementById("qr-display").innerHTML = '<img src="' + d.qrCode + '" alt="Delivery QR Code">';
+            }
+        } catch(e) {}
+    }
+
+    function updateStepper(activeStep) {
+        var steps = ["placed", "paid", "assigned", "enroute", "delivered"];
+        var activeIdx = steps.indexOf(activeStep);
+        var rows = document.querySelectorAll(".step-row");
+        rows.forEach(function(row, i) {
+            var ind = row.querySelector(".step-indicator");
+            row.classList.remove("active");
+            ind.classList.remove("done", "current");
+            if (i < activeIdx) { ind.classList.add("done"); }
+            else if (i === activeIdx) { ind.classList.add("current"); row.classList.add("active"); }
+        });
+    }
+</script>
+{% endblock %}

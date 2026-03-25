@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block title %}Sign Up - MediConnect{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card signup-card">
+        <!-- Progress -->
+        <div class="steps-bar">
+            <div class="step-item active" id="si-1"><div class="step-dot">1</div><span>Account</span></div>
+            <div class="step-line" id="sl-1"></div>
+            <div class="step-item" id="si-2"><div class="step-dot">2</div><span>Profile</span></div>
+            <div class="step-line" id="sl-2"></div>
+            <div class="step-item" id="si-3"><div class="step-dot">3</div><span>Health Info</span></div>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="step-panel" id="step-1">
+            <div class="form-group"><label>Full Name *</label><input id="s-name" required></div>
+            <div class="form-group"><label>Email *</label><input type="email" id="s-email" required placeholder="you@example.com"><small class="field-err" id="err-email"></small></div>
+            <div class="form-group"><label>Password *</label><input type="password" id="s-password" required placeholder="Min 8 characters"><div class="strength-bar"><div class="strength-fill" id="str-fill"></div></div><small id="str-text"></small></div>
+            <div class="form-group"><label>Confirm Password *</label><input type="password" id="s-confirm" required><small class="field-err" id="err-confirm"></small></div>
+            <button class="btn btn-primary btn-block" onclick="goStep(2)">Next &rarr;</button>
+            <p class="text-center text-sm mt-3"><a href="/auth/login">Already have an account? Login &rarr;</a></p>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="step-panel" id="step-2" style="display:none">
+            <div class="form-group"><label>NRIC *</label><input id="s-nric" placeholder="e.g. S1234567A"><small class="field-err" id="err-nric"></small></div>
+            <div class="form-group"><label>Date of Birth *</label><input type="date" id="s-dob"></div>
+            <div class="form-group"><label>Phone *</label><input id="s-phone" placeholder="+65XXXXXXXX"><small class="field-err" id="err-phone"></small></div>
+            <div class="form-group"><label>Address *</label><input id="s-address"></div>
+            <div class="form-group"><label>Postal Code *</label><input id="s-postal" placeholder="6 digits" maxlength="6"><small class="field-err" id="err-postal"></small></div>
+            <div class="step-btns"><button class="btn btn-secondary" onclick="goStep(1)">&larr; Back</button><button class="btn btn-primary" onclick="goStep(3)">Next &rarr;</button></div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="step-panel" id="step-3" style="display:none">
+            <h3 class="step-heading">Help us keep you safe</h3>
+            <p class="text-muted text-sm mb-3">This helps your doctor provide safer, more personalised care. You can update this later.</p>
+
+            <label class="mb-1">Known Allergies <span class="text-muted">(optional)</span></label>
+            <div class="preset-pills" id="allergy-presets">
+                <button class="pill-btn" onclick="addTag('allergies','Prawn',this)">+ Prawn</button>
+                <button class="pill-btn" onclick="addTag('allergies','Egg',this)">+ Egg</button>
+                <button class="pill-btn" onclick="addTag('allergies','Peanut',this)">+ Peanut</button>
+                <button class="pill-btn" onclick="addTag('allergies','Penicillin',this)">+ Penicillin</button>
+                <button class="pill-btn" onclick="addTag('allergies','Latex',this)">+ Latex</button>
+                <button class="pill-btn" onclick="addTag('allergies','Pollen',this)">+ Pollen</button>
+                <button class="pill-btn" onclick="addTag('allergies','Dust Mites',this)">+ Dust Mites</button>
+            </div>
+            <div class="tag-input-row"><input id="allergy-custom" placeholder="Other allergy"><button class="btn btn-sm btn-secondary" onclick="addCustomTag('allergies','allergy-custom')">Add</button></div>
+            <div class="tag-list" id="allergies-tags"></div>
+
+            <label class="mb-1 mt-3">Past Medical History <span class="text-muted">(optional)</span></label>
+            <div class="preset-pills">
+                <button class="pill-btn" onclick="addTag('history','Asthma',this)">+ Asthma</button>
+                <button class="pill-btn" onclick="addTag('history','Diabetes',this)">+ Diabetes</button>
+                <button class="pill-btn" onclick="addTag('history','Hypertension',this)">+ Hypertension</button>
+                <button class="pill-btn" onclick="addTag('history','Heart Disease',this)">+ Heart Disease</button>
+                <button class="pill-btn" onclick="addTag('history','Eczema',this)">+ Eczema</button>
+                <button class="pill-btn" onclick="addTag('history','Thyroid Condition',this)">+ Thyroid Condition</button>
+            </div>
+            <div class="tag-input-row"><input id="history-custom" placeholder="Other condition"><button class="btn btn-sm btn-secondary" onclick="addCustomTag('history','history-custom')">Add</button></div>
+            <div class="tag-list" id="history-tags"></div>
+
+            <div id="step3-error" class="alert alert-error mt-2" style="display:none"></div>
+            <div class="step-btns mt-3"><button class="btn btn-secondary" onclick="goStep(2)">&larr; Back</button><button class="btn btn-primary" id="create-btn" onclick="createAccount()">Create Account</button></div>
+        </div>
+
+        <!-- Welcome -->
+        <div class="step-panel" id="step-welcome" style="display:none">
+            <div class="welcome-screen">
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <h2 id="welcome-name">Welcome to MediConnect!</h2>
+                <p class="text-muted">Your account is ready. What would you like to do first?</p>
+                <div class="welcome-actions">
+                    <a href="/patient/symptom-checker" class="btn btn-primary">Check My Symptoms</a>
+                    <a href="/patient/dashboard" class="btn btn-secondary">Go to Dashboard &rarr;</a>
+                </div>
+                <p class="text-muted text-sm mt-2" id="countdown-text">Redirecting to dashboard in <span id="countdown">8</span>s...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-page{min-height:100vh;background:linear-gradient(135deg,#0d9488,#0f766e);display:flex;align-items:center;justify-content:center;padding:1.5rem}
+    .signup-card{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.12)}
+    .steps-bar{display:flex;align-items:center;justify-content:center;margin-bottom:2rem;gap:0}
+    .step-item{display:flex;flex-direction:column;align-items:center;gap:.25rem}
+    .step-item span{font-size:.75rem;color:#94a3b8;font-weight:500}
+    .step-item.active span,.step-item.done span{color:#0d9488}
+    .step-dot{width:28px;height:28px;border-radius:50%;border:2px solid #e2e8f0;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;color:#94a3b8;background:#fff}
+    .step-item.active .step-dot{border-color:#0d9488;background:#0d9488;color:#fff}
+    .step-item.done .step-dot{border-color:#0d9488;background:#0d9488;color:#fff}
+    .step-line{width:40px;height:2px;background:#e2e8f0;margin:0 .25rem;margin-bottom:1rem}
+    .step-line.done{background:#0d9488}
+    .form-group{margin-bottom:1rem}
+    .form-group label{display:block;font-size:.875rem;font-weight:500;color:#1e293b;margin-bottom:.375rem}
+    .form-group input,.form-group select{width:100%;padding:.625rem .75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.875rem;box-sizing:border-box;min-height:44px}
+    .form-group input:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.15)}
+    .field-err{color:#b91c1c;font-size:.75rem;display:none}
+    .strength-bar{height:4px;background:#e2e8f0;border-radius:2px;margin-top:.375rem;overflow:hidden}
+    .strength-fill{height:100%;width:0;border-radius:2px;transition:width .2s,background .2s}
+    .step-btns{display:flex;gap:.75rem;justify-content:space-between}
+    .step-btns .btn{flex:1}
+    .step-heading{font-size:1.125rem;font-weight:600;color:#1e293b;margin:0 0 .25rem}
+    .preset-pills{display:flex;flex-wrap:wrap;gap:.375rem;margin-bottom:.5rem}
+    .pill-btn{background:#f0fdfa;border:1px solid #99f6e4;color:#0d9488;border-radius:999px;padding:.25rem .75rem;font-size:.8125rem;cursor:pointer;transition:all .15s}
+    .pill-btn:hover{background:#ccfbf1}
+    .pill-btn.added{background:#0d9488;color:#fff;border-color:#0d9488}
+    .tag-input-row{display:flex;gap:.5rem;margin-bottom:.5rem}
+    .tag-input-row input{flex:1;padding:.375rem .625rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.8125rem;min-height:36px}
+    .tag-list{display:flex;flex-wrap:wrap;gap:.375rem;min-height:1.5rem}
+    .tag-badge{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:999px;padding:.125rem .625rem;font-size:.75rem;display:inline-flex;align-items:center;gap:.375rem}
+    .tag-badge.history{background:#f0fdfa;border-color:#99f6e4;color:#0f766e}
+    .tag-badge button{background:none;border:none;cursor:pointer;font-size:.875rem;color:inherit;padding:0;line-height:1}
+    .welcome-screen{text-align:center;padding:1.5rem 0}
+    .welcome-screen h2{font-size:1.5rem;font-weight:600;color:#1e293b;margin:.75rem 0 .5rem}
+    .welcome-actions{display:flex;gap:.75rem;justify-content:center;margin-top:1.5rem}
+    .btn{padding:.625rem 1.25rem;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer;border:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:44px;transition:all .15s}
+    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .btn-secondary{background:#fff;color:#0d9488;border:1px solid #0d9488}
+    .btn-block{width:100%}.btn-sm{padding:.375rem .75rem;font-size:.8125rem;min-height:36px}
+    .alert-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.75rem;border-radius:8px;font-size:.875rem}
+    .text-muted{color:#64748b}.text-sm{font-size:.8125rem}.text-center{text-align:center}
+    .mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}.mb-1{margin-bottom:.25rem}.mb-3{margin-bottom:.75rem}
+</style>
+
+<script>
+(function() {
+    const tags = { allergies: [], history: [] };
+    const cfg = document.getElementById("svc-config").dataset;
+
+    window.addTag = function(type, value, btn) {
+        if (tags[type].includes(value)) return;
+        tags[type].push(value);
+        if (btn) btn.classList.add("added");
+        renderTags(type);
+    };
+    window.addCustomTag = function(type, inputId) {
+        const inp = document.getElementById(inputId);
+        const val = inp.value.trim();
+        if (!val || tags[type].includes(val)) return;
+        tags[type].push(val);
+        inp.value = "";
+        renderTags(type);
+    };
+    function removeTag(type, value) {
+        tags[type] = tags[type].filter(t => t !== value);
+        document.querySelectorAll(".pill-btn").forEach(b => {
+            if (b.textContent.includes(value)) b.classList.remove("added");
+        });
+        renderTags(type);
+    }
+    function renderTags(type) {
+        const el = document.getElementById(type === "allergies" ? "allergies-tags" : "history-tags");
+        el.innerHTML = tags[type].map(t =>
+            `<span class="tag-badge ${type === 'history' ? 'history' : ''}">${t}<button onclick="window._removeTag('${type}','${t}')">&times;</button></span>`
+        ).join("");
+    }
+    window._removeTag = removeTag;
+
+    // Step navigation
+    let currentStep = 1;
+    window.goStep = function(step) {
+        if (step > currentStep && !validateStep(currentStep)) return;
+        document.getElementById("step-" + currentStep).style.display = "none";
+        document.getElementById("step-" + step).style.display = "";
+        currentStep = step;
+        updateStepBar();
+    };
+    function updateStepBar() {
+        for (let i = 1; i <= 3; i++) {
+            const si = document.getElementById("si-" + i);
+            si.classList.remove("active", "done");
+            if (i < currentStep) si.classList.add("done");
+            else if (i === currentStep) si.classList.add("active");
+            const dot = si.querySelector(".step-dot");
+            dot.textContent = i < currentStep ? "\u2713" : i;
+        }
+        for (let i = 1; i <= 2; i++) {
+            document.getElementById("sl-" + i).classList.toggle("done", i < currentStep);
+        }
+    }
+
+    function validateStep(step) {
+        if (step === 1) {
+            const name = document.getElementById("s-name").value.trim();
+            const email = document.getElementById("s-email").value.trim();
+            const pw = document.getElementById("s-password").value;
+            const confirm = document.getElementById("s-confirm").value;
+            let ok = true;
+            if (!name) { ok = false; }
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                show("err-email", "Valid email required."); ok = false;
+            } else hide("err-email");
+            if (pw.length < 8) { ok = false; }
+            if (pw !== confirm) { show("err-confirm", "Passwords do not match."); ok = false; } else hide("err-confirm");
+            return ok;
+        }
+        if (step === 2) {
+            const nric = document.getElementById("s-nric").value.trim();
+            const dob = document.getElementById("s-dob").value;
+            const phone = document.getElementById("s-phone").value.trim();
+            const addr = document.getElementById("s-address").value.trim();
+            const postal = document.getElementById("s-postal").value.trim();
+            let ok = true;
+            if (!/^[STFG]\d{7}[A-Z]$/.test(nric)) { show("err-nric", "Invalid NRIC format."); ok = false; } else hide("err-nric");
+            if (!dob) ok = false;
+            if (!/^\+65\d{8}$/.test(phone)) { show("err-phone", "Format: +65XXXXXXXX"); ok = false; } else hide("err-phone");
+            if (!addr) ok = false;
+            if (!/^\d{6}$/.test(postal)) { show("err-postal", "6 digits required."); ok = false; } else hide("err-postal");
+            return ok;
+        }
+        return true;
+    }
+    function show(id, msg) { const e = document.getElementById(id); e.textContent = msg; e.style.display = ""; }
+    function hide(id) { document.getElementById(id).style.display = "none"; }
+
+    // Password strength
+    document.getElementById("s-password").addEventListener("input", function() {
+        const pw = this.value;
+        const fill = document.getElementById("str-fill");
+        const txt = document.getElementById("str-text");
+        if (pw.length < 8) { fill.style.width = "33%"; fill.style.background = "#ef4444"; txt.textContent = "Weak"; txt.style.color = "#ef4444"; }
+        else if (pw.length >= 12 && /[a-z]/.test(pw) && /[A-Z]/.test(pw) && /\d/.test(pw) && /[^a-zA-Z0-9]/.test(pw)) { fill.style.width = "100%"; fill.style.background = "#16a34a"; txt.textContent = "Strong"; txt.style.color = "#16a34a"; }
+        else { fill.style.width = "66%"; fill.style.background = "#f59e0b"; txt.textContent = "Fair"; txt.style.color = "#b45309"; }
+    });
+
+    // Set max DOB
+    const dob = document.getElementById("s-dob");
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    dob.max = yesterday.toISOString().split("T")[0];
+
+    // Create account
+    window.createAccount = async function() {
+        const btn = document.getElementById("create-btn");
+        const errDiv = document.getElementById("step3-error");
+        errDiv.style.display = "none";
+        btn.disabled = true; btn.textContent = "Creating your account...";
+
+        const name = document.getElementById("s-name").value.trim();
+        const email = document.getElementById("s-email").value.trim();
+        const password = document.getElementById("s-password").value;
+        let firebaseUser = null;
+
+        try {
+            // 1. Create Firebase Auth account
+            const cred = await fbAuth.createUserWithEmailAndPassword(email, password);
+            firebaseUser = cred.user;
+
+            // 2. Register in patient-service
+            const res = await fetch(cfg.patientUrl + "/patient", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: name,
+                    email: email,
+                    phone: document.getElementById("s-phone").value.trim(),
+                    NRIC: document.getElementById("s-nric").value.trim(),
+                    address: document.getElementById("s-address").value.trim(),
+                    postalCode: document.getElementById("s-postal").value.trim(),
+                    birthDate: document.getElementById("s-dob").value,
+                    allergies: tags.allergies,
+                    pastHistory: tags.history
+                })
+            });
+            if (!res.ok) {
+                const e = await res.json().catch(() => ({}));
+                throw new Error(e.error || e.message || "Registration failed");
+            }
+            const data = await res.json();
+
+            // 3. Write Firestore users doc
+            await fbDb.collection("users").doc(firebaseUser.uid).set({
+                uid: firebaseUser.uid,
+                role: "patient",
+                name: name,
+                linkedID: data.patientID
+            });
+
+            // 4. Show welcome
+            document.getElementById("step-3").style.display = "none";
+            document.getElementById("step-welcome").style.display = "";
+            document.getElementById("welcome-name").textContent = "Welcome to MediConnect, " + name + "!";
+            document.querySelector(".steps-bar").style.display = "none";
+
+            // Countdown redirect
+            let sec = 8;
+            const cdEl = document.getElementById("countdown");
+            const timer = setInterval(() => {
+                sec--;
+                cdEl.textContent = sec;
+                if (sec <= 0) { clearInterval(timer); location.href = "/patient/dashboard"; }
+            }, 1000);
+
+        } catch (err) {
+            // Cleanup Firebase user on failure
+            if (firebaseUser && err.message !== "Registration failed") {
+                try { await firebaseUser.delete(); } catch(e) {}
+            }
+            errDiv.textContent = err.message || "Account creation failed.";
+            errDiv.style.display = "";
+            btn.disabled = false; btn.textContent = "Create Account";
+        }
+    };
+})();
+</script>
+{% endblock %}

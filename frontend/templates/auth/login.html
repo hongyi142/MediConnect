@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Login - MediConnect{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-header">
+            <a href="/" class="auth-logo">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span>MediConnect</span>
+            </a>
+        </div>
+
+        <div class="role-toggle" id="role-toggle">
+            <button class="role-pill active" data-role="patient">Patient</button>
+            <button class="role-pill" data-role="doctor">Doctor</button>
+            <button class="role-pill" data-role="rider">Rider</button>
+        </div>
+
+        <form id="login-form" onsubmit="return false">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" required autocomplete="email" placeholder="you@example.com">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div class="input-password-wrap">
+                    <input type="password" id="password" required autocomplete="current-password" placeholder="Enter your password">
+                    <button type="button" class="password-toggle" id="toggle-pw" aria-label="Toggle password visibility">
+                        <svg id="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5"><path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <svg id="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5" style="display:none"><path d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div id="login-error" class="alert alert-error" style="display:none"></div>
+            <button type="submit" class="btn btn-primary btn-block" id="login-btn">Login</button>
+        </form>
+
+        <div class="auth-links">
+            <button type="button" class="link-btn" id="forgot-btn">Forgot password?</button>
+            <div class="auth-divider"><span>or</span></div>
+            <a href="/auth/signup" class="link-btn">New patient? Create an account &rarr;</a>
+            <p class="text-muted text-sm">Doctors and riders: contact your administrator for access.</p>
+        </div>
+
+        <div id="forgot-panel" style="display:none" class="forgot-panel">
+            <p class="text-sm mb-2">Enter your email to receive a password reset link.</p>
+            <input type="email" id="forgot-email" placeholder="Email address">
+            <div class="flex gap-2 mt-2">
+                <button class="btn btn-primary btn-sm" id="send-reset-btn">Send Reset Link</button>
+                <button class="btn btn-secondary btn-sm" id="cancel-reset-btn">Cancel</button>
+            </div>
+            <div id="forgot-msg" class="mt-2" style="display:none"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-page{min-height:100vh;background:linear-gradient(135deg,#0d9488,#0f766e);display:flex;align-items:center;justify-content:center;padding:1.5rem}
+    .auth-card{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.12)}
+    .auth-header{text-align:center;margin-bottom:1.5rem}
+    .auth-logo{display:inline-flex;align-items:center;gap:.5rem;text-decoration:none;font-size:1.25rem;font-weight:700;color:#0d9488}
+    .role-toggle{display:flex;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:1.5rem}
+    .role-pill{flex:1;padding:.625rem;border:none;background:#fff;color:#0d9488;font-weight:500;font-size:.875rem;cursor:pointer;transition:all .15s}
+    .role-pill.active{background:#0d9488;color:#fff}
+    .role-pill:not(:last-child){border-right:1px solid #e2e8f0}
+    .form-group{margin-bottom:1rem}
+    .form-group label{display:block;font-size:.875rem;font-weight:500;color:#1e293b;margin-bottom:.375rem}
+    .form-group input{width:100%;padding:.625rem .75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.875rem;box-sizing:border-box;min-height:44px}
+    .form-group input:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.15)}
+    .input-password-wrap{position:relative}
+    .input-password-wrap input{padding-right:2.75rem}
+    .password-toggle{position:absolute;right:.625rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;display:flex}
+    .auth-links{text-align:center;margin-top:1.25rem}
+    .link-btn{background:none;border:none;color:#0d9488;cursor:pointer;font-size:.875rem;font-weight:500;padding:.25rem}
+    .link-btn:hover{text-decoration:underline}
+    a.link-btn{text-decoration:none}
+    .auth-divider{display:flex;align-items:center;gap:.75rem;margin:1rem 0;color:#94a3b8;font-size:.8125rem}
+    .auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:#e2e8f0}
+    .forgot-panel{margin-top:1rem;padding:1rem;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0}
+    .forgot-panel input{width:100%;padding:.5rem .75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.875rem;box-sizing:border-box}
+    .btn-block{width:100%}
+    .btn-primary{background:#0d9488;color:#fff;border:none;padding:.625rem 1.25rem;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer;min-height:44px;transition:background .15s}
+    .btn-primary:hover{background:#0f766e}
+    .btn-secondary{background:#fff;color:#0d9488;border:1px solid #0d9488;padding:.5rem 1rem;border-radius:8px;font-weight:500;font-size:.875rem;cursor:pointer}
+    .btn-sm{padding:.375rem .75rem;font-size:.8125rem}
+    .alert-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.75rem;border-radius:8px;font-size:.875rem;margin-bottom:1rem}
+    .text-muted{color:#64748b}.text-sm{font-size:.8125rem}.mt-2{margin-top:.5rem}.mb-2{margin-bottom:.5rem}.flex{display:flex}.gap-2{gap:.5rem}
+</style>
+
+<script>
+(function() {
+    // Role toggle (cosmetic only)
+    document.querySelectorAll(".role-pill").forEach(pill => {
+        pill.addEventListener("click", () => {
+            document.querySelectorAll(".role-pill").forEach(p => p.classList.remove("active"));
+            pill.classList.add("active");
+        });
+    });
+
+    // Password toggle
+    document.getElementById("toggle-pw").addEventListener("click", () => {
+        const pw = document.getElementById("password");
+        const isHidden = pw.type === "password";
+        pw.type = isHidden ? "text" : "password";
+        document.getElementById("eye-open").style.display = isHidden ? "none" : "";
+        document.getElementById("eye-closed").style.display = isHidden ? "" : "none";
+    });
+
+    // Login
+    document.getElementById("login-form").addEventListener("submit", async () => {
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+        const btn = document.getElementById("login-btn");
+        const errDiv = document.getElementById("login-error");
+        errDiv.style.display = "none";
+        btn.disabled = true; btn.textContent = "Signing in...";
+
+        try {
+            const cred = await fbAuth.signInWithEmailAndPassword(email, password);
+            const snap = await fbDb.collection("users").doc(cred.user.uid).get();
+            if (!snap.exists) {
+                await fbAuth.signOut();
+                errDiv.textContent = "Account not fully set up. Contact your administrator.";
+                errDiv.style.display = ""; btn.disabled = false; btn.textContent = "Login";
+                return;
+            }
+            const user = snap.data();
+            if (user.role === "patient") location.href = "/patient/dashboard";
+            else if (user.role === "doctor") location.href = "/doctor/dashboard";
+            else if (user.role === "rider") location.href = "/rider/dashboard";
+            else { errDiv.textContent = "Unknown role."; errDiv.style.display = ""; }
+        } catch (err) {
+            const msgs = {
+                "auth/user-not-found": "No account found with this email.",
+                "auth/wrong-password": "Incorrect password.",
+                "auth/invalid-email": "Please enter a valid email address.",
+                "auth/too-many-requests": "Too many attempts. Please try again later.",
+                "auth/user-disabled": "This account has been disabled.",
+                "auth/invalid-credential": "Invalid email or password."
+            };
+            errDiv.textContent = msgs[err.code] || "Login failed. Please try again.";
+            errDiv.style.display = "";
+        }
+        btn.disabled = false; btn.textContent = "Login";
+    });
+
+    // Forgot password
+    document.getElementById("forgot-btn").addEventListener("click", () => {
+        document.getElementById("forgot-panel").style.display = "";
+        document.getElementById("forgot-email").value = document.getElementById("email").value;
+    });
+    document.getElementById("cancel-reset-btn").addEventListener("click", () => {
+        document.getElementById("forgot-panel").style.display = "none";
+    });
+    document.getElementById("send-reset-btn").addEventListener("click", async () => {
+        const email = document.getElementById("forgot-email").value.trim();
+        const msg = document.getElementById("forgot-msg");
+        if (!email) { msg.textContent = "Enter an email."; msg.style.display = ""; msg.style.color = "#b91c1c"; return; }
+        try {
+            await fbAuth.sendPasswordResetEmail(email);
+            msg.textContent = "Password reset email sent. Check your inbox.";
+            msg.style.color = "#0d9488"; msg.style.display = "";
+        } catch (e) {
+            msg.textContent = "Could not send reset email. Check the address.";
+            msg.style.color = "#b91c1c"; msg.style.display = "";
+        }
+    });
+
+    // Redirect if already logged in
+    fbAuth.onAuthStateChanged(async (u) => {
+        if (!u) return;
+        const s = await fbDb.collection("users").doc(u.uid).get();
+        if (!s.exists) return;
+        const r = s.data().role;
+        if (r === "patient") location.href = "/patient/dashboard";
+        else if (r === "doctor") location.href = "/doctor/dashboard";
+        else if (r === "rider") location.href = "/rider/dashboard";
+    });
+})();
+</script>
+{% endblock %}

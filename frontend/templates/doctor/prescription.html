@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}Prescription - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Prescribe Medications</h1>
+        <p class="text-muted" id="context-info"></p>
+    </div>
+    <div class="two-col">
+        <div class="col-left">
+            <div class="card" id="med-list"><p class="text-muted">Loading medications...</p></div>
+            <div class="running-total" id="running-total">Selected: 0 items | Total: $0.00</div>
+        </div>
+        <div class="col-right">
+            <div class="card">
+                <h2>Order Summary</h2>
+                <div id="order-summary"><p class="text-muted text-sm">Select medications to see summary.</p></div>
+                <div class="mc-section">
+                    <div class="mc-toggle">
+                        <label class="toggle-label"><input type="checkbox" id="mc-toggle" onchange="toggleMC()"> Issue Medical Certificate</label>
+                    </div>
+                    <div id="mc-form" style="display:none">
+                        <div class="form-group"><label>Diagnosis *</label><input id="mc-diagnosis" required></div>
+                        <div class="form-row">
+                            <div class="form-group flex-1"><label>Start Date</label><input type="date" id="mc-start"></div>
+                            <div class="form-group flex-1"><label>Days</label><input type="number" id="mc-days" min="1" value="2" onchange="updateMCEnd()"></div>
+                        </div>
+                        <div class="form-group"><label>End Date</label><input type="date" id="mc-end" readonly></div>
+                    </div>
+                </div>
+                <div id="complete-error" class="alert alert-error" style="display:none"></div>
+                <button class="btn btn-primary btn-block" id="complete-btn" onclick="completeConsultation()" disabled>Complete Consultation</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container{max-width:1000px;margin:0 auto;padding:2rem 1.5rem}
+    .page-header h1{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0}
+    .text-muted{color:#64748b;font-size:.875rem}.text-sm{font-size:.8125rem}
+    .two-col{display:grid;grid-template-columns:58% 42%;gap:1.5rem;margin-top:1.5rem}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .card h2{font-size:1.0625rem;font-weight:600;margin:0 0 1rem;color:#1e293b}
+    .med-card{border:1px solid #e2e8f0;border-radius:8px;padding:.75rem 1rem;margin-bottom:.5rem;display:flex;align-items:center;gap:.75rem;transition:all .15s}
+    .med-card.selected{border-left:3px solid #0d9488;background:#f0fdfa}
+    .med-card input[type="checkbox"]{width:18px;height:18px;accent-color:#0d9488;cursor:pointer}
+    .med-info{flex:1}
+    .med-name{font-weight:600;font-size:.875rem;color:#1e293b}
+    .med-price{font-size:.75rem;color:#64748b}
+    .med-qty{width:60px;padding:.375rem;border:1px solid #e2e8f0;border-radius:6px;text-align:center;font-size:.8125rem;min-height:32px}
+    .med-qty:disabled{background:#f8fafc;color:#94a3b8}
+    .running-total{background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:.75rem 1rem;margin-top:.75rem;font-weight:600;color:#0d9488;font-size:.875rem}
+    .mc-section{border-top:1px solid #e2e8f0;margin-top:1rem;padding-top:1rem}
+    .toggle-label{display:flex;align-items:center;gap:.5rem;font-size:.875rem;font-weight:500;color:#1e293b;cursor:pointer}
+    .toggle-label input{accent-color:#0d9488;width:16px;height:16px}
+    .form-group{margin-bottom:.75rem}
+    .form-group label{display:block;font-size:.8125rem;font-weight:500;margin-bottom:.25rem;color:#1e293b}
+    .form-group input{width:100%;padding:.5rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.8125rem;box-sizing:border-box;min-height:36px}
+    .form-row{display:flex;gap:.75rem}
+    .flex-1{flex:1}
+    .btn{padding:.625rem 1.25rem;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer;border:none;min-height:44px;transition:all .15s}
+    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .btn-primary:disabled{background:#e2e8f0;color:#94a3b8;cursor:not-allowed}
+    .btn-block{width:100%}
+    .alert-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.75rem;border-radius:8px;font-size:.875rem;margin-bottom:.75rem}
+    .summary-item{display:flex;justify-content:space-between;font-size:.8125rem;padding:.25rem 0;border-bottom:1px solid #f1f5f9}
+    .summary-total{display:flex;justify-content:space-between;font-weight:700;font-size:1rem;padding:.5rem 0;color:#0d9488;border-top:2px solid #e2e8f0;margin-top:.5rem}
+    @media(max-width:768px){.two-col{grid-template-columns:1fr}}
+</style>
+
+<script>
+    var medications = [], selected = {}, consultData = null, patientData = null;
+
+    fbAuth.onAuthStateChanged(async function(u) {
+        if (!u) { location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(u.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "doctor") { location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage(user);
+    });
+
+    async function initPage(user) {
+        var raw = sessionStorage.getItem("consultationData");
+        if (!raw) { location.href = "/doctor/dashboard"; return; }
+        consultData = JSON.parse(raw);
+        document.getElementById("context-info").textContent = "Appt: " + (consultData.apptID || "");
+
+        // Set MC defaults
+        var tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+        document.getElementById("mc-start").value = tmr.toISOString().split("T")[0];
+        updateMCEnd();
+
+        // Load patient data
+        var cfg = document.getElementById("svc-config").dataset;
+        var token = await fbAuth.currentUser.getIdToken();
+        try {
+            var aRes = await fetch(cfg.apptUrl + "/appointment/" + consultData.apptID, { headers: { "Authorization": "Bearer " + token } });
+            var appt = await aRes.json();
+            var pRes = await fetch(cfg.patientUrl + "/patient/" + appt.patientID, { headers: { "Authorization": "Bearer " + token } });
+            patientData = await pRes.json();
+            patientData.patientID = appt.patientID;
+        } catch(e) {}
+
+        // Load medications
+        try {
+            var res = await fetch(cfg.completeConsultationUrl + "/available-medications", { headers: { "Authorization": "Bearer " + token } });
+            var data = await res.json();
+            medications = data.medications || data || [];
+            renderMeds();
+        } catch(e) { document.getElementById("med-list").innerHTML = '<p style="color:#b91c1c">Could not load medications.</p>'; }
+    }
+
+    function renderMeds() {
+        var html = medications.map(function(m, i) {
+            var id = m.medicationID || m.id || i;
+            var price = m.price || m.unitPrice || 0;
+            var qty = m.quantity || m.Quantity || 0;
+            return '<div class="med-card" id="mc-' + id + '">' +
+                '<input type="checkbox" onchange="toggleMed(\'' + id + '\',' + price + ',\'' + (m.name||"") + '\')">' +
+                '<div class="med-info"><div class="med-name">' + (m.name||"Unknown") + '</div><div class="med-price">$' + Number(price).toFixed(2) + '/unit &middot; ' + qty + ' in stock</div></div>' +
+                '<input type="number" class="med-qty" id="qty-' + id + '" min="1" max="' + qty + '" value="1" disabled onchange="updateTotals()">' +
+                '</div>';
+        }).join("");
+        document.getElementById("med-list").innerHTML = html || '<p class="text-muted">No medications available.</p>';
+    }
+
+    function toggleMed(id, price, name) {
+        if (selected[id]) {
+            delete selected[id];
+            document.getElementById("mc-" + id).classList.remove("selected");
+            document.getElementById("qty-" + id).disabled = true;
+        } else {
+            selected[id] = { medicationID: id, medicationName: name, unitPrice: price, qty: 1 };
+            document.getElementById("mc-" + id).classList.add("selected");
+            document.getElementById("qty-" + id).disabled = false;
+        }
+        updateTotals();
+    }
+
+    function updateTotals() {
+        var total = 0, count = 0;
+        Object.keys(selected).forEach(function(id) {
+            var q = parseInt(document.getElementById("qty-" + id).value) || 1;
+            selected[id].qty = q;
+            total += q * selected[id].unitPrice;
+            count++;
+        });
+        document.getElementById("running-total").textContent = "Selected: " + count + " items | Total: $" + total.toFixed(2);
+        document.getElementById("complete-btn").disabled = count === 0;
+
+        var summaryHtml = Object.keys(selected).map(function(id) {
+            var m = selected[id];
+            return '<div class="summary-item"><span>' + m.medicationName + ' x' + m.qty + '</span><span>$' + (m.qty * m.unitPrice).toFixed(2) + '</span></div>';
+        }).join("");
+        summaryHtml += '<div class="summary-total"><span>Total</span><span>$' + total.toFixed(2) + '</span></div>';
+        document.getElementById("order-summary").innerHTML = count ? summaryHtml : '<p class="text-muted text-sm">Select medications to see summary.</p>';
+    }
+
+    function toggleMC() { document.getElementById("mc-form").style.display = document.getElementById("mc-toggle").checked ? "" : "none"; }
+    function updateMCEnd() {
+        var start = document.getElementById("mc-start").value;
+        var days = parseInt(document.getElementById("mc-days").value) || 1;
+        if (start) {
+            var end = new Date(start);
+            end.setDate(end.getDate() + days - 1);
+            document.getElementById("mc-end").value = end.toISOString().split("T")[0];
+        }
+    }
+
+    async function completeConsultation() {
+        var btn = document.getElementById("complete-btn");
+        var errDiv = document.getElementById("complete-error");
+        errDiv.style.display = "none";
+        btn.disabled = true; btn.textContent = "Processing...";
+
+        var cfg = document.getElementById("svc-config").dataset;
+        var meds = Object.values(selected);
+        var issueMC = document.getElementById("mc-toggle").checked;
+
+        var body = {
+            apptID: consultData.apptID,
+            patientID: patientData ? patientData.patientID : "",
+            doctorID: window.currentUser.linkedID,
+            notes: sessionStorage.getItem("doctorNotes") || "",
+            medications: meds,
+            issueMC: issueMC
+        };
+
+        if (issueMC) {
+            body.mcDetails = {
+                patientName: patientData ? patientData.name : "",
+                patientNRIC: patientData ? patientData.NRIC : "",
+                patientID: patientData ? patientData.patientID : "",
+                doctorName: window.currentUser.name,
+                diagnosis: document.getElementById("mc-diagnosis").value,
+                startDate: document.getElementById("mc-start").value,
+                endDate: document.getElementById("mc-end").value,
+                days: parseInt(document.getElementById("mc-days").value) || 1
+            };
+        }
+
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.completeConsultationUrl + "/complete-consultation", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify(body)
+            });
+            var data = await res.json();
+            if (res.status === 409) { errDiv.textContent = "Stock issue - recheck inventory."; errDiv.style.display = ""; btn.disabled = false; btn.textContent = "Complete Consultation"; return; }
+            if (!res.ok) throw new Error(data.error || data.message || "Failed");
+
+            // Store completion data for payment/MC flow
+            data.medications = meds;
+            sessionStorage.setItem("completionData", JSON.stringify(data));
+            sessionStorage.removeItem("doctorNotes");
+
+            if (issueMC) { location.href = "/doctor/mc"; }
+            else {
+                if (typeof showToast === "function") showToast("Order #" + (data.orderID||"") + " created! Total: $" + Number(data.totalAmount||0).toFixed(2));
+                setTimeout(function() { location.href = "/doctor/dashboard"; }, 4000);
+            }
+        } catch(e) {
+            errDiv.textContent = e.message; errDiv.style.display = "";
+            btn.disabled = false; btn.textContent = "Complete Consultation";
+        }
+    }
+</script>
+{% endblock %}

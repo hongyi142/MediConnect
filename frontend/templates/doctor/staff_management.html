@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Staff Management - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <h1 class="page-title">Staff Management</h1>
+    <div class="tab-bar">
+        <button class="tab active" onclick="switchTab('doctors',this)">Doctors</button>
+        <button class="tab" onclick="switchTab('riders',this)">Riders</button>
+    </div>
+
+    <div id="doctors-tab">
+        <div class="table-header"><h2>Doctors</h2><button class="btn btn-primary btn-sm" onclick="openModal('doctor')">+ Add Doctor</button></div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Specialisation</th><th>Email</th><th>Status</th></tr></thead><tbody id="doctors-body"><tr><td colspan="4" class="text-muted">Loading...</td></tr></tbody></table></div>
+    </div>
+
+    <div id="riders-tab" style="display:none">
+        <div class="table-header"><h2>Riders</h2><button class="btn btn-primary btn-sm" onclick="openModal('rider')">+ Add Rider</button></div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Phone</th><th>Status</th></tr></thead><tbody id="riders-body"><tr><td colspan="3" class="text-muted">Loading...</td></tr></tbody></table></div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal" style="display:none">
+    <div class="modal-card">
+        <div class="modal-header"><h3 id="modal-title">Add Staff</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" id="modal-submit" onclick="submitStaff()">Add</button>
+        </div>
+        <div id="modal-error" class="alert alert-error mt-2" style="display:none"></div>
+    </div>
+</div>
+
+<style>
+    .page-container{max-width:900px;margin:0 auto;padding:2rem 1.5rem}
+    .page-title{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0 0 1rem}
+    .tab-bar{display:flex;border-bottom:2px solid #e2e8f0;margin-bottom:1.5rem}
+    .tab{padding:.625rem 1.25rem;background:none;border:none;font-size:.875rem;font-weight:500;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+    .tab.active{color:#0d9488;border-bottom-color:#0d9488}
+    .table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+    .table-header h2{font-size:1.0625rem;font-weight:600;color:#1e293b;margin:0}
+    .table-wrap{background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+    .data-table{width:100%;border-collapse:collapse;font-size:.8125rem}
+    .data-table th{text-align:left;padding:.75rem 1rem;background:#f8fafc;color:#64748b;font-weight:500;border-bottom:1px solid #e2e8f0}
+    .data-table td{padding:.75rem 1rem;border-bottom:1px solid #f1f5f9;color:#1e293b}
+    .data-table tr:last-child td{border:none}
+    .status-available{color:#16a34a;font-weight:500}.status-busy{color:#b45309;font-weight:500}
+    .btn{padding:.5rem 1rem;border-radius:8px;font-weight:600;font-size:.8125rem;cursor:pointer;border:none;min-height:36px;transition:all .15s}
+    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .btn-secondary{background:#fff;color:#0d9488;border:1px solid #0d9488}
+    .btn-sm{padding:.375rem .75rem;font-size:.8125rem}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}
+    .modal-card{background:#fff;border-radius:12px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;padding:1.25rem 1.5rem;border-bottom:1px solid #e2e8f0}
+    .modal-header h3{margin:0;font-size:1.0625rem;font-weight:600;color:#1e293b}
+    .modal-close{background:none;border:none;font-size:1.5rem;cursor:pointer;color:#64748b;padding:0;line-height:1}
+    .modal-body{padding:1.5rem}
+    .modal-footer{padding:.75rem 1.5rem;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:.5rem}
+    .form-group{margin-bottom:1rem}
+    .form-group label{display:block;font-size:.875rem;font-weight:500;margin-bottom:.375rem;color:#1e293b}
+    .form-group input,.form-group select{width:100%;padding:.625rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.875rem;box-sizing:border-box;min-height:44px}
+    .alert-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.75rem;border-radius:8px;font-size:.875rem;margin:0 1.5rem 1rem}
+    .text-muted{color:#64748b;text-align:center;padding:1rem}.mt-2{margin-top:.5rem}
+</style>
+
+<script>
+    var modalType = "doctor";
+
+    fbAuth.onAuthStateChanged(async function(u) {
+        if (!u) { location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(u.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "doctor") { location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage(user);
+    });
+
+    function initPage(user) {
+        var cfg = document.getElementById("svc-config").dataset;
+        loadDoctors(cfg);
+        loadRiders(cfg);
+    }
+
+    async function loadDoctors(cfg) {
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.doctorUrl + "/doctor/available", { headers: { "Authorization": "Bearer " + token } });
+            var data = await res.json();
+            var docs = data.doctors || data || [];
+            if (!docs.length) { document.getElementById("doctors-body").innerHTML = '<tr><td colspan="4" class="text-muted">No doctors found.</td></tr>'; return; }
+            document.getElementById("doctors-body").innerHTML = docs.map(function(d) {
+                return '<tr><td>' + (d.name||"") + '</td><td>' + (d.specialisation||"") + '</td><td>' + (d.email||"") + '</td><td class="status-' + (d.status||"available") + '">' + (d.status||"available") + '</td></tr>';
+            }).join("");
+        } catch(e) { document.getElementById("doctors-body").innerHTML = '<tr><td colspan="4" class="text-muted">Could not load doctors.</td></tr>'; }
+    }
+
+    async function loadRiders(cfg) {
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.riderUrl + "/rider/free", { headers: { "Authorization": "Bearer " + token } });
+            var data = await res.json();
+            var riders = data.data || data || [];
+            if (!riders.length) { document.getElementById("riders-body").innerHTML = '<tr><td colspan="3" class="text-muted">No riders found.</td></tr>'; return; }
+            document.getElementById("riders-body").innerHTML = riders.map(function(r) {
+                return '<tr><td>' + (r.name||"") + '</td><td>' + (r.phone||"") + '</td><td class="status-' + (r.status||"available") + '">' + (r.status||"available") + '</td></tr>';
+            }).join("");
+        } catch(e) { document.getElementById("riders-body").innerHTML = '<tr><td colspan="3" class="text-muted">Could not load riders.</td></tr>'; }
+    }
+
+    function switchTab(tab, btn) {
+        document.querySelectorAll(".tab").forEach(function(t) { t.classList.remove("active"); });
+        btn.classList.add("active");
+        document.getElementById("doctors-tab").style.display = tab === "doctors" ? "" : "none";
+        document.getElementById("riders-tab").style.display = tab === "riders" ? "" : "none";
+    }
+
+    function openModal(type) {
+        modalType = type;
+        document.getElementById("modal-title").textContent = type === "doctor" ? "Add Doctor" : "Add Rider";
+        document.getElementById("modal-error").style.display = "none";
+        if (type === "doctor") {
+            document.getElementById("modal-body").innerHTML =
+                '<div class="form-group"><label>Name *</label><input id="m-name"></div>' +
+                '<div class="form-group"><label>Specialisation *</label><select id="m-spec"><option>General Practice</option><option>Dermatology</option><option>Cardiology</option><option>Orthopaedics</option><option>ENT</option><option>Ophthalmology</option><option>Gastroenterology</option><option>Neurology</option><option>Psychiatry</option><option>Gynaecology</option><option>Paediatrics</option></select></div>' +
+                '<div class="form-group"><label>Email *</label><input type="email" id="m-email"></div>' +
+                '<div class="form-group"><label>Phone *</label><input id="m-phone"></div>';
+        } else {
+            document.getElementById("modal-body").innerHTML =
+                '<div class="form-group"><label>Name *</label><input id="m-name"></div>' +
+                '<div class="form-group"><label>Phone *</label><input id="m-phone"></div>';
+        }
+        document.getElementById("modal").style.display = "flex";
+    }
+
+    function closeModal() { document.getElementById("modal").style.display = "none"; }
+
+    async function submitStaff() {
+        var cfg = document.getElementById("svc-config").dataset;
+        var name = document.getElementById("m-name").value.trim();
+        var phone = document.getElementById("m-phone").value.trim();
+        var errDiv = document.getElementById("modal-error");
+        errDiv.style.display = "none";
+
+        if (!name || !phone) { errDiv.textContent = "All fields required."; errDiv.style.display = ""; return; }
+
+        var btn = document.getElementById("modal-submit");
+        btn.disabled = true; btn.textContent = "Adding...";
+        var token = await fbAuth.currentUser.getIdToken();
+
+        try {
+            if (modalType === "doctor") {
+                var email = document.getElementById("m-email").value.trim();
+                var spec = document.getElementById("m-spec").value;
+                var res = await fetch(cfg.doctorUrl + "/doctor", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                    body: JSON.stringify({ name: name, specialisation: spec, email: email, phone: phone })
+                });
+                if (!res.ok) { var e = await res.json(); throw new Error(e.error || "Failed"); }
+                loadDoctors(cfg);
+            } else {
+                var res = await fetch(cfg.riderUrl + "/rider", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                    body: JSON.stringify({ name: name, phone: phone })
+                });
+                if (!res.ok) { var e = await res.json(); throw new Error(e.error || "Failed"); }
+                loadRiders(cfg);
+            }
+            closeModal();
+            if (typeof showToast === "function") showToast(modalType.charAt(0).toUpperCase() + modalType.slice(1) + " added successfully!");
+        } catch(e) {
+            errDiv.textContent = e.message;
+            errDiv.style.display = "";
+        }
+        btn.disabled = false; btn.textContent = "Add";
+    }
+</script>
+{% endblock %}

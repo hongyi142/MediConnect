@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Inventory - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header-row">
+        <h1 class="page-title">Inventory Management</h1>
+        <button class="btn btn-primary" onclick="openAddModal()">+ Add Medication</button>
+    </div>
+
+    <div class="stat-grid" id="stats"></div>
+
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Medication</th><th>Description</th><th>Stock</th><th>Price</th><th>Actions</th></tr></thead>
+            <tbody id="inv-body"><tr><td colspan="5" class="text-muted">Loading...</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Restock Modal -->
+<div class="modal-overlay" id="modal" style="display:none">
+    <div class="modal-card">
+        <div class="modal-header"><h3 id="modal-title">Add Medication</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" id="modal-submit">Save</button>
+        </div>
+        <div id="modal-error" class="alert-err" style="display:none"></div>
+    </div>
+</div>
+
+<style>
+    .page-container{max-width:960px;margin:0 auto;padding:2rem 1.5rem}
+    .page-header-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem}
+    .page-title{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0}
+    .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+    .stat-box{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;text-align:center}
+    .stat-box .val{font-size:1.5rem;font-weight:700;color:#1e293b}
+    .stat-box .lbl{font-size:.75rem;color:#64748b;margin-top:.125rem}
+    .table-wrap{background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .data-table{width:100%;border-collapse:collapse;font-size:.8125rem}
+    .data-table th{text-align:left;padding:.75rem 1rem;background:#f8fafc;color:#64748b;font-weight:500;border-bottom:1px solid #e2e8f0}
+    .data-table td{padding:.75rem 1rem;border-bottom:1px solid #f1f5f9;color:#1e293b}
+    .data-table tr:last-child td{border:none}
+    .data-table tr.low{background:#fffbeb}.data-table tr.out{background:#fef2f2}
+    .warn-icon{color:#b45309;font-weight:700;margin-left:.25rem}
+    .btn{padding:.5rem 1rem;border-radius:8px;font-weight:600;font-size:.8125rem;cursor:pointer;border:none;min-height:36px;transition:all .15s}
+    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .btn-secondary{background:#fff;color:#0d9488;border:1px solid #0d9488}
+    .btn-sm{padding:.25rem .5rem;font-size:.75rem;min-height:28px}
+    .btn-amber{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
+    .action-btns{display:flex;gap:.375rem}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}
+    .modal-card{background:#fff;border-radius:12px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;padding:1.25rem 1.5rem;border-bottom:1px solid #e2e8f0}
+    .modal-header h3{margin:0;font-size:1.0625rem;font-weight:600;color:#1e293b}
+    .modal-close{background:none;border:none;font-size:1.5rem;cursor:pointer;color:#64748b;padding:0}
+    .modal-body{padding:1.5rem}
+    .modal-footer{padding:.75rem 1.5rem;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:.5rem}
+    .form-group{margin-bottom:.75rem}
+    .form-group label{display:block;font-size:.8125rem;font-weight:500;margin-bottom:.25rem;color:#1e293b}
+    .form-group input{width:100%;padding:.5rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.875rem;box-sizing:border-box;min-height:40px}
+    .alert-err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.5rem 1.5rem;font-size:.8125rem}
+    .text-muted{color:#64748b;text-align:center;padding:1rem}
+    @media(max-width:768px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+
+<script>
+    var allItems = [];
+
+    fbAuth.onAuthStateChanged(async function(u) {
+        if (!u) { location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(u.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "doctor") { location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        loadInventory();
+    });
+
+    async function loadInventory() {
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.invUrl + "/inventory", { headers: { "Authorization": "Bearer " + token } });
+            var data = await res.json();
+            allItems = data.data || data || [];
+            renderStats();
+            renderTable();
+        } catch(e) { document.getElementById("inv-body").innerHTML = '<tr><td colspan="5" class="text-muted">Could not load inventory.</td></tr>'; }
+    }
+
+    function renderStats() {
+        var total = allItems.length;
+        var inStock = allItems.filter(function(i) { return (i.quantity||i.Quantity||0) > 0; }).length;
+        var low = allItems.filter(function(i) { var q = i.quantity||i.Quantity||0; return q > 0 && q < 5; }).length;
+        var out = allItems.filter(function(i) { return (i.quantity||i.Quantity||0) === 0; }).length;
+        document.getElementById("stats").innerHTML =
+            '<div class="stat-box"><div class="val">' + total + '</div><div class="lbl">Total SKUs</div></div>' +
+            '<div class="stat-box"><div class="val">' + inStock + '</div><div class="lbl">In Stock</div></div>' +
+            '<div class="stat-box"><div class="val" style="color:#b45309">' + low + '</div><div class="lbl">Low Stock</div></div>' +
+            '<div class="stat-box"><div class="val" style="color:#ef4444">' + out + '</div><div class="lbl">Out of Stock</div></div>';
+    }
+
+    function renderTable() {
+        if (!allItems.length) { document.getElementById("inv-body").innerHTML = '<tr><td colspan="5" class="text-muted">No inventory items.</td></tr>'; return; }
+        document.getElementById("inv-body").innerHTML = allItems.map(function(item) {
+            var qty = item.quantity || item.Quantity || 0;
+            var cls = qty === 0 ? "out" : qty < 5 ? "low" : "";
+            var id = item.medicationID || item.id;
+            var warn = qty < 5 && qty > 0 ? '<span class="warn-icon">!</span>' : qty === 0 ? '<span style="color:#ef4444;font-weight:700"> OUT</span>' : '';
+            var actions = '<div class="action-btns">';
+            if (qty < 10) actions += '<button class="btn btn-amber btn-sm" onclick="openRestock(\'' + id + '\',' + qty + ',\'' + (item.name||"") + '\')">Restock</button>';
+            actions += '</div>';
+            return '<tr class="' + cls + '"><td>' + (item.name||"") + '</td><td>' + (item.description||"") + '</td><td>' + qty + warn + '</td><td>$' + Number(item.price||0).toFixed(2) + '</td><td>' + actions + '</td></tr>';
+        }).join("");
+    }
+
+    function openAddModal() {
+        document.getElementById("modal-title").textContent = "Add Medication";
+        document.getElementById("modal-body").innerHTML =
+            '<div class="form-group"><label>Name *</label><input id="m-name"></div>' +
+            '<div class="form-group"><label>Description</label><input id="m-desc"></div>' +
+            '<div class="form-group"><label>Quantity *</label><input type="number" id="m-qty" min="0" value="0"></div>' +
+            '<div class="form-group"><label>Price *</label><input type="number" id="m-price" min="0" step="0.01" value="0"></div>';
+        document.getElementById("modal-error").style.display = "none";
+        document.getElementById("modal-submit").onclick = submitAdd;
+        document.getElementById("modal").style.display = "flex";
+    }
+
+    function openRestock(id, currentQty, name) {
+        document.getElementById("modal-title").textContent = "Restock: " + name;
+        document.getElementById("modal-body").innerHTML =
+            '<p style="font-size:.8125rem;color:#64748b;margin:0 0 1rem">Current stock: ' + currentQty + '</p>' +
+            '<div class="form-group"><label>Add Quantity</label><input type="number" id="m-restock-qty" min="1" value="10"></div>';
+        document.getElementById("modal-error").style.display = "none";
+        document.getElementById("modal-submit").onclick = function() { submitRestock(id); };
+        document.getElementById("modal").style.display = "flex";
+    }
+
+    function closeModal() { document.getElementById("modal").style.display = "none"; }
+
+    async function submitAdd() {
+        var cfg = document.getElementById("svc-config").dataset;
+        var name = document.getElementById("m-name").value.trim();
+        var errDiv = document.getElementById("modal-error");
+        if (!name) { errDiv.textContent = "Name required."; errDiv.style.display = ""; return; }
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.invUrl + "/inventory", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({
+                    name: name,
+                    description: document.getElementById("m-desc").value.trim(),
+                    quantity: parseInt(document.getElementById("m-qty").value) || 0,
+                    price: parseFloat(document.getElementById("m-price").value) || 0
+                })
+            });
+            if (!res.ok) throw new Error("Failed");
+            closeModal(); loadInventory();
+            if (typeof showToast === "function") showToast("Medication added!");
+        } catch(e) { errDiv.textContent = "Could not add medication."; errDiv.style.display = ""; }
+    }
+
+    async function submitRestock(id) {
+        var cfg = document.getElementById("svc-config").dataset;
+        var qty = parseInt(document.getElementById("m-restock-qty").value) || 0;
+        if (qty < 1) return;
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.invUrl + "/inventory/" + id, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({ quantity: qty })
+            });
+            if (!res.ok) throw new Error("Failed");
+            closeModal(); loadInventory();
+            if (typeof showToast === "function") showToast("Restocked!");
+        } catch(e) { document.getElementById("modal-error").textContent = "Restock failed."; document.getElementById("modal-error").style.display = ""; }
+    }
+</script>
+{% endblock %}

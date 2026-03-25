@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Consultation - MediConnect{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="consult-layout">
+    <div class="video-area">
+        <div class="video-container">
+            <div id="remote-video" class="remote-video"></div>
+            <div id="local-video" class="local-video"></div>
+            <div class="video-status" id="video-status">Connecting...</div>
+        </div>
+        <div class="controls-bar">
+            <button class="ctrl-btn" id="mute-btn" onclick="toggleMute()" title="Toggle Microphone">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><path d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/></svg>
+            </button>
+            <button class="ctrl-btn" id="cam-btn" onclick="toggleCamera()" title="Toggle Camera">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>
+            </button>
+            <button class="ctrl-btn ctrl-leave" onclick="leaveCall()" title="Leave">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><path d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"/></svg>
+            </button>
+        </div>
+    </div>
+    <div class="info-panel">
+        <div class="panel-card">
+            <h3>Consultation Info</h3>
+            <div id="consult-info"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+    body{margin:0;background:#0f172a}
+    .consult-layout{display:grid;grid-template-columns:1fr 300px;height:100vh}
+    .video-area{display:flex;flex-direction:column;background:#0f172a}
+    .video-container{flex:1;position:relative;overflow:hidden}
+    .remote-video{width:100%;height:100%;background:#1e293b;display:flex;align-items:center;justify-content:center}
+    .remote-video video{width:100%;height:100%;object-fit:cover}
+    .local-video{position:absolute;bottom:1rem;right:1rem;width:180px;height:120px;border-radius:8px;background:#334155;overflow:hidden;border:2px solid rgba(255,255,255,.2)}
+    .local-video video{width:100%;height:100%;object-fit:cover}
+    .video-status{position:absolute;top:1rem;left:1rem;background:rgba(0,0,0,.5);color:#fff;padding:.25rem .75rem;border-radius:999px;font-size:.75rem}
+    .controls-bar{display:flex;justify-content:center;gap:1rem;padding:1rem;background:#1e293b}
+    .ctrl-btn{width:48px;height:48px;border-radius:50%;border:none;background:#334155;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+    .ctrl-btn:hover{background:#475569}
+    .ctrl-btn.active{background:#ef4444}
+    .ctrl-leave{background:#ef4444}
+    .ctrl-leave:hover{background:#dc2626}
+    .info-panel{background:#1e293b;border-left:1px solid #334155;padding:1.5rem;overflow-y:auto}
+    .panel-card{background:#334155;border-radius:12px;padding:1rem}
+    .panel-card h3{color:#fff;font-size:.9375rem;font-weight:600;margin:0 0 .75rem}
+    #consult-info{color:#94a3b8;font-size:.8125rem}
+    #consult-info .row{display:flex;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid #475569}
+    #consult-info .row:last-child{border:none}
+    #consult-info .val{color:#e2e8f0;font-weight:500}
+    @media(max-width:768px){.consult-layout{grid-template-columns:1fr}.info-panel{display:none}}
+</style>
+
+<script>
+    var room = null, localTracks = [];
+
+    fbAuth.onAuthStateChanged(async function(u) {
+        if (!u) { location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(u.uid).get();
+        if (!snap.exists) { location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "patient") { location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage(user);
+    });
+
+    function initPage(user) {
+        var raw = sessionStorage.getItem("consultationData");
+        if (!raw) { location.href = "/patient/join"; return; }
+        var data = JSON.parse(raw);
+
+        document.getElementById("consult-info").innerHTML =
+            '<div class="row"><span>Room</span><span class="val">' + (data.roomName || "N/A") + '</span></div>' +
+            '<div class="row"><span>Appt ID</span><span class="val">' + (data.apptID || "N/A") + '</span></div>';
+
+        connectVideo(data.patientToken, data.roomName);
+    }
+
+    async function connectVideo(token, roomName) {
+        if (!token || !window.Twilio) {
+            document.getElementById("video-status").textContent = "Video unavailable";
+            return;
+        }
+        try {
+            room = await Twilio.Video.connect(token, { name: roomName, audio: true, video: { width: 640 } });
+            document.getElementById("video-status").textContent = "Connected";
+
+            room.localParticipant.tracks.forEach(function(pub) {
+                if (pub.track) {
+                    localTracks.push(pub.track);
+                    document.getElementById("local-video").appendChild(pub.track.attach());
+                }
+            });
+
+            room.participants.forEach(handleParticipant);
+            room.on("participantConnected", handleParticipant);
+            room.on("participantDisconnected", function() {
+                document.getElementById("remote-video").innerHTML = "";
+                document.getElementById("video-status").textContent = "Doctor disconnected";
+            });
+        } catch(e) {
+            document.getElementById("video-status").textContent = "Connection failed";
+        }
+    }
+
+    function handleParticipant(participant) {
+        participant.tracks.forEach(function(pub) {
+            if (pub.isSubscribed && pub.track) {
+                document.getElementById("remote-video").appendChild(pub.track.attach());
+            }
+        });
+        participant.on("trackSubscribed", function(track) {
+            document.getElementById("remote-video").appendChild(track.attach());
+        });
+    }
+
+    function toggleMute() {
+        var btn = document.getElementById("mute-btn");
+        localTracks.forEach(function(t) { if (t.kind === "audio") { t.isEnabled ? t.disable() : t.enable(); } });
+        btn.classList.toggle("active");
+    }
+
+    function toggleCamera() {
+        var btn = document.getElementById("cam-btn");
+        localTracks.forEach(function(t) { if (t.kind === "video") { t.isEnabled ? t.disable() : t.enable(); } });
+        btn.classList.toggle("active");
+    }
+
+    function leaveCall() {
+        if (room) room.disconnect();
+        localTracks.forEach(function(t) { t.stop(); });
+        location.href = "/patient/dashboard";
+    }
+</script>
+{% endblock %}

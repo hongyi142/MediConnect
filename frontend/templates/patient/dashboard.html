@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header" id="page-header">
+        <h1 id="greeting"></h1>
+        <p class="text-muted" id="today-date"></p>
+    </div>
+
+    <div class="quick-actions">
+        <a href="/patient/symptom-checker" class="action-card">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="1.5"><path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>
+            <h3>Check Symptoms</h3>
+            <p>AI-powered symptom assessment</p>
+        </a>
+        <a href="/patient/book" class="action-card">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="1.5"><path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+            <h3>Book Appointment</h3>
+            <p>Schedule a consultation</p>
+        </a>
+        <a href="/patient/appointments" class="action-card">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="1.5"><path d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"/></svg>
+            <h3>My Appointments</h3>
+            <p>View and manage bookings</p>
+        </a>
+        <a href="/patient/order-status" class="action-card">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="1.5"><path d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg>
+            <h3>Order Status</h3>
+            <p>Track your deliveries</p>
+        </a>
+    </div>
+
+    <div class="section-card">
+        <h2>Upcoming Appointments</h2>
+        <div id="appt-list"></div>
+        <div id="appt-empty" class="empty-state" style="display:none">
+            <p>No upcoming appointments.</p>
+            <a href="/patient/book" class="btn btn-primary btn-sm">Book one now &rarr;</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container{max-width:960px;margin:0 auto;padding:2rem 1.5rem}
+    .page-header h1{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0}
+    .page-header .text-muted{color:#64748b;font-size:.875rem;margin-top:.25rem}
+    .quick-actions{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin:1.5rem 0}
+    .action-card{display:block;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.25rem;text-decoration:none;transition:all .15s;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .action-card:hover{border-color:#0d9488;box-shadow:0 4px 12px rgba(13,148,136,.1);transform:translateY(-2px)}
+    .action-card h3{font-size:.9375rem;font-weight:600;color:#1e293b;margin:.75rem 0 .25rem}
+    .action-card p{font-size:.8125rem;color:#64748b;margin:0}
+    .section-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .section-card h2{font-size:1.125rem;font-weight:600;margin:0 0 1rem;color:#1e293b}
+    .appt-card{display:flex;align-items:center;justify-content:space-between;padding:1rem;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:.75rem}
+    .appt-info{flex:1}
+    .appt-info .date{font-weight:600;color:#1e293b;font-size:.9375rem}
+    .appt-info .detail{font-size:.8125rem;color:#64748b;margin-top:.25rem}
+    .status-badge{display:inline-block;padding:.125rem .625rem;border-radius:999px;font-size:.75rem;font-weight:500}
+    .status-confirmed{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
+    .status-pending{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
+    .status-cancelled{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+    .btn{padding:.5rem 1rem;border-radius:8px;font-weight:600;font-size:.8125rem;cursor:pointer;border:none;text-decoration:none;display:inline-flex;align-items:center;min-height:36px;transition:all .15s}
+    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .btn-sm{padding:.375rem .75rem;font-size:.8125rem}
+    .empty-state{text-align:center;padding:2rem;color:#64748b}
+    @media(max-width:640px){.quick-actions{grid-template-columns:1fr 1fr}}
+</style>
+
+<script>
+    fbAuth.onAuthStateChanged(async function(firebaseUser) {
+        if (!firebaseUser) { window.location.href = "/auth/login"; return; }
+        var snap = await fbDb.collection("users").doc(firebaseUser.uid).get();
+        if (!snap.exists) { await fbAuth.signOut(); window.location.href = "/auth/login"; return; }
+        var user = snap.data();
+        if (user.role !== "patient") { window.location.href = "/auth/login"; return; }
+        window.currentUser = user;
+        initPage(user);
+    });
+
+    function initPage(user) {
+        var now = new Date();
+        var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+        document.getElementById("greeting").textContent = "Welcome back, " + user.name + ".";
+        document.getElementById("today-date").textContent = now.getDate() + " " + months[now.getMonth()] + " " + now.getFullYear();
+
+        var cfg = document.getElementById("svc-config").dataset;
+        loadAppointments(cfg, user);
+    }
+
+    async function loadAppointments(cfg, user) {
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.apptUrl + "/appointment/patient/" + user.linkedID, {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            if (!res.ok) throw new Error("Failed to load");
+            var data = await res.json();
+            var appts = data.appointments || data || [];
+            var upcoming = appts.filter(function(a) { return a.status !== "cancelled" && new Date(a.dateTime) >= new Date(); })
+                .sort(function(a, b) { return new Date(a.dateTime) - new Date(b.dateTime); })
+                .slice(0, 3);
+
+            var list = document.getElementById("appt-list");
+            if (upcoming.length === 0) {
+                document.getElementById("appt-empty").style.display = "";
+                return;
+            }
+            list.innerHTML = upcoming.map(function(a) {
+                var d = new Date(a.dateTime);
+                var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                var statusClass = "status-" + a.status;
+                var joinBtn = a.status === "confirmed" ?
+                    '<button class="btn btn-primary btn-sm" onclick="joinAppt(\'' + (a.appointmentID || a.id) + '\')">Join</button>' : '';
+                return '<div class="appt-card"><div class="appt-info"><div class="date">' + d.getDate() + " " + months[d.getMonth()] + " " + d.getFullYear() +
+                    ' at ' + d.getHours().toString().padStart(2,"0") + ':' + d.getMinutes().toString().padStart(2,"0") +
+                    '</div><div class="detail"><span class="status-badge ' + statusClass + '">' + a.status + '</span></div></div>' + joinBtn + '</div>';
+            }).join("");
+        } catch(e) {
+            document.getElementById("appt-empty").style.display = "";
+        }
+    }
+
+    function joinAppt(apptID) {
+        sessionStorage.setItem("apptID", apptID);
+        window.location.href = "/patient/join";
+    }
+</script>
+{% endblock %}

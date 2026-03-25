@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}MediConnect{% endblock %}</title>
+
+  <!-- Google Fonts – Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="/static/css/main.css">
+
+  <!-- Firebase compat SDK 10.12.0 -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- Twilio Video SDK 2.27.0 -->
+  <script src="https://sdk.twilio.com/js/video/releases/2.27.0/twilio-video.min.js"></script>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Hidden service-config element -->
+  <div id="svc-config" style="display:none"
+    data-patient-url="{{ PATIENT_SERVICE_URL }}"
+    data-doctor-url="{{ DOCTOR_SERVICE_URL }}"
+    data-appt-url="{{ APPT_SERVICE_URL }}"
+    data-consultation-url="{{ CONSULTATION_SERVICE_URL }}"
+    data-order-url="{{ ORDER_SERVICE_URL }}"
+    data-inv-url="{{ INV_SERVICE_URL }}"
+    data-payment-url="{{ PAYMENT_SERVICE_URL }}"
+    data-delivery-url="{{ DELIVERY_SERVICE_URL }}"
+    data-rider-url="{{ RIDER_SERVICE_URL }}"
+    data-mc-url="{{ MC_SERVICE_URL }}"
+    data-twilio-url="{{ TWILIO_WRAPPER_URL }}"
+    data-openai-url="{{ OPENAI_WRAPPER_URL }}"
+    data-payment-wrapper-url="{{ PAYMENT_WRAPPER_URL }}"
+    data-start-consultation-url="{{ START_CONSULTATION_URL }}"
+    data-complete-consultation-url="{{ COMPLETE_CONSULTATION_URL }}"
+    data-book-appointment-url="{{ BOOK_APPOINTMENT_URL }}"
+    data-process-payment-url="{{ PROCESS_PAYMENT_URL }}"
+    data-assign-delivery-url="{{ ASSIGN_DELIVERY_URL }}"
+    data-complete-delivery-url="{{ COMPLETE_DELIVERY_URL }}"
+  ></div>
+
+  <!-- Firebase initialisation -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "{{ FIREBASE_API_KEY }}",
+      authDomain: "{{ FIREBASE_AUTH_DOMAIN }}",
+      projectId: "{{ FIREBASE_PROJECT_ID }}",
+      storageBucket: "{{ FIREBASE_STORAGE_BUCKET }}",
+      messagingSenderId: "{{ FIREBASE_MESSAGING_SENDER_ID }}",
+      appId: "{{ FIREBASE_APP_ID }}"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const fbAuth = firebase.auth();
+    const fbDb = firebase.firestore();
+  </script>
+
+  <!-- Navbar -->
+  {% set show_navbar = show_navbar if show_navbar is defined else true %}
+  {% block navbar %}
+  <nav id="main-navbar" style="background:#fff;height:56px;border-bottom:1px solid #e2e8f0;display:{% if show_navbar %}flex{% else %}none{% endif %};align-items:center;justify-content:space-between;padding:0 24px;">
+    <a href="/" style="text-decoration:none;font-size:18px;font-weight:700;color:#0d9488;">MediConnect</a>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span id="nav-name" style="font-size:14px;font-weight:500;"></span>
+      <span id="nav-role" class="role-badge"></span>
+      <button id="nav-logout" style="font-size:13px;padding:6px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;">Logout</button>
+    </div>
+  </nav>
+  {% endblock %}
+
+  <!-- Main content -->
+  {% block content %}{% endblock %}
+
+  <!-- Toast container -->
+  <div id="toast-container" style="position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:9999;"></div>
+
+  <!-- Navbar auth-state listener -->
+  <script>
+    fbAuth.onAuthStateChanged(async (firebaseUser) => {
+      const navName = document.getElementById("nav-name");
+      const navRole = document.getElementById("nav-role");
+      const navLogout = document.getElementById("nav-logout");
+      const navbar = document.getElementById("main-navbar");
+      if (!firebaseUser) { if (navbar) navbar.style.display = "none"; return; }
+      if (navbar) navbar.style.display = "";
+      const snap = await fbDb.collection("users").doc(firebaseUser.uid).get();
+      if (!snap.exists) return;
+      const user = snap.data();
+      if (navName) navName.textContent = user.name;
+      if (navRole) {
+        navRole.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
+        navRole.className = "role-badge role-" + user.role;
+      }
+    });
+    document.getElementById("nav-logout")?.addEventListener("click", () =>
+      fbAuth.signOut().then(() => window.location.href = "/"));
+  </script>
+
+  <!-- Utility JS helpers -->
+  <script>
+    function showToast(message, type) {
+      type = type || "success";
+      var container = document.getElementById("toast-container");
+      var toast = document.createElement("div");
+      toast.textContent = message;
+      toast.style.cssText =
+        "padding:12px 20px;border-radius:8px;font-size:14px;font-weight:500;" +
+        "color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);opacity:0;transition:opacity .3s;" +
+        (type === "error" ? "background:#ef4444;" : "background:#10b981;");
+      container.appendChild(toast);
+      requestAnimationFrame(function () { toast.style.opacity = "1"; });
+      setTimeout(function () {
+        toast.style.opacity = "0";
+        setTimeout(function () { toast.remove(); }, 300);
+      }, 3000);
+    }
+
+    function showError(container, message) {
+      clearError(container);
+      var el = typeof container === "string" ? document.getElementById(container) : container;
+      if (!el) return;
+      var banner = document.createElement("div");
+      banner.className = "error-banner";
+      banner.style.cssText = "background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;";
+      banner.textContent = message;
+      el.prepend(banner);
+    }
+
+    function clearError(container) {
+      var el = typeof container === "string" ? document.getElementById(container) : container;
+      if (!el) return;
+      var existing = el.querySelector(".error-banner");
+      if (existing) existing.remove();
+    }
+
+    function setLoading(btn, loading) {
+      if (!btn) return;
+      if (loading) {
+        btn.dataset.originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "Loading\u2026";
+        btn.style.opacity = "0.6";
+      } else {
+        btn.disabled = false;
+        btn.textContent = btn.dataset.originalText || btn.textContent;
+        btn.style.opacity = "1";
+      }
+    }
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

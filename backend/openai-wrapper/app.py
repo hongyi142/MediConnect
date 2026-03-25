@@ -53,6 +53,27 @@ def summarise_notes():
     return jsonify({"summary": summary})
 
 
+@app.route("/openai/symptom-check", methods=["POST"])
+def symptom_check():
+    body = request.get_json(silent=True) or {}
+    symptoms = body.get("symptoms")
+    if not symptoms:
+        return jsonify({"error": "symptoms is required"}), 400
+
+    raw = generate(
+        "You are a medical triage assistant. Given patient symptoms, return a JSON object with: "
+        '{"specialisation":"<recommended doctor specialisation>","urgency":"<low|medium|high>",'
+        '"reasoning":"<brief clinical reasoning>","advice":"<what the patient should do>"}. '
+        "Be concise and helpful. Do not diagnose — recommend seeing a doctor. Raw JSON only, no markdown.",
+        symptoms,
+    )
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Failed to parse LLM response", "raw": raw}), 500
+    return jsonify(parsed)
+
+
 @app.route("/openai/recommend-medications", methods=["POST"])
 def recommend_medications():
     body = request.get_json(silent=True) or {}
