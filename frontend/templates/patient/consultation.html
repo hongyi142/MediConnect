@@ -31,29 +31,29 @@
 </div>
 
 <style>
-    body{margin:0;background:#0f172a}
-    .consult-layout{display:grid;grid-template-columns:1fr 300px;height:100vh}
-    .video-area{display:flex;flex-direction:column;background:#0f172a}
-    .video-container{flex:1;position:relative;overflow:hidden}
-    .remote-video{width:100%;height:100%;background:#1e293b;display:flex;align-items:center;justify-content:center}
-    .remote-video video{width:100%;height:100%;object-fit:cover}
-    .local-video{position:absolute;bottom:1rem;right:1rem;width:180px;height:120px;border-radius:8px;background:#334155;overflow:hidden;border:2px solid rgba(255,255,255,.2)}
-    .local-video video{width:100%;height:100%;object-fit:cover}
-    .video-status{position:absolute;top:1rem;left:1rem;background:rgba(0,0,0,.5);color:#fff;padding:.25rem .75rem;border-radius:999px;font-size:.75rem}
-    .controls-bar{display:flex;justify-content:center;gap:1rem;padding:1rem;background:#1e293b}
-    .ctrl-btn{width:48px;height:48px;border-radius:50%;border:none;background:#334155;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
-    .ctrl-btn:hover{background:#475569}
-    .ctrl-btn.active{background:#ef4444}
-    .ctrl-leave{background:#ef4444}
-    .ctrl-leave:hover{background:#dc2626}
-    .info-panel{background:#1e293b;border-left:1px solid #334155;padding:1.5rem;overflow-y:auto}
-    .panel-card{background:#334155;border-radius:12px;padding:1rem}
-    .panel-card h3{color:#fff;font-size:.9375rem;font-weight:600;margin:0 0 .75rem}
-    #consult-info{color:#94a3b8;font-size:.8125rem}
-    #consult-info .row{display:flex;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid #475569}
-    #consult-info .row:last-child{border:none}
-    #consult-info .val{color:#e2e8f0;font-weight:500}
-    @media(max-width:768px){.consult-layout{grid-template-columns:1fr}.info-panel{display:none}}
+    body { margin: 0; background: var(--slate-900); }
+    .consult-layout { display: grid; grid-template-columns: 1fr 300px; height: 100vh; }
+    .video-area { display: flex; flex-direction: column; background: var(--slate-900); }
+    .video-container { flex: 1; position: relative; overflow: hidden; }
+    .remote-video { width: 100%; height: 100%; background: var(--slate-800); display: flex; align-items: center; justify-content: center; }
+    .remote-video video { width: 100%; height: 100%; object-fit: cover; }
+    .local-video { position: absolute; bottom: 1.25rem; right: 1.25rem; width: 200px; height: 140px; border-radius: 14px; background: var(--slate-700); overflow: hidden; border: 2px solid rgba(255,255,255,.15); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+    .local-video video { width: 100%; height: 100%; object-fit: cover; }
+    .video-status { position: absolute; top: 1.25rem; left: 1.25rem; background: rgba(0,0,0,.5); backdrop-filter: blur(8px); color: #fff; padding: .375rem 1rem; border-radius: 999px; font-size: var(--text-xs); font-weight: 500; }
+    .controls-bar { display: flex; justify-content: center; gap: 1rem; padding: 1.25rem; background: var(--slate-800); border-top: 1px solid rgba(255,255,255,.06); }
+    .ctrl-btn { width: 52px; height: 52px; border-radius: 14px; border: none; background: var(--slate-700); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+    .ctrl-btn:hover { background: var(--slate-600); }
+    .ctrl-btn.active { background: var(--danger); }
+    .ctrl-leave { background: var(--danger); }
+    .ctrl-leave:hover { background: #B91C1C; }
+    .info-panel { background: var(--slate-800); border-left: 1px solid rgba(255,255,255,.06); padding: 1.5rem; overflow-y: auto; }
+    .panel-card { background: var(--slate-700); border-radius: 14px; padding: 1.25rem; }
+    .panel-card h3 { color: #fff; font-size: var(--text-base); font-weight: 600; margin: 0 0 .75rem; }
+    #consult-info { color: var(--slate-400); font-size: var(--text-sm); }
+    #consult-info .row { display: flex; justify-content: space-between; padding: .375rem 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+    #consult-info .row:last-child { border: none; }
+    #consult-info .val { color: var(--slate-200); font-weight: 500; }
+    @media(max-width: 768px) { .consult-layout { grid-template-columns: 1fr; } .info-panel { display: none; } }
 </style>
 
 <script>

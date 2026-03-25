@@ -5,7 +5,7 @@
 <div class="page-container">
     <div class="mc-card">
         <div class="mc-icon">
-            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
         <h1>Medical Certificate Issued</h1>
 
@@ -25,19 +25,19 @@
 </div>
 
 <style>
-    .page-container{max-width:640px;margin:0 auto;padding:2rem 1.5rem}
-    .mc-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:2.5rem;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .page-container{max-width:640px;margin:0 auto;padding:2rem 1.5rem;padding-top:var(--navbar-height)}
+    .mc-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2.5rem;text-align:center;box-shadow:var(--shadow-card)}
     .mc-icon{margin-bottom:1rem}
-    .mc-card h1{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0 0 1.5rem}
-    .mc-details,.order-details{text-align:left;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;margin-bottom:1rem}
-    .mc-details h3,.order-details h3{font-size:.875rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin:0 0 .5rem}
+    .mc-card h1{font-size:1.5rem;font-weight:600;color:var(--text);margin:0 0 1.5rem}
+    .mc-details,.order-details{text-align:left;background:var(--slate-50);border:1px solid var(--border);border-radius:var(--radius-md);padding:1rem;margin-bottom:1rem}
+    .mc-details h3,.order-details h3{font-size:.875rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin:0 0 .5rem}
     .detail-row{display:flex;justify-content:space-between;padding:.25rem 0;font-size:.8125rem}
-    .detail-row .label{color:#64748b}.detail-row .value{color:#1e293b;font-weight:500}
+    .detail-row .label{color:var(--text-secondary)}.detail-row .value{color:var(--text);font-weight:500}
     .mc-actions{display:flex;gap:.75rem;justify-content:center;margin-top:1.5rem}
-    .btn{padding:.75rem 1.5rem;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer;border:none;min-height:44px;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
-    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
-    .btn-secondary{background:#fff;color:#0d9488;border:1px solid #0d9488}
-    .alert-warning{background:#fffbeb;border:1px solid #fde68a;color:#b45309;padding:.75rem;border-radius:8px;font-size:.875rem;text-align:left}
+    .btn{padding:.75rem 1.5rem;border-radius:var(--radius-md);font-weight:600;font-size:.875rem;font-family:var(--font);cursor:pointer;border:none;min-height:44px;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+    .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-hover)}
+    .btn-secondary{background:#fff;color:var(--primary);border:1px solid var(--primary)}
+    .alert-warning{background:var(--warning-bg);border:1px solid var(--warning-light);color:var(--warning);padding:.75rem;border-radius:var(--radius-md);font-size:.875rem;text-align:left}
 </style>
 
 <script>

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:personal-wi9fn0qz.outsystemscloud.com)",
+      "Bash(python \"C:/Users/seann/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.0.1/src/ui-ux-pro-max/scripts/search.py\" \"healthcare teleconsultation medical platform professional clean\" --design-system -p \"MediConnect\")",
+      "Bash(python \"C:\\\\Users\\\\seann\\\\.claude\\\\plugins\\\\cache\\\\ui-ux-pro-max-skill\\\\ui-ux-pro-max\\\\2.0.1\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"healthcare teleconsultation medical clean minimalist depth\" --design-system -p \"MediConnect\")",
+      "Bash(python \"C:/Users/seann/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.0.1/src/ui-ux-pro-max/scripts/search.py\" \"healthcare teleconsultation medical clean minimalist depth\" --design-system -p \"MediConnect\")",
+      "Bash(python3 -c \":*)"
+    ]
+  }
+}

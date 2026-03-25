@@ -1,32 +1,47 @@
 services:
+  # ──── API Gateway ────────────────────────────────────────
+  kong:
+    image: kong:3.9
+    container_name: mediconnect-kong
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_PROXY_LISTEN: "0.0.0.0:8000"
+    volumes:
+      - ./kong.yml:/kong/declarative/kong.yml:ro
+    ports:
+      - "8000:8000"   # Proxy – all API traffic
+      - "8001:8001"   # Admin API
+    restart: on-failure
+
+  # ──── Core Services (no host ports – routed through Kong) ─
   consultation-service:
     build: ./backend/consultation-service
-    ports: ["5004:5004"]
     env_file: ./backend/consultation-service/.env
 
   mc-service:
     build: ./backend/mc-service
-    ports: ["5010:5010"]
     env_file: ./backend/mc-service/.env
 
   twilio-wrapper:
     build: ./backend/twilio-wrapper
-    ports: ["5020:5020"]
     env_file: ./backend/twilio-wrapper/.env
 
   openai-wrapper:
     build: ./backend/openai-wrapper
-    ports: ["5021:5021"]
     env_file: ./backend/openai-wrapper/.env
 
   notification-wrapper:
     build: ./backend/notification_wrapper
-    ports: ["5011:5011"]
     env_file: ./backend/notification_wrapper/.env
 
   start-consultation:
     build: ./backend/start-consultation-composite
-    ports: ["5013:5013"]
     env_file: ./backend/start-consultation-composite/.env
     depends_on:
       - consultation-service
@@ -34,7 +49,6 @@ services:
 
   complete-consultation:
     build: ./backend/complete-consultation-composite
-    ports: ["5014:5014"]
     env_file: ./backend/complete-consultation-composite/.env
     depends_on:
       - consultation-service
@@ -42,6 +56,7 @@ services:
       - mc-service
       - notification-wrapper
 
+  # ──── Message Queue ──────────────────────────────────────
   rabbitmq:
     image: rabbitmq:3-management
     container_name: mediconnect-rabbitmq
@@ -54,12 +69,11 @@ services:
       timeout: 5s
       retries: 5
 
+  # ──── Payment Services ───────────────────────────────────
   payment_atomic:
     build:
       context: ./backend/payment_atomic
     container_name: payment_atomic_api
-    ports:
-      - "5000:5000"
     environment:
       - PYTHONUNBUFFERED=1
       - FIREBASE_CRED_PATH=./serviceAccountKey.json
@@ -68,22 +82,18 @@ services:
     build:
       context: ./backend/payment_wrapper
     container_name: payment_wrapper_api
-    ports:
-      - "5001:5001"
     environment:
       - PYTHONUNBUFFERED=1
     env_file:
-      - ./backend/payment_wrapper/.env # Load external API keys like Stripe safely
+      - ./backend/payment_wrapper/.env
 
   process_payment:
     build:
       context: ./backend/process_payment_composite
     container_name: process_payment_api
-    ports:
-      - "5002:5002"
     environment:
       - PYTHONUNBUFFERED=1
-      # Overriding env variables for internal Docker DNS routing
+      # Internal Docker DNS routing (service-to-service, not through Kong)
       - RABBITMQ_URL=amqp://rabbitmq/
       - PAYMENT_WRAPPER_URL=http://payment_wrapper:5001
       - PAYMENT_ATOMIC_URL=http://payment_atomic:5000
@@ -105,7 +115,7 @@ services:
     # No ports exposed as this is a background worker pulling from the queue
     environment:
       - PYTHONUNBUFFERED=1
-      # Overriding env variables for internal Docker DNS routing
+      # Internal Docker DNS routing (service-to-service, not through Kong)
       - RABBITMQ_URL=amqp://rabbitmq/
       - PAYMENT_WRAPPER_URL=http://payment_wrapper:5001
       - PAYMENT_ATOMIC_URL=http://payment_atomic:5000
@@ -127,36 +137,29 @@ services:
     # No ports exposed as this is a background worker pulling from the queue
     environment:
       - PYTHONUNBUFFERED=1
-      - RABBITMQ_URL=amqp://rabbitmq/ 
+      - RABBITMQ_URL=amqp://rabbitmq/
     env_file:
-      - ./backend/notification_wrapper/.env # Load SMU keys 
+      - ./backend/notification_wrapper/.env
     depends_on:
       rabbitmq:
         condition: service_healthy
 
+  # ──── Domain Services ────────────────────────────────────
   patient-service:
     build: ./backend/patient-service
     container_name: patient-service
-    ports:
-      - "5030:5030"
 
   doctor-service:
     build: ./backend/doctor-service
     container_name: doctor-service
-    ports:
-      - "5031:5031"
 
   appointment-service:
     build: ./backend/appointment-service
     container_name: appointment-service
-    ports:
-      - "5032:5032"
 
   book-appointment:
     build: ./backend/book-appointment
     container_name: book-appointment
-    ports:
-      - "5033:5033"
     depends_on:
       - patient-service
       - doctor-service
@@ -165,26 +168,19 @@ services:
   inventory-service:
     build: ./backend/inventory
     container_name: inventory-service
-    ports:
-      - "5005:5005"
 
+  # ──── Delivery Services ──────────────────────────────────
   delivery-service:
     build: ./backend/delivery-service
     container_name: delivery-service
-    ports:
-      - "5040:5000"
 
   rider-service:
     build: ./backend/rider-service
     container_name: rider-service
-    ports:
-      - "5041:5001"
 
   assign-delivery:
     build: ./backend/assign-delivery-service
     container_name: assign-delivery
-    ports:
-      - "5042:5002"
     depends_on:
       - delivery-service
       - rider-service
@@ -192,37 +188,40 @@ services:
   complete-delivery:
     build: ./backend/complete-delivery-service
     container_name: complete-delivery
-    ports:
-      - "5043:5004"
     depends_on:
       - delivery-service
 
+  # ──── Frontend ───────────────────────────────────────────
   frontend:
     build: ./frontend
     container_name: mediconnect-frontend
     ports:
       - "8080:8080"
     environment:
-      - PATIENT_SERVICE_URL=http://localhost:5030
-      - DOCTOR_SERVICE_URL=http://localhost:5031
-      - APPT_SERVICE_URL=http://localhost:5032
-      - BOOK_APPOINTMENT_URL=http://localhost:5033
-      - CONSULTATION_SERVICE_URL=http://localhost:5004
-      - START_CONSULTATION_URL=http://localhost:5013
-      - COMPLETE_CONSULTATION_URL=http://localhost:5014
-      - INV_SERVICE_URL=http://localhost:5005
-      - MC_SERVICE_URL=http://localhost:5010
-      - TWILIO_WRAPPER_URL=http://localhost:5020
-      - OPENAI_WRAPPER_URL=http://localhost:5021
-      - NOTIFICATION_WRAPPER_URL=http://localhost:5011
-      - PAYMENT_SERVICE_URL=http://localhost:5000
-      - PAYMENT_WRAPPER_URL=http://localhost:5001
-      - PROCESS_PAYMENT_URL=http://localhost:5002
-      - DELIVERY_SERVICE_URL=http://localhost:5040
-      - RIDER_SERVICE_URL=http://localhost:5041
-      - ASSIGN_DELIVERY_URL=http://localhost:5042
-      - COMPLETE_DELIVERY_URL=http://localhost:5043
+      # All API traffic routed through Kong API Gateway on port 8000
+      - PATIENT_SERVICE_URL=http://localhost:8000
+      - DOCTOR_SERVICE_URL=http://localhost:8000
+      - APPT_SERVICE_URL=http://localhost:8000
+      - BOOK_APPOINTMENT_URL=http://localhost:8000
+      - CONSULTATION_SERVICE_URL=http://localhost:8000
+      - START_CONSULTATION_URL=http://localhost:8000
+      - COMPLETE_CONSULTATION_URL=http://localhost:8000
+      - INV_SERVICE_URL=http://localhost:8000
+      - MC_SERVICE_URL=http://localhost:8000
+      - TWILIO_WRAPPER_URL=http://localhost:8000
+      - OPENAI_WRAPPER_URL=http://localhost:8000
+      - NOTIFICATION_WRAPPER_URL=http://localhost:8000
+      # Payment services use Kong path prefixes to resolve /payment/* conflicts
+      - PAYMENT_SERVICE_URL=http://localhost:8000/payment-svc
+      - PAYMENT_WRAPPER_URL=http://localhost:8000/payment-gateway
+      - PROCESS_PAYMENT_URL=http://localhost:8000
+      - DELIVERY_SERVICE_URL=http://localhost:8000
+      - RIDER_SERVICE_URL=http://localhost:8000
+      - ASSIGN_DELIVERY_URL=http://localhost:8000
+      - COMPLETE_DELIVERY_URL=http://localhost:8000
+      # External service (not routed through Kong)
       - ORDER_SERVICE_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
+      # Firebase
       - FIREBASE_API_KEY=AIzaSyCGGxpmbhezNBNs2M_jwLr6myVpbSerBpE
       - FIREBASE_AUTH_DOMAIN=mediconnect-b50d2.firebaseapp.com
       - FIREBASE_PROJECT_ID=mediconnect-b50d2
@@ -230,6 +229,4 @@ services:
       - FIREBASE_MESSAGING_SENDER_ID=400332937391
       - FIREBASE_APP_ID=1:400332937391:web:3ea04d60d579933b0c1ebb
     depends_on:
-      - patient-service
-      - doctor-service
-      - appointment-service
+      - kong

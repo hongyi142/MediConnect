@@ -44,6 +44,11 @@ def auth_signup():
     return render_template("auth/signup.html")
 
 
+@app.route("/auth/doctor-signup")
+def auth_doctor_signup():
+    return render_template("auth/doctor_signup.html")
+
+
 # ── Patient ──
 @app.route("/patient/dashboard")
 def patient_dashboard():

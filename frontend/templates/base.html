@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}MediConnect{% endblock %}</title>
 
-  <!-- Google Fonts – Inter -->
+  <!-- Google Fonts – Figtree -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Main stylesheet -->
   <link rel="stylesheet" href="/static/css/main.css">
@@ -46,6 +46,7 @@
     data-process-payment-url="{{ PROCESS_PAYMENT_URL }}"
     data-assign-delivery-url="{{ ASSIGN_DELIVERY_URL }}"
     data-complete-delivery-url="{{ COMPLETE_DELIVERY_URL }}"
+    data-notification-url="{{ NOTIFICATION_WRAPPER_URL }}"
   ></div>
 
   <!-- Firebase initialisation -->
@@ -66,12 +67,22 @@
   <!-- Navbar -->
   {% set show_navbar = show_navbar if show_navbar is defined else true %}
   {% block navbar %}
-  <nav id="main-navbar" style="background:#fff;height:56px;border-bottom:1px solid #e2e8f0;display:{% if show_navbar %}flex{% else %}none{% endif %};align-items:center;justify-content:space-between;padding:0 24px;">
-    <a href="/" style="text-decoration:none;font-size:18px;font-weight:700;color:#0d9488;">MediConnect</a>
-    <div style="display:flex;align-items:center;gap:12px;">
-      <span id="nav-name" style="font-size:14px;font-weight:500;"></span>
+  <nav class="navbar" id="main-navbar" style="{% if not show_navbar %}display:none{% endif %}">
+    <a href="/" class="navbar-brand">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+        <rect width="32" height="32" rx="8" fill="#2563EB"/>
+        <path d="M16 7v18M7 16h18" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      MediConnect
+    </a>
+    <div class="navbar-user">
+      <div class="navbar-avatar" id="nav-avatar"></div>
+      <span class="navbar-name" id="nav-name"></span>
       <span id="nav-role" class="role-badge"></span>
-      <button id="nav-logout" style="font-size:13px;padding:6px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;">Logout</button>
+      <button class="navbar-logout" id="nav-logout">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:-2px"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Logout
+      </button>
     </div>
   </nav>
   {% endblock %}
@@ -80,28 +91,53 @@
   {% block content %}{% endblock %}
 
   <!-- Toast container -->
-  <div id="toast-container" style="position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:9999;"></div>
+  <div id="toast-container" style="position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:var(--z-toast, 500);"></div>
 
-  <!-- Navbar auth-state listener -->
+  <!-- Navbar auth-state listener + scroll effect -->
   <script>
-    fbAuth.onAuthStateChanged(async (firebaseUser) => {
-      const navName = document.getElementById("nav-name");
-      const navRole = document.getElementById("nav-role");
-      const navLogout = document.getElementById("nav-logout");
-      const navbar = document.getElementById("main-navbar");
-      if (!firebaseUser) { if (navbar) navbar.style.display = "none"; return; }
-      if (navbar) navbar.style.display = "";
-      const snap = await fbDb.collection("users").doc(firebaseUser.uid).get();
+    (function() {
+      var navbar = document.getElementById("main-navbar");
+      if (navbar) {
+        window.addEventListener("scroll", function() {
+          if (window.scrollY > 8) navbar.classList.add("scrolled");
+          else navbar.classList.remove("scrolled");
+        });
+      }
+    })();
+
+    fbAuth.onAuthStateChanged(async function(firebaseUser) {
+      var navName = document.getElementById("nav-name");
+      var navRole = document.getElementById("nav-role");
+      var navAvatar = document.getElementById("nav-avatar");
+      var navLogout = document.getElementById("nav-logout");
+      var navbar = document.getElementById("main-navbar");
+
+      if (!firebaseUser) {
+        if (navbar) navbar.style.display = "none";
+        return;
+      }
+      if (navbar && navbar.style.display !== "none") {
+        navbar.style.display = "";
+      }
+
+      var snap = await fbDb.collection("users").doc(firebaseUser.uid).get();
       if (!snap.exists) return;
-      const user = snap.data();
+      var user = snap.data();
+
       if (navName) navName.textContent = user.name;
+      if (navAvatar) {
+        var initials = (user.name || "U").split(" ").map(function(w){ return w[0]; }).join("").toUpperCase().slice(0, 2);
+        navAvatar.textContent = initials;
+      }
       if (navRole) {
         navRole.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
         navRole.className = "role-badge role-" + user.role;
       }
     });
-    document.getElementById("nav-logout")?.addEventListener("click", () =>
-      fbAuth.signOut().then(() => window.location.href = "/"));
+
+    document.getElementById("nav-logout").addEventListener("click", function() {
+      fbAuth.signOut().then(function() { window.location.href = "/"; });
+    });
   </script>
 
   <!-- Utility JS helpers -->
@@ -110,17 +146,29 @@
       type = type || "success";
       var container = document.getElementById("toast-container");
       var toast = document.createElement("div");
-      toast.textContent = message;
+
+      var icon = type === "error"
+        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+
+      var bgColor = type === "error" ? "var(--danger, #ef4444)" : "var(--success, #059669)";
+
+      toast.innerHTML = icon + '<span>' + message + '</span>';
       toast.style.cssText =
-        "padding:12px 20px;border-radius:8px;font-size:14px;font-weight:500;" +
-        "color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);opacity:0;transition:opacity .3s;" +
-        (type === "error" ? "background:#ef4444;" : "background:#10b981;");
+        "display:flex;align-items:center;gap:10px;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:500;" +
+        "color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.16);opacity:0;transform:translateY(12px);" +
+        "transition:opacity .3s,transform .3s;background:" + bgColor + ";";
       container.appendChild(toast);
-      requestAnimationFrame(function () { toast.style.opacity = "1"; });
-      setTimeout(function () {
+
+      requestAnimationFrame(function() {
+        toast.style.opacity = "1";
+        toast.style.transform = "translateY(0)";
+      });
+      setTimeout(function() {
         toast.style.opacity = "0";
-        setTimeout(function () { toast.remove(); }, 300);
-      }, 3000);
+        toast.style.transform = "translateY(12px)";
+        setTimeout(function() { toast.remove(); }, 300);
+      }, 3500);
     }
 
     function showError(container, message) {
@@ -129,8 +177,13 @@
       if (!el) return;
       var banner = document.createElement("div");
       banner.className = "error-banner";
-      banner.style.cssText = "background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;";
-      banner.textContent = message;
+      banner.innerHTML =
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+        '<span>' + message + '</span>';
+      banner.style.cssText =
+        "display:flex;align-items:flex-start;gap:10px;background:var(--danger-bg,#fef2f2);color:var(--danger,#DC2626);" +
+        "border:1px solid var(--danger-light,#fecaca);border-radius:10px;padding:12px 16px;margin-bottom:16px;" +
+        "font-size:14px;line-height:1.5;animation:fadeIn .2s ease-out;";
       el.prepend(banner);
     }
 
@@ -144,17 +197,23 @@
     function setLoading(btn, loading) {
       if (!btn) return;
       if (loading) {
-        btn.dataset.originalText = btn.textContent;
+        btn.dataset.originalText = btn.innerHTML;
         btn.disabled = true;
-        btn.textContent = "Loading\u2026";
-        btn.style.opacity = "0.6";
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin .8s linear infinite"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg> Loading\u2026';
+        btn.style.opacity = "0.65";
+        btn.style.pointerEvents = "none";
       } else {
         btn.disabled = false;
-        btn.textContent = btn.dataset.originalText || btn.textContent;
+        btn.innerHTML = btn.dataset.originalText || btn.innerHTML;
         btn.style.opacity = "1";
+        btn.style.pointerEvents = "";
       }
     }
   </script>
+
+  <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 
   {% block scripts %}{% endblock %}
 </body>

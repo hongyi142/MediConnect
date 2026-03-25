@@ -3,52 +3,443 @@
 {% block navbar %}{% endblock %}
 
 {% block content %}
-<div class="hero">
-    <div class="hero-content">
-        <div class="hero-logo">
-            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-            <span>MediConnect</span>
-        </div>
-        <h1 class="hero-title">Healthcare at your fingertips.</h1>
-        <p class="hero-subtitle">Book consultations, get prescriptions, and receive medications &mdash; all from home.</p>
-        <div class="hero-actions">
-            <a href="/auth/login" class="btn btn-hero-primary">Login</a>
-            <a href="/auth/signup" class="btn btn-hero-secondary">Sign Up</a>
-        </div>
-        <p class="hero-note">Sign up is for patients only. Doctors and riders contact your administrator.</p>
-        <div class="hero-features">
-            <div class="hero-feature">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>
-                <span>Video Consultations</span>
+<div class="landing">
+    <!-- Hero Section -->
+    <section class="landing-hero">
+        <nav class="landing-nav">
+            <a href="/" class="landing-logo">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <rect width="32" height="32" rx="8" fill="#2563EB"/>
+                    <path d="M16 7v18M7 16h18" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+                <span>MediConnect</span>
+            </a>
+            <div class="landing-nav-actions">
+                <a href="/auth/login" class="landing-nav-link">Login</a>
+                <a href="/auth/signup" class="landing-btn-sm">Get Started</a>
             </div>
-            <div class="hero-feature">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><path d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25m-2.25 0h-2.25m4.5 0V6a.75.75 0 00-.75-.75H6.75A.75.75 0 006 6v6.75"/></svg>
-                <span>Medication Delivery</span>
+        </nav>
+
+        <div class="landing-hero-content">
+            <div class="landing-hero-text">
+                <div class="landing-badge">Trusted by patients across Singapore</div>
+                <h1>Healthcare,<br><span class="text-gradient">reimagined.</span></h1>
+                <p class="landing-subtitle">Book video consultations with licensed doctors, receive AI-powered symptom analysis, and get medications delivered to your door.</p>
+                <div class="landing-cta-row">
+                    <a href="/auth/signup" class="btn-landing-primary">
+                        Create Free Account
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </a>
+                    <a href="/auth/login" class="btn-landing-secondary">Login</a>
+                </div>
+                <p class="landing-note">Patient sign-up only. Doctors and riders contact your administrator.</p>
             </div>
-            <div class="hero-feature">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
-                <span>Digital MCs</span>
+            <div class="landing-hero-visual">
+                <div class="visual-card card-1">
+                    <div class="vc-icon blue">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>
+                    </div>
+                    <div class="vc-text">
+                        <strong>Video Consultation</strong>
+                        <span>Face-to-face with your doctor</span>
+                    </div>
+                </div>
+                <div class="visual-card card-2">
+                    <div class="vc-icon violet">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-2.47 2.47a2.25 2.25 0 01-1.59.659H9.06a2.25 2.25 0 01-1.591-.659L5 14.5m14 0V5.846a1.5 1.5 0 00-1.2-1.47 24.226 24.226 0 00-3.3-.39m-8 10.514V5.846a1.5 1.5 0 011.2-1.47 24.226 24.226 0 013.3-.39"/></svg>
+                    </div>
+                    <div class="vc-text">
+                        <strong>AI Symptom Check</strong>
+                        <span>Smart preliminary analysis</span>
+                    </div>
+                </div>
+                <div class="visual-card card-3">
+                    <div class="vc-icon orange">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25m-2.25 0h-2.25"/></svg>
+                    </div>
+                    <div class="vc-text">
+                        <strong>Med Delivery</strong>
+                        <span>Prescriptions to your door</span>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="landing-features">
+        <div class="features-inner">
+            <h2>Everything you need, one platform</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon blue">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+                    </div>
+                    <h3>Easy Scheduling</h3>
+                    <p>Book appointments with available doctors in just a few clicks. See real-time availability.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon violet">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>
+                    </div>
+                    <h3>Live Consultations</h3>
+                    <p>Secure video calls with licensed doctors. Get diagnosed and treated from the comfort of home.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon green">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+                    </div>
+                    <h3>Digital MCs & Prescriptions</h3>
+                    <p>Receive medical certificates and prescriptions digitally. No more paper chasing.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon orange">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25"/></svg>
+                    </div>
+                    <h3>Medication Delivery</h3>
+                    <p>Get your prescribed medications delivered right to your doorstep by our rider network.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="landing-footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+                    <rect width="32" height="32" rx="8" fill="#2563EB"/>
+                    <path d="M16 7v18M7 16h18" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+                <span>MediConnect</span>
+            </div>
+            <p class="footer-copy">SMU Enterprise Solution Development Project</p>
+        </div>
+    </footer>
 </div>
 
 <style>
-    body{margin:0;padding:0}
-    .hero{min-height:100vh;background:linear-gradient(135deg,#0d9488 0%,#0f766e 100%);display:flex;align-items:center;justify-content:center;text-align:center;padding:2rem}
-    .hero-content{max-width:600px}
-    .hero-logo{display:flex;align-items:center;justify-content:center;gap:.75rem;margin-bottom:2rem}
-    .hero-logo span{font-size:2rem;font-weight:700;color:#fff}
-    .hero-title{font-size:2.5rem;font-weight:700;color:#fff;margin:0 0 1rem}
-    .hero-subtitle{font-size:1.125rem;color:rgba(255,255,255,.85);margin:0 0 2.5rem;line-height:1.6}
-    .hero-actions{display:flex;gap:1rem;justify-content:center;margin-bottom:1.5rem}
-    .btn-hero-primary{background:#fff;color:#0d9488;padding:.75rem 2rem;border-radius:8px;font-weight:600;text-decoration:none;font-size:1rem;transition:transform .15s,box-shadow .15s}
-    .btn-hero-primary:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
-    .btn-hero-secondary{background:transparent;color:#fff;padding:.75rem 2rem;border-radius:8px;font-weight:600;text-decoration:none;font-size:1rem;border:2px solid rgba(255,255,255,.6);transition:border-color .15s,background .15s}
-    .btn-hero-secondary:hover{border-color:#fff;background:rgba(255,255,255,.1)}
-    .hero-note{font-size:.8125rem;color:rgba(255,255,255,.55);margin-bottom:3rem}
-    .hero-features{display:flex;gap:2.5rem;justify-content:center;flex-wrap:wrap}
-    .hero-feature{display:flex;flex-direction:column;align-items:center;gap:.5rem;color:rgba(255,255,255,.9);font-size:.875rem;font-weight:500}
-    @media(max-width:640px){.hero-title{font-size:1.75rem}.hero-actions{flex-direction:column}.hero-features{gap:1.5rem}}
+    body { margin: 0; padding: 0; }
+
+    .landing { overflow-x: hidden; }
+
+    /* Hero */
+    .landing-hero {
+        min-height: 100vh;
+        background: var(--slate-900);
+        position: relative;
+        overflow: hidden;
+    }
+    .landing-hero::before {
+        content: "";
+        position: absolute;
+        top: -40%;
+        right: -20%;
+        width: 70%;
+        height: 120%;
+        background: radial-gradient(ellipse, rgba(37,99,235,.15) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .landing-hero::after {
+        content: "";
+        position: absolute;
+        bottom: -20%;
+        left: -10%;
+        width: 50%;
+        height: 80%;
+        background: radial-gradient(ellipse, rgba(124,58,237,.1) 0%, transparent 70%);
+        pointer-events: none;
+    }
+
+    /* Nav */
+    .landing-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.25rem 2.5rem;
+        position: relative;
+        z-index: 10;
+    }
+    .landing-logo {
+        display: flex;
+        align-items: center;
+        gap: .625rem;
+        text-decoration: none;
+    }
+    .landing-logo span {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -0.02em;
+    }
+    .landing-nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    .landing-nav-link {
+        color: rgba(255,255,255,.7);
+        text-decoration: none;
+        font-size: .875rem;
+        font-weight: 500;
+        padding: .5rem 1rem;
+        border-radius: 8px;
+        transition: color .15s;
+    }
+    .landing-nav-link:hover { color: #fff; }
+    .landing-btn-sm {
+        background: var(--primary);
+        color: #fff;
+        text-decoration: none;
+        font-size: .875rem;
+        font-weight: 600;
+        padding: .5rem 1.25rem;
+        border-radius: 8px;
+        transition: background .15s, transform .15s;
+    }
+    .landing-btn-sm:hover { background: var(--primary-hover); transform: translateY(-1px); }
+
+    /* Hero Content */
+    .landing-hero-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4rem;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 4rem 2.5rem 6rem;
+        align-items: center;
+        position: relative;
+        z-index: 2;
+    }
+    .landing-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: .375rem 1rem;
+        background: rgba(37,99,235,.15);
+        border: 1px solid rgba(37,99,235,.25);
+        border-radius: 999px;
+        font-size: .75rem;
+        font-weight: 600;
+        color: #93C5FD;
+        margin-bottom: 1.5rem;
+        letter-spacing: .02em;
+    }
+    .landing-hero-text h1 {
+        font-size: 3.5rem;
+        font-weight: 800;
+        color: #fff;
+        line-height: 1.1;
+        margin: 0 0 1.5rem;
+        letter-spacing: -0.03em;
+    }
+    .text-gradient {
+        background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 50%, #F97316 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .landing-subtitle {
+        font-size: 1.125rem;
+        color: rgba(255,255,255,.6);
+        line-height: 1.7;
+        margin: 0 0 2rem;
+        max-width: 480px;
+    }
+    .landing-cta-row {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .btn-landing-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        background: var(--primary);
+        color: #fff;
+        padding: .875rem 1.75rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 1rem;
+        text-decoration: none;
+        transition: background .15s, transform .15s, box-shadow .15s;
+        box-shadow: 0 4px 16px rgba(37,99,235,.3);
+    }
+    .btn-landing-primary:hover {
+        background: var(--primary-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(37,99,235,.4);
+    }
+    .btn-landing-secondary {
+        display: inline-flex;
+        align-items: center;
+        color: rgba(255,255,255,.8);
+        padding: .875rem 1.75rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 1rem;
+        text-decoration: none;
+        border: 1px solid rgba(255,255,255,.2);
+        transition: border-color .15s, color .15s, background .15s;
+    }
+    .btn-landing-secondary:hover {
+        border-color: rgba(255,255,255,.5);
+        color: #fff;
+        background: rgba(255,255,255,.05);
+    }
+    .landing-note {
+        font-size: .75rem;
+        color: rgba(255,255,255,.35);
+        margin: 0;
+    }
+
+    /* Hero Visual Cards */
+    .landing-hero-visual {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        position: relative;
+    }
+    .visual-card {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: rgba(255,255,255,.06);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 14px;
+        padding: 1.125rem 1.25rem;
+        transition: transform .3s ease, border-color .3s ease;
+    }
+    .visual-card:hover {
+        transform: translateX(-6px);
+        border-color: rgba(255,255,255,.15);
+    }
+    .card-1 { transform: translateX(0); animation: floatIn .6s ease-out; }
+    .card-2 { transform: translateX(24px); animation: floatIn .6s ease-out .15s both; }
+    .card-3 { transform: translateX(12px); animation: floatIn .6s ease-out .3s both; }
+
+    @keyframes floatIn {
+        from { opacity: 0; transform: translateX(40px); }
+        to { opacity: 1; }
+    }
+
+    .vc-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .vc-icon.blue { background: rgba(37,99,235,.2); color: #60A5FA; }
+    .vc-icon.violet { background: rgba(124,58,237,.2); color: #A78BFA; }
+    .vc-icon.orange { background: rgba(249,115,22,.2); color: #FB923C; }
+    .vc-text strong { display: block; color: #fff; font-size: .9375rem; font-weight: 600; margin-bottom: .125rem; }
+    .vc-text span { font-size: .8125rem; color: rgba(255,255,255,.5); }
+
+    /* Features Section */
+    .landing-features {
+        background: var(--bg);
+        padding: 5rem 2.5rem;
+    }
+    .features-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+    .features-inner h2 {
+        text-align: center;
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text);
+        margin: 0 0 3rem;
+        letter-spacing: -0.02em;
+    }
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+    }
+    .feature-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.75rem 1.5rem;
+        transition: box-shadow .2s, transform .2s;
+    }
+    .feature-card:hover {
+        box-shadow: 0 8px 32px rgba(0,0,0,.08);
+        transform: translateY(-4px);
+    }
+    .feature-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1.25rem;
+    }
+    .feature-icon.blue { background: #DBEAFE; color: #2563EB; }
+    .feature-icon.violet { background: #EDE9FE; color: #7C3AED; }
+    .feature-icon.green { background: #D1FAE5; color: #059669; }
+    .feature-icon.orange { background: #FFF7ED; color: #F97316; }
+    .feature-card h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text);
+        margin: 0 0 .5rem;
+    }
+    .feature-card p {
+        font-size: .8125rem;
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    /* Footer */
+    .landing-footer {
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        padding: 2rem 2.5rem;
+    }
+    .footer-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .footer-brand {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text);
+    }
+    .footer-copy {
+        font-size: .8125rem;
+        color: var(--text-muted);
+        margin: 0;
+    }
+
+    /* Responsive */
+    @media(max-width: 1024px) {
+        .landing-hero-content { grid-template-columns: 1fr; gap: 3rem; padding: 3rem 2rem 4rem; }
+        .landing-hero-text h1 { font-size: 2.75rem; }
+        .features-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media(max-width: 640px) {
+        .landing-nav { padding: 1rem 1.25rem; }
+        .landing-hero-content { padding: 2rem 1.25rem 3rem; }
+        .landing-hero-text h1 { font-size: 2rem; }
+        .landing-subtitle { font-size: 1rem; }
+        .landing-cta-row { flex-direction: column; }
+        .btn-landing-primary, .btn-landing-secondary { width: 100%; justify-content: center; text-align: center; }
+        .card-1, .card-2, .card-3 { transform: none !important; }
+        .features-grid { grid-template-columns: 1fr; }
+        .footer-inner { flex-direction: column; gap: 1rem; text-align: center; }
+    }
 </style>
 {% endblock %}

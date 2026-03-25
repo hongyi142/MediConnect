@@ -3,136 +3,465 @@
 {% block navbar %}{% endblock %}
 
 {% block content %}
-<div class="auth-page">
-    <div class="auth-card">
-        <div class="auth-header">
-            <a href="/" class="auth-logo">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+<div class="auth-layout">
+    <!-- Left Brand Panel -->
+    <div class="auth-brand">
+        <div class="auth-brand-content">
+            <a href="/" class="auth-brand-logo">
+                <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
+                    <rect width="32" height="32" rx="8" fill="#fff"/>
+                    <path d="M16 7v18M7 16h18" stroke="#2563EB" stroke-width="3" stroke-linecap="round"/>
+                </svg>
                 <span>MediConnect</span>
             </a>
-        </div>
-
-        <div class="role-toggle" id="role-toggle">
-            <button class="role-pill active" data-role="patient">Patient</button>
-            <button class="role-pill" data-role="doctor">Doctor</button>
-            <button class="role-pill" data-role="rider">Rider</button>
-        </div>
-
-        <form id="login-form" onsubmit="return false">
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" required autocomplete="email" placeholder="you@example.com">
-            </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <div class="input-password-wrap">
-                    <input type="password" id="password" required autocomplete="current-password" placeholder="Enter your password">
-                    <button type="button" class="password-toggle" id="toggle-pw" aria-label="Toggle password visibility">
-                        <svg id="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5"><path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        <svg id="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5" style="display:none"><path d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
-                    </button>
+            <h2>Welcome back</h2>
+            <p>Access your healthcare dashboard to manage appointments, consultations, and prescriptions.</p>
+            <div class="auth-brand-features">
+                <div class="auth-brand-feat">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Secure video consultations</span>
+                </div>
+                <div class="auth-brand-feat">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>AI-powered symptom analysis</span>
+                </div>
+                <div class="auth-brand-feat">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Medication delivery to your door</span>
                 </div>
             </div>
-            <div id="login-error" class="alert alert-error" style="display:none"></div>
-            <button type="submit" class="btn btn-primary btn-block" id="login-btn">Login</button>
-        </form>
-
-        <div class="auth-links">
-            <button type="button" class="link-btn" id="forgot-btn">Forgot password?</button>
-            <div class="auth-divider"><span>or</span></div>
-            <a href="/auth/signup" class="link-btn">New patient? Create an account &rarr;</a>
-            <p class="text-muted text-sm">Doctors and riders: contact your administrator for access.</p>
         </div>
+    </div>
 
-        <div id="forgot-panel" style="display:none" class="forgot-panel">
-            <p class="text-sm mb-2">Enter your email to receive a password reset link.</p>
-            <input type="email" id="forgot-email" placeholder="Email address">
-            <div class="flex gap-2 mt-2">
-                <button class="btn btn-primary btn-sm" id="send-reset-btn">Send Reset Link</button>
-                <button class="btn btn-secondary btn-sm" id="cancel-reset-btn">Cancel</button>
+    <!-- Right Form Panel -->
+    <div class="auth-form-panel">
+        <div class="auth-form-inner">
+            <div class="auth-form-header">
+                <h1>Sign in</h1>
+                <p>Enter your credentials to continue</p>
             </div>
-            <div id="forgot-msg" class="mt-2" style="display:none"></div>
+
+            <div class="role-toggle" id="role-toggle">
+                <button class="role-pill active" data-role="patient">Patient</button>
+                <button class="role-pill" data-role="doctor">Doctor</button>
+                <button class="role-pill" data-role="rider">Rider</button>
+            </div>
+
+            <form id="login-form" onsubmit="return false">
+                <div class="form-group">
+                    <label for="email">Email address</label>
+                    <input type="email" id="email" required autocomplete="email" placeholder="name@example.com">
+                </div>
+                <div class="form-group">
+                    <div class="label-row">
+                        <label for="password">Password</label>
+                        <button type="button" class="link-subtle" id="forgot-btn">Forgot?</button>
+                    </div>
+                    <div class="input-password-wrap">
+                        <input type="password" id="password" required autocomplete="current-password" placeholder="Enter your password">
+                        <button type="button" class="password-toggle" id="toggle-pw" aria-label="Toggle password visibility">
+                            <svg id="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5"><path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            <svg id="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" style="display:none"><path d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="login-error" class="alert-banner" style="display:none"></div>
+
+                <button type="submit" class="btn btn-primary btn-block" id="login-btn">Sign in</button>
+            </form>
+
+            <div class="auth-footer-links">
+                <div class="auth-divider"><span>or</span></div>
+                <a href="/auth/signup" class="btn btn-outline btn-block">Create a patient account</a>
+                <p class="auth-admin-note">Doctors and riders: contact your administrator for access.</p>
+            </div>
+
+            <!-- Forgot Password Panel -->
+            <div id="forgot-panel" class="forgot-panel" style="display:none">
+                <div class="forgot-panel-header">
+                    <h3>Reset password</h3>
+                    <button type="button" class="forgot-close" id="cancel-reset-btn" aria-label="Close">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <p class="forgot-desc">Enter your email to receive a password reset link.</p>
+                <input type="email" id="forgot-email" placeholder="Email address" class="forgot-input">
+                <button class="btn btn-primary btn-block" id="send-reset-btn">Send Reset Link</button>
+                <div id="forgot-msg" class="forgot-msg" style="display:none"></div>
+            </div>
         </div>
     </div>
 </div>
 
 <style>
-    .auth-page{min-height:100vh;background:linear-gradient(135deg,#0d9488,#0f766e);display:flex;align-items:center;justify-content:center;padding:1.5rem}
-    .auth-card{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.12)}
-    .auth-header{text-align:center;margin-bottom:1.5rem}
-    .auth-logo{display:inline-flex;align-items:center;gap:.5rem;text-decoration:none;font-size:1.25rem;font-weight:700;color:#0d9488}
-    .role-toggle{display:flex;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:1.5rem}
-    .role-pill{flex:1;padding:.625rem;border:none;background:#fff;color:#0d9488;font-weight:500;font-size:.875rem;cursor:pointer;transition:all .15s}
-    .role-pill.active{background:#0d9488;color:#fff}
-    .role-pill:not(:last-child){border-right:1px solid #e2e8f0}
-    .form-group{margin-bottom:1rem}
-    .form-group label{display:block;font-size:.875rem;font-weight:500;color:#1e293b;margin-bottom:.375rem}
-    .form-group input{width:100%;padding:.625rem .75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.875rem;box-sizing:border-box;min-height:44px}
-    .form-group input:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.15)}
-    .input-password-wrap{position:relative}
-    .input-password-wrap input{padding-right:2.75rem}
-    .password-toggle{position:absolute;right:.625rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;display:flex}
-    .auth-links{text-align:center;margin-top:1.25rem}
-    .link-btn{background:none;border:none;color:#0d9488;cursor:pointer;font-size:.875rem;font-weight:500;padding:.25rem}
-    .link-btn:hover{text-decoration:underline}
-    a.link-btn{text-decoration:none}
-    .auth-divider{display:flex;align-items:center;gap:.75rem;margin:1rem 0;color:#94a3b8;font-size:.8125rem}
-    .auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:#e2e8f0}
-    .forgot-panel{margin-top:1rem;padding:1rem;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0}
-    .forgot-panel input{width:100%;padding:.5rem .75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.875rem;box-sizing:border-box}
-    .btn-block{width:100%}
-    .btn-primary{background:#0d9488;color:#fff;border:none;padding:.625rem 1.25rem;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer;min-height:44px;transition:background .15s}
-    .btn-primary:hover{background:#0f766e}
-    .btn-secondary{background:#fff;color:#0d9488;border:1px solid #0d9488;padding:.5rem 1rem;border-radius:8px;font-weight:500;font-size:.875rem;cursor:pointer}
-    .btn-sm{padding:.375rem .75rem;font-size:.8125rem}
-    .alert-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.75rem;border-radius:8px;font-size:.875rem;margin-bottom:1rem}
-    .text-muted{color:#64748b}.text-sm{font-size:.8125rem}.mt-2{margin-top:.5rem}.mb-2{margin-bottom:.5rem}.flex{display:flex}.gap-2{gap:.5rem}
+    body { margin: 0; padding: 0; background: var(--bg); }
+
+    .auth-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        min-height: 100vh;
+    }
+
+    /* Brand Panel */
+    .auth-brand {
+        background: linear-gradient(135deg, var(--slate-900) 0%, #1E3A5F 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .auth-brand::before {
+        content: "";
+        position: absolute;
+        top: -30%;
+        right: -20%;
+        width: 60%;
+        height: 100%;
+        background: radial-gradient(ellipse, rgba(37,99,235,.2) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .auth-brand-content {
+        position: relative;
+        z-index: 2;
+        max-width: 400px;
+    }
+    .auth-brand-logo {
+        display: inline-flex;
+        align-items: center;
+        gap: .625rem;
+        text-decoration: none;
+        margin-bottom: 2.5rem;
+    }
+    .auth-brand-logo span {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .auth-brand h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #fff;
+        margin: 0 0 .75rem;
+        letter-spacing: -0.02em;
+    }
+    .auth-brand > .auth-brand-content > p {
+        font-size: 1rem;
+        color: rgba(255,255,255,.6);
+        line-height: 1.6;
+        margin: 0 0 2rem;
+    }
+    .auth-brand-features {
+        display: flex;
+        flex-direction: column;
+        gap: .875rem;
+    }
+    .auth-brand-feat {
+        display: flex;
+        align-items: center;
+        gap: .625rem;
+        color: rgba(255,255,255,.8);
+        font-size: .875rem;
+        font-weight: 500;
+    }
+    .auth-brand-feat svg { color: #60A5FA; flex-shrink: 0; }
+
+    /* Form Panel */
+    .auth-form-panel {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        background: var(--surface);
+    }
+    .auth-form-inner {
+        width: 100%;
+        max-width: 400px;
+    }
+    .auth-form-header { margin-bottom: 1.75rem; }
+    .auth-form-header h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text);
+        margin: 0 0 .375rem;
+    }
+    .auth-form-header p {
+        font-size: var(--text-sm);
+        color: var(--text-muted);
+        margin: 0;
+    }
+
+    /* Role Toggle */
+    .role-toggle {
+        display: flex;
+        background: var(--slate-100);
+        border-radius: 10px;
+        padding: 4px;
+        margin-bottom: 1.5rem;
+        gap: 4px;
+    }
+    .role-pill {
+        flex: 1;
+        padding: .5rem;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        font-weight: 500;
+        font-size: var(--text-sm);
+        cursor: pointer;
+        border-radius: 8px;
+        transition: all .2s ease;
+    }
+    .role-pill.active {
+        background: var(--surface);
+        color: var(--primary);
+        box-shadow: 0 1px 3px rgba(0,0,0,.08);
+        font-weight: 600;
+    }
+    .role-pill:hover:not(.active) { color: var(--text); }
+
+    /* Form Groups */
+    .form-group { margin-bottom: 1.125rem; }
+    .form-group label {
+        display: block;
+        font-size: var(--text-sm);
+        font-weight: 500;
+        color: var(--text);
+        margin-bottom: .375rem;
+    }
+    .label-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: .375rem;
+    }
+    .label-row label { margin-bottom: 0; }
+    .link-subtle {
+        background: none;
+        border: none;
+        color: var(--primary);
+        font-size: var(--text-xs);
+        font-weight: 500;
+        cursor: pointer;
+        padding: 0;
+    }
+    .link-subtle:hover { text-decoration: underline; }
+    .form-group input {
+        width: 100%;
+        padding: .75rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-size: var(--text-base);
+        font-family: var(--font);
+        box-sizing: border-box;
+        min-height: 44px;
+        transition: border-color .15s, box-shadow .15s;
+        background: var(--surface);
+        color: var(--text);
+    }
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .form-group input::placeholder { color: var(--text-muted); }
+    .input-password-wrap { position: relative; }
+    .input-password-wrap input { padding-right: 3rem; }
+    .password-toggle {
+        position: absolute;
+        right: .75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        border-radius: 6px;
+    }
+    .password-toggle:hover { background: var(--slate-100); }
+
+    /* Alert */
+    .alert-banner {
+        background: var(--danger-bg);
+        border: 1px solid var(--danger-light);
+        color: var(--danger);
+        padding: .75rem 1rem;
+        border-radius: 10px;
+        font-size: var(--text-sm);
+        margin-bottom: 1rem;
+        line-height: 1.5;
+    }
+
+    /* Buttons */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: .75rem 1.25rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: var(--text-base);
+        font-family: var(--font);
+        cursor: pointer;
+        border: none;
+        min-height: 44px;
+        transition: all .15s ease;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-outline {
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid var(--border);
+    }
+    .btn-outline:hover { border-color: var(--slate-300); background: var(--slate-50); }
+    .btn-block { width: 100%; }
+
+    /* Footer links */
+    .auth-footer-links { margin-top: 1.5rem; }
+    .auth-divider {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        margin-bottom: 1rem;
+        color: var(--text-muted);
+        font-size: var(--text-xs);
+    }
+    .auth-divider::before, .auth-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+    }
+    .auth-admin-note {
+        text-align: center;
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+        margin: 1rem 0 0;
+    }
+
+    /* Forgot Panel */
+    .forgot-panel {
+        position: absolute;
+        inset: 0;
+        background: var(--surface);
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        z-index: 10;
+        animation: fadeIn .2s ease-out;
+    }
+    .auth-form-inner { position: relative; }
+    .forgot-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: .5rem;
+    }
+    .forgot-panel-header h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text);
+        margin: 0;
+    }
+    .forgot-close {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text-muted);
+        padding: 4px;
+        border-radius: 6px;
+    }
+    .forgot-close:hover { background: var(--slate-100); color: var(--text); }
+    .forgot-desc {
+        font-size: var(--text-sm);
+        color: var(--text-secondary);
+        margin: 0 0 1.25rem;
+    }
+    .forgot-input {
+        width: 100%;
+        padding: .75rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-size: var(--text-base);
+        font-family: var(--font);
+        box-sizing: border-box;
+        min-height: 44px;
+        margin-bottom: 1rem;
+        background: var(--surface);
+        color: var(--text);
+    }
+    .forgot-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .forgot-msg {
+        font-size: var(--text-sm);
+        padding: .75rem;
+        border-radius: 8px;
+        margin-top: .75rem;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Responsive */
+    @media(max-width: 768px) {
+        .auth-layout { grid-template-columns: 1fr; }
+        .auth-brand { display: none; }
+        .auth-form-panel { min-height: 100vh; padding: 1.5rem; }
+    }
 </style>
 
 <script>
 (function() {
-    // Role toggle (cosmetic only)
-    document.querySelectorAll(".role-pill").forEach(pill => {
-        pill.addEventListener("click", () => {
-            document.querySelectorAll(".role-pill").forEach(p => p.classList.remove("active"));
+    // Role toggle
+    document.querySelectorAll(".role-pill").forEach(function(pill) {
+        pill.addEventListener("click", function() {
+            document.querySelectorAll(".role-pill").forEach(function(p) { p.classList.remove("active"); });
             pill.classList.add("active");
         });
     });
 
     // Password toggle
-    document.getElementById("toggle-pw").addEventListener("click", () => {
-        const pw = document.getElementById("password");
-        const isHidden = pw.type === "password";
+    document.getElementById("toggle-pw").addEventListener("click", function() {
+        var pw = document.getElementById("password");
+        var isHidden = pw.type === "password";
         pw.type = isHidden ? "text" : "password";
         document.getElementById("eye-open").style.display = isHidden ? "none" : "";
         document.getElementById("eye-closed").style.display = isHidden ? "" : "none";
     });
 
     // Login
-    document.getElementById("login-form").addEventListener("submit", async () => {
-        const email = document.getElementById("email").value.trim();
-        const password = document.getElementById("password").value;
-        const btn = document.getElementById("login-btn");
-        const errDiv = document.getElementById("login-error");
+    document.getElementById("login-form").addEventListener("submit", async function() {
+        var email = document.getElementById("email").value.trim();
+        var password = document.getElementById("password").value;
+        var btn = document.getElementById("login-btn");
+        var errDiv = document.getElementById("login-error");
         errDiv.style.display = "none";
-        btn.disabled = true; btn.textContent = "Signing in...";
+        setLoading(btn, true);
 
         try {
-            const cred = await fbAuth.signInWithEmailAndPassword(email, password);
-            const snap = await fbDb.collection("users").doc(cred.user.uid).get();
+            var cred = await fbAuth.signInWithEmailAndPassword(email, password);
+            var snap = await fbDb.collection("users").doc(cred.user.uid).get();
             if (!snap.exists) {
                 await fbAuth.signOut();
                 errDiv.textContent = "Account not fully set up. Contact your administrator.";
-                errDiv.style.display = ""; btn.disabled = false; btn.textContent = "Login";
+                errDiv.style.display = "";
+                setLoading(btn, false);
                 return;
             }
-            const user = snap.data();
+            var user = snap.data();
             if (user.role === "patient") location.href = "/patient/dashboard";
             else if (user.role === "doctor") location.href = "/doctor/dashboard";
             else if (user.role === "rider") location.href = "/rider/dashboard";
             else { errDiv.textContent = "Unknown role."; errDiv.style.display = ""; }
-        } catch (err) {
-            const msgs = {
+        } catch(err) {
+            var msgs = {
                 "auth/user-not-found": "No account found with this email.",
                 "auth/wrong-password": "Incorrect password.",
                 "auth/invalid-email": "Please enter a valid email address.",
@@ -143,37 +472,46 @@
             errDiv.textContent = msgs[err.code] || "Login failed. Please try again.";
             errDiv.style.display = "";
         }
-        btn.disabled = false; btn.textContent = "Login";
+        setLoading(btn, false);
     });
 
     // Forgot password
-    document.getElementById("forgot-btn").addEventListener("click", () => {
+    document.getElementById("forgot-btn").addEventListener("click", function() {
         document.getElementById("forgot-panel").style.display = "";
         document.getElementById("forgot-email").value = document.getElementById("email").value;
+        document.getElementById("forgot-email").focus();
     });
-    document.getElementById("cancel-reset-btn").addEventListener("click", () => {
+    document.getElementById("cancel-reset-btn").addEventListener("click", function() {
         document.getElementById("forgot-panel").style.display = "none";
     });
-    document.getElementById("send-reset-btn").addEventListener("click", async () => {
-        const email = document.getElementById("forgot-email").value.trim();
-        const msg = document.getElementById("forgot-msg");
-        if (!email) { msg.textContent = "Enter an email."; msg.style.display = ""; msg.style.color = "#b91c1c"; return; }
+    document.getElementById("send-reset-btn").addEventListener("click", async function() {
+        var email = document.getElementById("forgot-email").value.trim();
+        var msg = document.getElementById("forgot-msg");
+        if (!email) {
+            msg.textContent = "Enter an email address.";
+            msg.style.display = "";
+            msg.style.cssText = "display:block;background:var(--danger-bg);color:var(--danger);padding:.75rem;border-radius:8px;margin-top:.75rem;font-size:.8125rem;";
+            return;
+        }
+        var btn = document.getElementById("send-reset-btn");
+        setLoading(btn, true);
         try {
             await fbAuth.sendPasswordResetEmail(email);
             msg.textContent = "Password reset email sent. Check your inbox.";
-            msg.style.color = "#0d9488"; msg.style.display = "";
-        } catch (e) {
+            msg.style.cssText = "display:block;background:var(--success-bg);color:var(--success);padding:.75rem;border-radius:8px;margin-top:.75rem;font-size:.8125rem;";
+        } catch(e) {
             msg.textContent = "Could not send reset email. Check the address.";
-            msg.style.color = "#b91c1c"; msg.style.display = "";
+            msg.style.cssText = "display:block;background:var(--danger-bg);color:var(--danger);padding:.75rem;border-radius:8px;margin-top:.75rem;font-size:.8125rem;";
         }
+        setLoading(btn, false);
     });
 
     // Redirect if already logged in
-    fbAuth.onAuthStateChanged(async (u) => {
+    fbAuth.onAuthStateChanged(async function(u) {
         if (!u) return;
-        const s = await fbDb.collection("users").doc(u.uid).get();
+        var s = await fbDb.collection("users").doc(u.uid).get();
         if (!s.exists) return;
-        const r = s.data().role;
+        var r = s.data().role;
         if (r === "patient") location.href = "/patient/dashboard";
         else if (r === "doctor") location.href = "/doctor/dashboard";
         else if (r === "rider") location.href = "/rider/dashboard";

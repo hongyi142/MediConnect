@@ -2,49 +2,105 @@
 {% block title %}Doctor Dashboard - MediConnect{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    <div class="page-header"><h1 id="greeting"></h1><p class="text-muted" id="today-date"></p></div>
+<div class="doc-dashboard">
+    <div class="doc-container">
+        <div class="dash-header">
+            <div><h1 id="greeting"></h1><p class="dash-date" id="today-date"></p></div>
+        </div>
 
-    <div class="stat-grid">
-        <div class="stat-card"><div class="stat-icon teal"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75"/></svg></div><div class="stat-info"><div class="stat-value" id="stat-total">-</div><div class="stat-label">Today's Appointments</div></div></div>
-        <div class="stat-card"><div class="stat-icon amber"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><div class="stat-info"><div class="stat-value" id="stat-pending">-</div><div class="stat-label">Pending</div></div></div>
-        <div class="stat-card"><div class="stat-icon blue"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg></div><div class="stat-info"><div class="stat-value" id="stat-active">0</div><div class="stat-label">Active Consultations</div></div></div>
-        <div class="stat-card"><div class="stat-icon red"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg></div><div class="stat-info"><div class="stat-value" id="stat-alerts">-</div><div class="stat-label">Inventory Alerts</div></div></div>
-    </div>
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-icon blue"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75"/></svg></div>
+                <div class="stat-info"><div class="stat-value" id="stat-total">-</div><div class="stat-label">Today's Appointments</div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon amber"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+                <div class="stat-info"><div class="stat-value" id="stat-pending">-</div><div class="stat-label">Pending</div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon violet"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg></div>
+                <div class="stat-info"><div class="stat-value" id="stat-active">0</div><div class="stat-label">Active Consultations</div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon red"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg></div>
+                <div class="stat-info"><div class="stat-value" id="stat-alerts">-</div><div class="stat-label">Inventory Alerts</div></div>
+            </div>
+        </div>
 
-    <div class="card">
-        <h2>Today's Schedule</h2>
-        <div id="schedule-list"><p class="text-muted">Loading...</p></div>
-    </div>
+        <div class="card">
+            <div class="card-header">
+                <h2>Today's Schedule</h2>
+            </div>
+            <div id="schedule-list"><p class="text-muted">Loading...</p></div>
+        </div>
 
-    <div class="quick-links">
-        <a href="/doctor/staff" class="link-card"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="1.5"><path d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg><span>Staff Management</span></a>
-        <a href="/doctor/inventory" class="link-card"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="1.5"><path d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg><span>Inventory</span></a>
-        <a href="/doctor/schedule" class="link-card"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="1.5"><path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75"/></svg><span>My Schedule</span></a>
+        <div class="quick-links">
+            <a href="/doctor/staff" class="link-card">
+                <div class="link-icon violet"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg></div>
+                <span>Staff Management</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="link-arrow"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
+            <a href="/doctor/inventory" class="link-card">
+                <div class="link-icon orange"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg></div>
+                <span>Inventory</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="link-arrow"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
+            <a href="/doctor/schedule" class="link-card">
+                <div class="link-icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75"/></svg></div>
+                <span>My Schedule</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="link-arrow"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
+        </div>
     </div>
 </div>
 
 <style>
-    .page-container{max-width:960px;margin:0 auto;padding:2rem 1.5rem}
-    .page-header h1{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0}
-    .text-muted{color:#64748b;font-size:.875rem;margin-top:.25rem}
-    .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:1.5rem 0}
-    .stat-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;display:flex;align-items:center;gap:.75rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-    .stat-icon{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center}
-    .stat-icon.teal{background:#f0fdfa;color:#0d9488}.stat-icon.amber{background:#fffbeb;color:#b45309}
-    .stat-icon.blue{background:#eff6ff;color:#1d4ed8}.stat-icon.red{background:#fef2f2;color:#ef4444}
-    .stat-value{font-size:1.375rem;font-weight:700;color:#1e293b}.stat-label{font-size:.75rem;color:#64748b}
-    .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:1.5rem}
-    .card h2{font-size:1.0625rem;font-weight:600;margin:0 0 1rem;color:#1e293b}
-    .appt-row{display:flex;align-items:center;justify-content:space-between;padding:.75rem;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:.5rem}
-    .appt-row .time{font-weight:600;color:#1e293b;min-width:60px}.appt-row .info{flex:1;margin-left:1rem;font-size:.8125rem;color:#64748b}
-    .status-badge{padding:.125rem .5rem;border-radius:999px;font-size:.6875rem;font-weight:500}
-    .status-confirmed{background:#f0fdf4;color:#16a34a}.status-pending{background:#fffbeb;color:#b45309}
-    .btn-sm{padding:.375rem .75rem;border-radius:8px;font-weight:600;font-size:.8125rem;cursor:pointer;border:none;background:#0d9488;color:#fff;min-height:32px}
-    .quick-links{display:flex;gap:1rem;flex-wrap:wrap}
-    .link-card{display:flex;align-items:center;gap:.5rem;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.75rem 1.25rem;text-decoration:none;color:#1e293b;font-weight:500;font-size:.875rem;transition:all .15s}
-    .link-card:hover{border-color:#0d9488;color:#0d9488}
-    @media(max-width:768px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+    .doc-dashboard { padding-top: var(--navbar-height); background: var(--bg); min-height: 100vh; }
+    .doc-container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    .dash-header { margin-bottom: 2rem; }
+    .dash-header h1 { font-size: var(--text-2xl); font-weight: 700; color: var(--text); margin: 0; letter-spacing: -0.02em; }
+    .dash-date { color: var(--text-muted); font-size: var(--text-sm); margin: .25rem 0 0; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; display: flex; align-items: center; gap: .875rem; box-shadow: var(--shadow-card); transition: transform .15s, box-shadow .15s; }
+    .stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+    .stat-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stat-icon.blue { background: var(--primary-light); color: var(--primary); }
+    .stat-icon.amber { background: var(--warning-bg); color: var(--warning); }
+    .stat-icon.violet { background: #EDE9FE; color: #7C3AED; }
+    .stat-icon.red { background: var(--danger-bg); color: var(--danger); }
+    .stat-value { font-size: var(--text-xl); font-weight: 700; color: var(--text); }
+    .stat-label { font-size: var(--text-xs); color: var(--text-muted); margin-top: .125rem; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: var(--shadow-card); margin-bottom: 1.5rem; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .card-header h2 { font-size: var(--text-lg); font-weight: 600; margin: 0; color: var(--text); }
+    .text-muted { color: var(--text-muted); font-size: var(--text-sm); }
+
+    .appt-row { display: flex; align-items: center; justify-content: space-between; padding: .875rem; border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: .5rem; transition: border-color .15s; }
+    .appt-row:hover { border-color: var(--slate-300); }
+    .appt-row .time { font-weight: 600; color: var(--text); min-width: 60px; font-size: var(--text-base); }
+    .appt-row .info { flex: 1; margin-left: 1rem; font-size: var(--text-sm); color: var(--text-secondary); }
+    .status-badge { padding: .125rem .5rem; border-radius: 999px; font-size: var(--text-xs); font-weight: 500; }
+    .status-confirmed { background: var(--success-bg); color: var(--success); }
+    .status-pending { background: var(--warning-bg); color: var(--warning); }
+    .btn-sm { padding: .375rem .875rem; border-radius: var(--radius-md); font-weight: 600; font-size: var(--text-xs); cursor: pointer; border: none; background: var(--primary); color: #fff; min-height: 32px; transition: background .15s; font-family: var(--font); }
+    .btn-sm:hover { background: var(--primary-hover); }
+
+    .quick-links { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .link-card { display: flex; align-items: center; gap: .75rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: .875rem 1.25rem; text-decoration: none; color: var(--text); font-weight: 500; font-size: var(--text-sm); transition: all .15s; box-shadow: var(--shadow-card); flex: 1; min-width: 180px; }
+    .link-card:hover { border-color: var(--primary); }
+    .link-card:hover span { color: var(--primary); }
+    .link-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .link-icon.blue { background: var(--primary-light); color: var(--primary); }
+    .link-icon.violet { background: #EDE9FE; color: #7C3AED; }
+    .link-icon.orange { background: var(--accent-light); color: var(--accent); }
+    .link-card span { flex: 1; }
+    .link-arrow { color: var(--slate-300); transition: color .15s; }
+    .link-card:hover .link-arrow { color: var(--primary); }
+
+    @media(max-width: 768px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } .quick-links { flex-direction: column; } }
 </style>
 
 <script>
@@ -60,15 +116,16 @@
 
     function initPage(user) {
         var now = new Date();
-        var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
         var hour = now.getHours();
         var greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-        document.getElementById("greeting").textContent = greet + ", Dr. " + user.name + ".";
-        document.getElementById("today-date").textContent = now.getDate() + " " + months[now.getMonth()] + " " + now.getFullYear();
+        document.getElementById("greeting").textContent = greet + ", Dr. " + user.name;
+        document.getElementById("today-date").textContent = now.toLocaleDateString("en-SG", {
+            weekday: "long", year: "numeric", month: "long", day: "numeric"
+        });
 
         var cfg = document.getElementById("svc-config").dataset;
         loadInventoryAlerts(cfg);
-        document.getElementById("schedule-list").innerHTML = '<p style="color:#64748b;font-size:.875rem">Appointment list available when appointments are booked for you.</p>';
+        document.getElementById("schedule-list").innerHTML = '<p style="color:var(--text-muted);font-size:var(--text-sm)">Appointment list available when appointments are booked for you.</p>';
         document.getElementById("stat-total").textContent = "0";
         document.getElementById("stat-pending").textContent = "0";
     }

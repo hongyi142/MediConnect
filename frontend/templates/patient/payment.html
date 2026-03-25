@@ -2,30 +2,35 @@
 {% block title %}Payment - MediConnect{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    <h1 class="page-title">Payment</h1>
-    <div class="two-col">
-        <div class="col-left">
-            <div class="card">
-                <h2>Order Summary</h2>
-                <div id="order-details"><p class="text-muted">Loading...</p></div>
+<div class="payment-page">
+    <div class="payment-container">
+        <h1 class="page-title">Payment</h1>
+        <div class="two-col">
+            <div class="col-left">
+                <div class="card">
+                    <h2>Order Summary</h2>
+                    <div id="order-details"><p class="text-muted">Loading...</p></div>
+                </div>
             </div>
-        </div>
-        <div class="col-right">
-            <div class="card">
-                <h2>Complete Payment</h2>
-                <div class="total-display" id="total-display"></div>
-                <p class="text-sm text-muted mb-3">You will be redirected to Stripe for secure payment.</p>
-                <div id="pay-error" class="alert alert-error" style="display:none"></div>
-                <button class="btn btn-primary btn-block" id="pay-btn" onclick="initiatePayment()">Pay Now</button>
-                <p class="text-xs text-muted mt-2 text-center">Powered by Stripe. Test mode enabled.</p>
-            </div>
+            <div class="col-right">
+                <div class="card" id="payment-card">
+                    <h2>Complete Payment</h2>
+                    <div class="total-display" id="total-display"></div>
+                    <p class="pay-note">You will be redirected to Stripe for secure payment.</p>
+                    <div id="pay-error" class="alert-banner" style="display:none"></div>
+                    <button class="btn btn-primary btn-block" id="pay-btn" onclick="initiatePayment()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                        Pay Now
+                    </button>
+                    <p class="stripe-note">Powered by Stripe. Test mode enabled.</p>
+                </div>
 
-            <div class="card mt-3" id="verify-card" style="display:none">
-                <div class="text-center">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <h2 class="mt-2">Payment Successful!</h2>
-                    <p class="text-muted">Redirecting to order status...</p>
+                <div class="card" id="verify-card" style="display:none">
+                    <div class="verify-success">
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <h2>Payment Successful!</h2>
+                        <p>Redirecting to order status...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -33,23 +38,33 @@
 </div>
 
 <style>
-    .page-container{max-width:900px;margin:0 auto;padding:2rem 1.5rem}
-    .page-title{font-size:1.5rem;font-weight:600;color:#1e293b;margin:0 0 1.5rem}
-    .two-col{display:grid;grid-template-columns:55% 45%;gap:1.5rem}
-    .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-    .card h2{font-size:1.0625rem;font-weight:600;margin:0 0 1rem;color:#1e293b}
-    .total-display{font-size:2rem;font-weight:700;color:#0d9488;margin-bottom:1rem}
-    .med-table{width:100%;border-collapse:collapse;font-size:.8125rem}
-    .med-table th{text-align:left;padding:.5rem;border-bottom:2px solid #e2e8f0;color:#64748b;font-weight:500}
-    .med-table td{padding:.5rem;border-bottom:1px solid #f1f5f9;color:#1e293b}
-    .med-table .total-row td{border-top:2px solid #e2e8f0;font-weight:600;color:#1e293b}
-    .btn{padding:.75rem 1.5rem;border-radius:8px;font-weight:600;font-size:.9375rem;cursor:pointer;border:none;min-height:44px;transition:all .15s}
-    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
-    .btn-block{width:100%}
-    .alert-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.75rem;border-radius:8px;font-size:.875rem;margin-bottom:1rem}
-    .text-muted{color:#64748b}.text-sm{font-size:.8125rem}.text-xs{font-size:.75rem}.text-center{text-align:center}
-    .mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}.mb-3{margin-bottom:.75rem}
-    @media(max-width:768px){.two-col{grid-template-columns:1fr}}
+    .payment-page { padding-top: var(--navbar-height); background: var(--bg); min-height: 100vh; }
+    .payment-container { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .page-title { font-size: var(--text-2xl); font-weight: 700; color: var(--text); margin: 0 0 1.5rem; letter-spacing: -0.02em; }
+    .two-col { display: grid; grid-template-columns: 55% 45%; gap: 1.5rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: var(--shadow-card); }
+    .card + .card { margin-top: 1rem; }
+    .card h2 { font-size: var(--text-lg); font-weight: 600; margin: 0 0 1rem; color: var(--text); }
+    .total-display { font-size: 2.25rem; font-weight: 800; color: var(--primary); margin-bottom: 1rem; letter-spacing: -0.02em; }
+    .pay-note { font-size: var(--text-sm); color: var(--text-muted); margin: 0 0 1.25rem; }
+    .stripe-note { font-size: var(--text-xs); color: var(--text-muted); text-align: center; margin-top: .75rem; }
+    .alert-banner { background: var(--danger-bg); border: 1px solid var(--danger-light); color: var(--danger); padding: .75rem 1rem; border-radius: var(--radius-md); font-size: var(--text-sm); margin-bottom: 1rem; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: .75rem 1.5rem; border-radius: var(--radius-md); font-weight: 600; font-size: var(--text-base); font-family: var(--font); cursor: pointer; border: none; min-height: 44px; transition: all .15s; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-block { width: 100%; }
+    .text-muted { color: var(--text-muted); }
+
+    .med-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+    .med-table th { text-align: left; padding: .625rem .5rem; border-bottom: 2px solid var(--border); color: var(--text-secondary); font-weight: 500; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .03em; }
+    .med-table td { padding: .625rem .5rem; border-bottom: 1px solid var(--border-light); color: var(--text); }
+    .med-table .total-row td { border-top: 2px solid var(--border); font-weight: 700; color: var(--text); padding-top: .75rem; }
+
+    .verify-success { text-align: center; padding: 1.5rem 0; }
+    .verify-success h2 { font-size: var(--text-xl); font-weight: 700; color: var(--text); margin: 1rem 0 .5rem; }
+    .verify-success p { color: var(--text-muted); font-size: var(--text-sm); margin: 0; }
+
+    @media(max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
 </style>
 
 <script>
@@ -66,7 +81,6 @@
     });
 
     function initPage(user) {
-        // Check if returning from Stripe
         var params = new URLSearchParams(window.location.search);
         var sessionId = params.get("session_id");
         if (sessionId) { verifyPayment(sessionId); return; }
@@ -88,7 +102,7 @@
         }).join("");
 
         document.getElementById("order-details").innerHTML =
-            '<div style="margin-bottom:.75rem"><span style="color:#64748b;font-size:.8125rem">Order ID:</span> <strong>' + (orderData.orderID || "N/A") + '</strong></div>' +
+            '<div style="margin-bottom:.75rem;font-size:var(--text-sm)"><span style="color:var(--text-muted)">Order ID:</span> <strong>' + (orderData.orderID || "N/A") + '</strong></div>' +
             '<table class="med-table"><thead><tr><th>Medication</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + rows +
             '<tr class="total-row"><td colspan="3">Total</td><td>$' + Number(total).toFixed(2) + '</td></tr></tbody></table>';
 
@@ -99,7 +113,7 @@
         var btn = document.getElementById("pay-btn");
         var errDiv = document.getElementById("pay-error");
         errDiv.style.display = "none";
-        btn.disabled = true; btn.textContent = "Redirecting to Stripe...";
+        setLoading(btn, true);
 
         var cfg = document.getElementById("svc-config").dataset;
         try {
@@ -112,7 +126,6 @@
             var data = await res.json();
             if (!res.ok) throw new Error(data.error || data.message || "Payment failed");
 
-            // Store for verification
             sessionStorage.setItem("paymentSession", JSON.stringify({
                 session_id: data.session_id,
                 documentID: data.documentID,
@@ -120,12 +133,11 @@
                 patientID: window.currentUser.linkedID
             }));
 
-            // Redirect to Stripe
             window.location.href = data.checkout_url;
         } catch(e) {
             errDiv.textContent = e.message;
             errDiv.style.display = "";
-            btn.disabled = false; btn.textContent = "Pay Now";
+            setLoading(btn, false);
         }
     }
 
@@ -149,7 +161,7 @@
 
             document.getElementById("verify-card").style.display = "";
             document.querySelector(".col-left").style.display = "none";
-            document.querySelector(".col-right .card:first-child").style.display = "none";
+            document.getElementById("payment-card").style.display = "none";
 
             sessionStorage.removeItem("paymentSession");
             setTimeout(function() { location.href = "/patient/order-status"; }, 2500);

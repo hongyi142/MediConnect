@@ -1,0 +1,212 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  # ──────────────────────────────────────────────
+  #  Atomic / Core Services
+  # ──────────────────────────────────────────────
+
+  - name: patient-service
+    url: http://patient-service:5030
+    routes:
+      - name: patient-routes
+        paths:
+          - /patient
+        strip_path: false
+
+  - name: doctor-service
+    url: http://doctor-service:5031
+    routes:
+      - name: doctor-routes
+        paths:
+          - /doctor
+        strip_path: false
+
+  - name: appointment-service
+    url: http://appointment-service:5032
+    routes:
+      - name: appointment-routes
+        paths:
+          - /appointment
+        strip_path: false
+
+  - name: consultation-service
+    url: http://consultation-service:5004
+    routes:
+      - name: consultation-routes
+        paths:
+          - /consultation
+        strip_path: false
+
+  - name: inventory-service
+    url: http://inventory-service:5005
+    routes:
+      - name: inventory-routes
+        paths:
+          - /inventory
+        strip_path: false
+
+  - name: mc-service
+    url: http://mc-service:5010
+    routes:
+      - name: mc-routes
+        paths:
+          - /mc
+        strip_path: false
+
+  # ──────────────────────────────────────────────
+  #  Wrapper / Integration Services
+  # ──────────────────────────────────────────────
+
+  - name: twilio-wrapper
+    url: http://twilio-wrapper:5020
+    routes:
+      - name: twilio-routes
+        paths:
+          - /twilio
+        strip_path: false
+
+  - name: openai-wrapper
+    url: http://openai-wrapper:5021
+    routes:
+      - name: openai-routes
+        paths:
+          - /openai
+        strip_path: false
+
+  - name: notification-wrapper
+    url: http://notification-wrapper:5011
+    routes:
+      - name: notification-routes
+        paths:
+          - /notify
+        strip_path: false
+
+  # ──────────────────────────────────────────────
+  #  Payment Services
+  #  payment_atomic and payment_wrapper both expose /payment/* routes,
+  #  so we use unique Kong prefixes with strip_path to resolve conflicts.
+  # ──────────────────────────────────────────────
+
+  - name: payment-atomic
+    url: http://payment_atomic:5000
+    routes:
+      - name: payment-atomic-routes
+        paths:
+          - /payment-svc
+        strip_path: true
+
+  - name: payment-wrapper
+    url: http://payment_wrapper:5001
+    routes:
+      - name: payment-wrapper-routes
+        paths:
+          - /payment-gateway
+        strip_path: true
+
+  - name: process-payment
+    url: http://process_payment:5002
+    routes:
+      - name: process-payment-routes
+        paths:
+          - /api
+        strip_path: false
+
+  # ──────────────────────────────────────────────
+  #  Delivery Services
+  #  Internal ports differ from previously-exposed host ports:
+  #    delivery-service  → internal 5000
+  #    rider-service     → internal 5001
+  #    assign-delivery   → internal 5002
+  #    complete-delivery → internal 5004
+  # ──────────────────────────────────────────────
+
+  - name: delivery-service
+    url: http://delivery-service:5000
+    routes:
+      - name: delivery-routes
+        paths:
+          - /delivery
+        strip_path: false
+
+  - name: rider-service
+    url: http://rider-service:5001
+    routes:
+      - name: rider-routes
+        paths:
+          - /rider
+        strip_path: false
+
+  - name: assign-delivery
+    url: http://assign-delivery:5002
+    routes:
+      - name: assign-delivery-routes
+        paths:
+          - /accept-delivery
+          - /nearest-rider
+        strip_path: false
+
+  - name: complete-delivery
+    url: http://complete-delivery:5004
+    routes:
+      - name: complete-delivery-routes
+        paths:
+          - /complete-delivery
+          - /prepare-delivery
+        strip_path: false
+
+  # ──────────────────────────────────────────────
+  #  Composite / Orchestration Services
+  # ──────────────────────────────────────────────
+
+  - name: book-appointment
+    url: http://book-appointment:5033
+    routes:
+      - name: book-appointment-routes
+        paths:
+          - /book-appointment
+        strip_path: false
+
+  - name: start-consultation
+    url: http://start-consultation:5013
+    routes:
+      - name: start-consultation-routes
+        paths:
+          - /start-consultation
+        strip_path: false
+
+  - name: complete-consultation
+    url: http://complete-consultation:5014
+    routes:
+      - name: complete-consultation-routes
+        paths:
+          - /complete-consultation
+          - /available-medications
+        strip_path: false
+
+# ──────────────────────────────────────────────
+#  Global Plugins
+# ──────────────────────────────────────────────
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        - OPTIONS
+      headers:
+        - Content-Type
+        - Authorization
+        - Accept
+      credentials: false
+      max_age: 3600
+
+  - name: rate-limiting
+    config:
+      minute: 500
+      policy: local

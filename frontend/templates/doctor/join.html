@@ -23,30 +23,32 @@
 </div>
 
 <style>
-    .page-container{max-width:640px;margin:0 auto;padding:2rem 1.5rem}
-    .join-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:2rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-    .join-card h1{font-size:1.375rem;font-weight:600;color:#1e293b;margin:0 0 1.5rem}
-    .info-section{border:1px solid #e2e8f0;border-radius:8px;padding:1rem;margin-bottom:1rem}
-    .info-section h4{font-size:.875rem;font-weight:600;color:#1e293b;margin:0 0 .5rem}
-    .medical-card{border-color:#fecaca;background:#fffbfb}
+    .page-container{max-width:640px;margin:0 auto;padding:2rem 1.5rem;padding-top:var(--navbar-height)}
+    .join-card{background:var(--surface,#fff);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;box-shadow:var(--shadow-card)}
+    .join-card h1{font-size:1.375rem;font-weight:600;color:var(--text);margin:0 0 1.5rem}
+    .info-section{border:1px solid var(--border);border-radius:var(--radius-md);padding:1rem;margin-bottom:1rem}
+    .info-section h4{font-size:.875rem;font-weight:600;color:var(--text);margin:0 0 .5rem}
+    .medical-card{border-color:var(--danger-light);background:var(--danger-bg)}
     .info-row{display:flex;justify-content:space-between;padding:.25rem 0;font-size:.8125rem}
-    .info-row .label{color:#64748b}.info-row .value{color:#1e293b;font-weight:500}
-    .allergy-section{margin-top:.5rem;padding-top:.5rem;border-top:1px solid #fecaca}
-    .allergy-label{font-size:.75rem;font-weight:600;color:#b91c1c;margin-bottom:.25rem}
-    .allergy-badge{display:inline-block;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:999px;padding:.125rem .5rem;font-size:.75rem;margin:.125rem;font-weight:500}
-    .status-badge{display:inline-block;padding:.125rem .5rem;border-radius:999px;font-size:.6875rem;font-weight:500}
-    .status-confirmed{background:#f0fdf4;color:#16a34a}
+    .info-row .label{color:var(--text-secondary)}.info-row .value{color:var(--text);font-weight:500}
+    .allergy-section{margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--danger-light)}
+    .allergy-label{font-size:.75rem;font-weight:600;color:var(--danger);margin-bottom:.25rem}
+    .allergy-badge{display:inline-block;background:var(--danger-bg);border:1px solid var(--danger-light);color:var(--danger);border-radius:var(--radius-full);padding:.125rem .5rem;font-size:.75rem;margin:.125rem;font-weight:500}
+    .status-badge{display:inline-block;padding:.125rem .5rem;border-radius:var(--radius-full);font-size:.6875rem;font-weight:500}
+    .status-confirmed{background:var(--success-bg);color:var(--success)}
+    .status-pending{background:var(--warning-bg);color:var(--warning)}
     .media-check{margin-bottom:1.5rem}
-    .media-check h3{font-size:.9375rem;font-weight:600;color:#1e293b;margin:0 0 .75rem}
+    .media-check h3{font-size:.9375rem;font-weight:600;color:var(--text);margin:0 0 .75rem}
     .media-preview{display:flex;gap:1rem;align-items:center}
-    .media-preview video{width:200px;height:150px;border-radius:8px;background:#1e293b;object-fit:cover}
+    .media-preview video{width:200px;height:150px;border-radius:12px;background:var(--slate-800);object-fit:cover}
     .media-status{display:flex;flex-direction:column;gap:.5rem;font-size:.8125rem}
     .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:.25rem}
-    .dot.green{background:#16a34a}.dot.grey{background:#94a3b8}
-    .btn{padding:.75rem 1.5rem;border-radius:8px;font-weight:600;font-size:.9375rem;cursor:pointer;border:none;min-height:44px;transition:all .15s}
-    .btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
+    .dot.green{background:var(--success)}.dot.grey{background:var(--text-muted)}.dot.red{background:var(--danger)}
+    .btn{padding:.75rem 1.5rem;border-radius:var(--radius-md);font-weight:600;font-size:.9375rem;cursor:pointer;border:none;min-height:44px;transition:all .15s}
+    .btn:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+    .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-hover)}
     .btn-block{width:100%}
-    .alert-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.75rem;border-radius:8px;font-size:.875rem;margin-bottom:1rem}
+    .alert-error{background:var(--danger-bg);border:1px solid var(--danger-light);color:var(--danger);padding:.75rem;border-radius:var(--radius-md);font-size:.875rem;margin-bottom:1rem}
 </style>
 
 <script>
