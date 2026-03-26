@@ -17,11 +17,14 @@ def get_inventory():
         
         inventory_list = []
         for doc in docs:
-            # We only take the dictionary data which already includes 'medicationID'
-            item = doc.to_dict() 
+            item = doc.to_dict() or {}
+            # Backfill medicationID for legacy documents that do not store it.
+            if not item.get("medicationID"):
+                item["medicationID"] = doc.id
             inventory_list.append(item)
             
-        return jsonify({"code": 200, "data": inventory_list})
+        # Keep both keys for backward compatibility across composites/frontends.
+        return jsonify({"code": 200, "data": inventory_list, "medications": inventory_list})
     except Exception as e:
         return jsonify({"code": 500, "message": str(e)}), 500
     
@@ -39,7 +42,7 @@ def get_one_item(medication_id):
         return jsonify({
             "code": 200, 
             "data": {
-                "Quantity": firestore_data.get('quantity', 0) # Match OutSystems Uppercase Q
+                "Quantity": firestore_data.get('quantity', firestore_data.get('Quantity', 0)) # Match OutSystems Uppercase Q
             }
         }), 200
     except Exception as e:
@@ -91,7 +94,8 @@ def restock(medication_id):
 
         update_data = {}
         if 'quantity' in data:
-            current_stock = item.to_dict().get('quantity', 0)
+            current = item.to_dict() or {}
+            current_stock = current.get('quantity', current.get('Quantity', 0))
             update_data['quantity'] = current_stock + data['quantity']
         
         if 'price' in data:
@@ -107,7 +111,12 @@ def restock(medication_id):
 def deduct_stock(medication_id):
     try:
         data = request.get_json()
-        quantity_to_deduct = data.get('quantity')
+        quantity_to_deduct = (data or {}).get('qty', (data or {}).get('quantity'))
+        if quantity_to_deduct is None:
+            return jsonify({"code": 400, "message": "qty or quantity is required."}), 400
+        quantity_to_deduct = int(quantity_to_deduct)
+        if quantity_to_deduct <= 0:
+            return jsonify({"code": 400, "message": "qty must be greater than 0."}), 400
 
         # Target the document using the medication_id passed from the Composite Service
         item_ref = db.collection('Inventory').document(medication_id)
@@ -117,7 +126,7 @@ def deduct_stock(medication_id):
             return jsonify({"code": 404, "message": "Medication not found."}), 404
 
         current_data = item.to_dict()
-        current_stock = current_data.get('quantity', 0)
+        current_stock = current_data.get('quantity', current_data.get('Quantity', 0))
 
         if current_stock >= quantity_to_deduct:
             new_stock = current_stock - quantity_to_deduct
