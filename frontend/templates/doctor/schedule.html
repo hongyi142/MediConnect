@@ -80,10 +80,9 @@
 
     function initPage() {
         var now = new Date();
-        var tomorrow = new Date(now);
-        tomorrow.setDate(now.getDate() + 1);
-        document.getElementById("slot-date").min = tomorrow.toISOString().split("T")[0];
-        document.getElementById("slot-date").value = tomorrow.toISOString().split("T")[0];
+        var today = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split("T")[0];
+        document.getElementById("slot-date").min = today;
+        document.getElementById("slot-date").value = today;
 
         currentWeekStart = new Date(now);
         currentWeekStart.setDate(now.getDate() - now.getDay() + 1);

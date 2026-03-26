@@ -14,7 +14,6 @@ db = firestore.client()
 DEFAULT_STAFF_PASSWORD = "NewStaff123!"
 DOCTOR_COLLECTION = "Doctor"
 DOCTOR_SCHEDULE_COLLECTION = "DoctorSchedule"
-COUNTER_COLLECTION = "_Counters"
 
 
 def now_utc():
@@ -62,16 +61,19 @@ def get_doctor_doc(doctor_id):
     return None
 
 
-@firestore.transactional
-def _next_schedule_slot_id(txn):
-    ref = db.collection(COUNTER_COLLECTION).document("DoctorScheduleSlot")
-    snap = ref.get(transaction=txn)
-    current = 0
-    if snap.exists:
-        current = int((snap.to_dict() or {}).get("value", 0))
-    nxt = current + 1
-    txn.set(ref, {"value": nxt, "updatedAt": now_utc()}, merge=True)
-    return str(nxt)
+def next_schedule_slot_id():
+    """
+    Generate a numeric string slotID compatible with environments where
+    firebase_admin.firestore does not expose transaction helpers.
+    """
+    max_id = 0
+    docs = db.collection(DOCTOR_SCHEDULE_COLLECTION).stream()
+    for doc in docs:
+        row = doc.to_dict() or {}
+        raw = str(row.get("slotID") or "").strip()
+        if raw.isdigit():
+            max_id = max(max_id, int(raw))
+    return str(max_id + 1)
 
 
 def create_staff_user_doc(firebase_uid, role, name, linked_id, email):
@@ -251,7 +253,7 @@ def create_doctor_schedule():
         if existing_start and existing_end and ranges_overlap(slot_start, slot_end, existing_start, existing_end):
             return jsonify({"error": "Schedule overlaps with an existing slot", "slotID": row.get("slotID")}), 409
 
-    slot_id = _next_schedule_slot_id(firestore.transaction())
+    slot_id = next_schedule_slot_id()
     ref = db.collection(DOCTOR_SCHEDULE_COLLECTION).document()
     payload = {
         "slotID": slot_id,

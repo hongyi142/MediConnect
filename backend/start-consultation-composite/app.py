@@ -38,7 +38,7 @@ def start_consultation():
     if not appt_id or not patient_id or not doctor_id:
         return jsonify({"error": "apptID, patientID, doctorID are required"}), 400
 
-    appointment_url = os.environ.get("APPOINTMENT_SERVICE_URL", "http://mock-service:5099").rstrip("/")
+    appointment_url = os.environ.get("APPOINTMENT_SERVICE_URL", "http://appointment-service:5032").rstrip("/")
     twilio_url = os.environ.get("TWILIO_WRAPPER_URL", "http://twilio-wrapper:5020").rstrip("/")
     consultation_url = os.environ.get("CONSULTATION_SERVICE_URL", "http://consultation-service:5004").rstrip("/")
 

@@ -115,6 +115,7 @@
 <script>
     var _doctorPoll = null;
     var _notificationPoll = null;
+    var _lastPendingCount = null;
 
     fbAuth.onAuthStateChanged(async function(u) {
         if (!u) { location.href = "/auth/login"; return; }
@@ -152,16 +153,29 @@
         var end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
         try {
-            var q = "?from=" + encodeURIComponent(start.toISOString()) + "&to=" + encodeURIComponent(end.toISOString());
-            var res = await fetch(cfg.apptUrl + "/appointment/doctor/" + doctorID + q, { headers: { "Authorization": "Bearer " + token } });
-            if (!res.ok) throw new Error();
-            var data = await res.json();
-            var appts = data.appointments || [];
-            var pending = appts.filter(function(a) { return a.status === "pending"; });
-            var todays = appts.filter(function(a) { return a.status !== "cancelled"; });
+            var pendingRes = await fetch(cfg.apptUrl + "/appointment/doctor/" + doctorID + "?status=pending", {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            if (!pendingRes.ok) throw new Error();
+            var pendingData = await pendingRes.json();
+            var pending = (pendingData.appointments || []).filter(function(a) {
+                return a.status === "pending";
+            });
+
+            var q = "?from=" + encodeURIComponent(toLocalIso(start)) + "&to=" + encodeURIComponent(toLocalIso(end));
+            var dayRes = await fetch(cfg.apptUrl + "/appointment/doctor/" + doctorID + q, {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            if (!dayRes.ok) throw new Error();
+            var dayData = await dayRes.json();
+            var todays = (dayData.appointments || []).filter(function(a) { return a.status !== "cancelled"; });
 
             document.getElementById("stat-total").textContent = todays.length;
             document.getElementById("stat-pending").textContent = pending.length;
+            if (_lastPendingCount !== null && pending.length > _lastPendingCount && typeof showToast === "function") {
+                showToast("New appointment request received.");
+            }
+            _lastPendingCount = pending.length;
 
             renderPending(pending);
             renderTodaySchedule(todays);
@@ -171,6 +185,16 @@
             document.getElementById("stat-total").textContent = "0";
             document.getElementById("stat-pending").textContent = "0";
         }
+    }
+
+    function toLocalIso(dt) {
+        var y = dt.getFullYear();
+        var m = (dt.getMonth() + 1).toString().padStart(2, "0");
+        var d = dt.getDate().toString().padStart(2, "0");
+        var hh = dt.getHours().toString().padStart(2, "0");
+        var mm = dt.getMinutes().toString().padStart(2, "0");
+        var ss = dt.getSeconds().toString().padStart(2, "0");
+        return y + "-" + m + "-" + d + "T" + hh + ":" + mm + ":" + ss;
     }
 
     function renderPending(list) {

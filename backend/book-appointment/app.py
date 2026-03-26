@@ -325,7 +325,7 @@ def book_appointment():
             doctor_url,
             slot_start,
             slot_end,
-            specialisation=specialisation,
+            specialisation=None,
             doctor_id=preferred_doctor_id,
         )
         if preferred_candidates:
