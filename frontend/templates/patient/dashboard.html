@@ -69,6 +69,19 @@
                 <a href="/patient/book" class="btn btn-primary btn-sm">Book an appointment</a>
             </div>
         </div>
+
+        <!-- Pending Orders -->
+        <div class="card" style="margin-top: 1.5rem">
+            <div class="card-header">
+                <h2>Pending Payments</h2>
+                <a href="/patient/order-status" class="view-all">View all</a>
+            </div>
+            <div id="order-list"></div>
+            <div id="order-empty" class="empty-state" style="display:none">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--slate-300)" stroke-width="1.5"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                <p>No pending payments</p>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -261,6 +274,7 @@
 
         var cfg = document.getElementById("svc-config").dataset;
         loadAppointments(cfg, user);
+        loadPendingOrders(cfg, user);
     }
 
     async function loadAppointments(cfg, user) {
@@ -293,6 +307,59 @@
             }).join("");
         } catch(e) {
             document.getElementById("appt-empty").style.display = "";
+        }
+    }
+
+    async function loadPendingOrders(cfg, user) {
+        if (!cfg.orderUrl) return;
+        try {
+            var res = await fetch(cfg.orderUrl + "/GetOrdersByPatient?PatientId=" + encodeURIComponent(user.linkedID));
+            if (!res.ok) throw new Error("Failed to load orders");
+            var orders = await res.json();
+            var pending = (orders || []).filter(function(o) { return (o.Status || "").toLowerCase() === "pending"; });
+            
+            var list = document.getElementById("order-list");
+            if (pending.length === 0) {
+                document.getElementById("order-empty").style.display = "";
+                return;
+            }
+            list.innerHTML = pending.map(function(o) {
+                return '<div class="appt-card"><div class="appt-info"><div class="date">Order #' + o.Id + '</div><div class="detail">Total: $' + Number(o.TotalAmount || 0).toFixed(2) + '</div></div>' +
+                       '<button class="btn btn-primary btn-sm" id="pay-btn-' + o.Id + '" onclick="payOrder(\'' + o.Id + '\', ' + o.TotalAmount + ')">Pay Now</button></div>';
+            }).join("");
+        } catch(e) {
+            document.getElementById("order-empty").style.display = "";
+        }
+    }
+
+    async function payOrder(orderId, total) {
+        var btn = document.getElementById("pay-btn-" + orderId);
+        btn.disabled = true;
+        btn.textContent = "Loading...";
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            var res = await fetch(cfg.orderUrl + "/GetItemsByOrder?OrderId=" + encodeURIComponent(orderId));
+            if (!res.ok) throw new Error();
+            var items = await res.json();
+            
+            var orderData = {
+                orderID: orderId,
+                totalAmount: total,
+                medications: items.map(function(i) {
+                    return {
+                        medicationName: i.MedicationId, // the swagger has MedicationId which might just be string ID, but frontend can display it
+                        qty: i.Quantity,
+                        unitPrice: i.UnitPrice,
+                        MedicationId: i.MedicationId
+                    };
+                })
+            };
+            sessionStorage.setItem("orderData", JSON.stringify(orderData));
+            window.location.href = "/patient/payment";
+        } catch(e) {
+            btn.disabled = false;
+            btn.textContent = "Pay Now";
+            if (typeof showToast === "function") showToast("Failed to fetch order items. Try again later.", "error");
         }
     }
 

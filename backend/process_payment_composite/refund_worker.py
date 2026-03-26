@@ -9,6 +9,7 @@ load_dotenv()
 PAYMENT_WRAPPER_URL = os.getenv("PAYMENT_WRAPPER_URL", "http://127.0.0.1:5001")
 PAYMENT_ATOMIC_URL = os.getenv("PAYMENT_ATOMIC_URL", "http://127.0.0.1:5000")
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://localhost/")
+ORDER_URL = os.getenv("ORDER_URL", "https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI")
 
 def start_worker():
     print("Initializing Refund Worker (DLX Consumer)...")
@@ -55,6 +56,13 @@ def start_worker():
                 atomic_payload = {"status": "refunded"}
                 atomic_resp = requests.put(f"{PAYMENT_ATOMIC_URL}/payment/{document_id}", json=atomic_payload)
                 atomic_resp.raise_for_status()
+
+                # --- NEW: Update external OutSystems Order ---
+                try:
+                    order_update = requests.put(f"{ORDER_URL}/UpdateOrderStatus?OrderId={order_id}&NewStatus=refunded", json={}, timeout=10)
+                    order_update.raise_for_status()
+                except requests.exceptions.RequestException as e:
+                    print(f"Warning: Failed to update OutSystems Order status: {e}")
 
                 # --- NEW: Publish async event to notification_queue ---
                 if patient_email and patient_name and amount:

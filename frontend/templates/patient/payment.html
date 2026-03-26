@@ -9,7 +9,9 @@
             <div class="col-left">
                 <div class="card">
                     <h2>Order Summary</h2>
-                    <div id="order-details"><p class="text-muted">Loading...</p></div>
+                    <div id="order-details">
+                        <p class="text-muted">Loading...</p>
+                    </div>
                 </div>
             </div>
             <div class="col-right">
@@ -19,15 +21,22 @@
                     <p class="pay-note">You will be redirected to Stripe for secure payment.</p>
                     <div id="pay-error" class="alert-banner" style="display:none"></div>
                     <button class="btn btn-primary btn-block" id="pay-btn" onclick="initiatePayment()">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-right:6px">
+                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+                            <line x1="1" y1="10" x2="23" y2="10" />
+                        </svg>
                         Pay Now
                     </button>
-                    <p class="stripe-note">Powered by Stripe. Test mode enabled.</p>
+                    <p class="stripe-note">Powered by Stripe.</p>
                 </div>
 
                 <div class="card" id="verify-card" style="display:none">
                     <div class="verify-success">
-                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--success)"
+                            stroke-width="2">
+                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                         <h2>Payment Successful!</h2>
                         <p>Redirecting to order status...</p>
                     </div>
@@ -38,39 +47,173 @@
 </div>
 
 <style>
-    .payment-page { padding-top: var(--navbar-height); background: var(--bg); min-height: 100vh; }
-    .payment-container { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
-    .page-title { font-size: var(--text-2xl); font-weight: 700; color: var(--text); margin: 0 0 1.5rem; letter-spacing: -0.02em; }
-    .two-col { display: grid; grid-template-columns: 55% 45%; gap: 1.5rem; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: var(--shadow-card); }
-    .card + .card { margin-top: 1rem; }
-    .card h2 { font-size: var(--text-lg); font-weight: 600; margin: 0 0 1rem; color: var(--text); }
-    .total-display { font-size: 2.25rem; font-weight: 800; color: var(--primary); margin-bottom: 1rem; letter-spacing: -0.02em; }
-    .pay-note { font-size: var(--text-sm); color: var(--text-muted); margin: 0 0 1.25rem; }
-    .stripe-note { font-size: var(--text-xs); color: var(--text-muted); text-align: center; margin-top: .75rem; }
-    .alert-banner { background: var(--danger-bg); border: 1px solid var(--danger-light); color: var(--danger); padding: .75rem 1rem; border-radius: var(--radius-md); font-size: var(--text-sm); margin-bottom: 1rem; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; padding: .75rem 1.5rem; border-radius: var(--radius-md); font-weight: 600; font-size: var(--text-base); font-family: var(--font); cursor: pointer; border: none; min-height: 44px; transition: all .15s; }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover { background: var(--primary-hover); }
-    .btn-block { width: 100%; }
-    .text-muted { color: var(--text-muted); }
+    .payment-page {
+        padding-top: var(--navbar-height);
+        background: var(--bg);
+        min-height: 100vh;
+    }
 
-    .med-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
-    .med-table th { text-align: left; padding: .625rem .5rem; border-bottom: 2px solid var(--border); color: var(--text-secondary); font-weight: 500; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .03em; }
-    .med-table td { padding: .625rem .5rem; border-bottom: 1px solid var(--border-light); color: var(--text); }
-    .med-table .total-row td { border-top: 2px solid var(--border); font-weight: 700; color: var(--text); padding-top: .75rem; }
+    .payment-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+    }
 
-    .verify-success { text-align: center; padding: 1.5rem 0; }
-    .verify-success h2 { font-size: var(--text-xl); font-weight: 700; color: var(--text); margin: 1rem 0 .5rem; }
-    .verify-success p { color: var(--text-muted); font-size: var(--text-sm); margin: 0; }
+    .page-title {
+        font-size: var(--text-2xl);
+        font-weight: 700;
+        color: var(--text);
+        margin: 0 0 1.5rem;
+        letter-spacing: -0.02em;
+    }
 
-    @media(max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+    .two-col {
+        display: grid;
+        grid-template-columns: 55% 45%;
+        gap: 1.5rem;
+    }
+
+    .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-card);
+    }
+
+    .card+.card {
+        margin-top: 1rem;
+    }
+
+    .card h2 {
+        font-size: var(--text-lg);
+        font-weight: 600;
+        margin: 0 0 1rem;
+        color: var(--text);
+    }
+
+    .total-display {
+        font-size: 2.25rem;
+        font-weight: 800;
+        color: var(--primary);
+        margin-bottom: 1rem;
+        letter-spacing: -0.02em;
+    }
+
+    .pay-note {
+        font-size: var(--text-sm);
+        color: var(--text-muted);
+        margin: 0 0 1.25rem;
+    }
+
+    .stripe-note {
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+        text-align: center;
+        margin-top: .75rem;
+    }
+
+    .alert-banner {
+        background: var(--danger-bg);
+        border: 1px solid var(--danger-light);
+        color: var(--danger);
+        padding: .75rem 1rem;
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
+        margin-bottom: 1rem;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: .75rem 1.5rem;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        font-size: var(--text-base);
+        font-family: var(--font);
+        cursor: pointer;
+        border: none;
+        min-height: 44px;
+        transition: all .15s;
+    }
+
+    .btn-primary {
+        background: var(--primary);
+        color: #fff;
+    }
+
+    .btn-primary:hover {
+        background: var(--primary-hover);
+    }
+
+    .btn-block {
+        width: 100%;
+    }
+
+    .text-muted {
+        color: var(--text-muted);
+    }
+
+    .med-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--text-sm);
+    }
+
+    .med-table th {
+        text-align: left;
+        padding: .625rem .5rem;
+        border-bottom: 2px solid var(--border);
+        color: var(--text-secondary);
+        font-weight: 500;
+        font-size: var(--text-xs);
+        text-transform: uppercase;
+        letter-spacing: .03em;
+    }
+
+    .med-table td {
+        padding: .625rem .5rem;
+        border-bottom: 1px solid var(--border-light);
+        color: var(--text);
+    }
+
+    .med-table .total-row td {
+        border-top: 2px solid var(--border);
+        font-weight: 700;
+        color: var(--text);
+        padding-top: .75rem;
+    }
+
+    .verify-success {
+        text-align: center;
+        padding: 1.5rem 0;
+    }
+
+    .verify-success h2 {
+        font-size: var(--text-xl);
+        font-weight: 700;
+        color: var(--text);
+        margin: 1rem 0 .5rem;
+    }
+
+    .verify-success p {
+        color: var(--text-muted);
+        font-size: var(--text-sm);
+        margin: 0;
+    }
+
+    @media(max-width: 768px) {
+        .two-col {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 
 <script>
     var orderData = null;
 
-    fbAuth.onAuthStateChanged(async function(u) {
+    fbAuth.onAuthStateChanged(async function (u) {
         if (!u) { location.href = "/auth/login"; return; }
         var snap = await fbDb.collection("users").doc(u.uid).get();
         if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
@@ -88,7 +231,7 @@
         var raw = sessionStorage.getItem("completionData") || sessionStorage.getItem("orderData");
         if (!raw) { location.href = "/patient/dashboard"; return; }
 
-        try { orderData = JSON.parse(raw); } catch(e) { location.href = "/patient/dashboard"; return; }
+        try { orderData = JSON.parse(raw); } catch (e) { location.href = "/patient/dashboard"; return; }
         renderOrder();
     }
 
@@ -96,7 +239,7 @@
         var meds = orderData.medications || [];
         var total = orderData.totalAmount || 0;
 
-        var rows = meds.map(function(m) {
+        var rows = meds.map(function (m) {
             var sub = ((m.qty || m.Quantity || 1) * (m.unitPrice || m.UnitPrice || 0)).toFixed(2);
             return '<tr><td>' + (m.medicationName || m.MedicationId || "Medication") + '</td><td>' + (m.qty || m.Quantity || 1) + '</td><td>$' + (m.unitPrice || m.UnitPrice || 0).toFixed(2) + '</td><td>$' + sub + '</td></tr>';
         }).join("");
@@ -134,7 +277,7 @@
             }));
 
             window.location.href = data.checkout_url;
-        } catch(e) {
+        } catch (e) {
             errDiv.textContent = e.message;
             errDiv.style.display = "";
             setLoading(btn, false);
@@ -164,8 +307,8 @@
             document.getElementById("payment-card").style.display = "none";
 
             sessionStorage.removeItem("paymentSession");
-            setTimeout(function() { location.href = "/patient/order-status"; }, 2500);
-        } catch(e) {
+            setTimeout(function () { location.href = "/patient/order-status"; }, 2500);
+        } catch (e) {
             document.getElementById("pay-error").textContent = "Payment verification failed. Contact support.";
             document.getElementById("pay-error").style.display = "";
         }

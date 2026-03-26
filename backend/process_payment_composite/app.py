@@ -172,6 +172,13 @@ def verify_and_handoff():
         update_response = requests.put(f"{PAYMENT_ATOMIC_URL}/payment/{document_id}", json=update_payload, timeout=10)
         update_response.raise_for_status()
 
+        # Step 2.5: Update OutSystems Order Status
+        try:
+            order_update = requests.put(f"{ORDER_URL}/UpdateOrderStatus?OrderId={order_id}&NewStatus=paid", json={}, timeout=10)
+            order_update.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            print(f"[Process Payment] Warning: Failed to update OutSystems Order status: {e}")
+
         # Step 3: RabbitMQ Handoff
         try:
             params = pika.URLParameters(RABBITMQ_URL)
