@@ -32,7 +32,7 @@ def health():
 
 @app.route("/available-medications")
 def available_medications():
-    inventory_url = os.environ.get("INVENTORY_SERVICE_URL", "http://mock-service:5099").rstrip("/")
+    inventory_url = os.environ.get("INVENTORY_SERVICE_URL", "http://inventory-service:5005").rstrip("/")
     resp = call("GET", f"{inventory_url}/inventory")
     resp.raise_for_status()
     meds = resp.json().get("medications", [])
@@ -52,8 +52,8 @@ def complete_consultation():
 
     consultation_url = os.environ.get("CONSULTATION_SERVICE_URL", "http://consultation-service:5004").rstrip("/")
     openai_url = os.environ.get("OPENAI_WRAPPER_URL", "http://openai-wrapper:5021").rstrip("/")
-    inventory_url = os.environ.get("INVENTORY_SERVICE_URL", "http://mock-service:5099").rstrip("/")
-    order_url = os.environ.get("ORDER_SERVICE_URL", "http://mock-service:5099").rstrip("/")
+    inventory_url = os.environ.get("INVENTORY_SERVICE_URL", "http://inventory-service:5005").rstrip("/")
+    order_url = os.environ.get("ORDER_SERVICE_URL", "https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI").rstrip("/")
     mc_url = os.environ.get("MC_SERVICE_URL", "http://mc-service:5010").rstrip("/")
     notification_url = os.environ.get("NOTIFICATION_WRAPPER_URL", "http://notification-wrapper:5011").rstrip("/")
 

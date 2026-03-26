@@ -51,7 +51,7 @@ def send_sms(phone_number=None, sms_message=None, sms_payload=None):
 
 
 def fetch_patient_email(patient_id):
-    base = os.environ.get("PATIENT_SERVICE_URL", "http://mock-service:5099").rstrip("/")
+    base = os.environ.get("PATIENT_SERVICE_URL", "http://patient-service:5030").rstrip("/")
     resp = requests.get(f"{base}/patient/{patient_id}", timeout=10)
     resp.raise_for_status()
     return resp.json().get("email")
