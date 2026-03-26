@@ -251,7 +251,9 @@
                     name: name,
                     email: email,
                     phone: phone,
-                    specialisation: spec
+                    specialisation: spec,
+                    createAuth: false,
+                    firebaseUID: firebaseUser.uid
                 })
             });
             if (!res.ok) {

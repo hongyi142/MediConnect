@@ -124,7 +124,8 @@
             var token = await fbAuth.currentUser.getIdToken();
             var res = await fetch(cfg.deliveryUrl + "/delivery/" + data.deliveryID, { headers: { "Authorization": "Bearer " + token } });
             if (!res.ok) { sessionStorage.removeItem("activeDelivery"); return; }
-            var delivery = await res.json();
+            var raw = await res.json();
+            var delivery = raw.data || raw;
             if (delivery.status === "delivered" || delivery.status === "completed") {
                 sessionStorage.removeItem("activeDelivery");
                 return;

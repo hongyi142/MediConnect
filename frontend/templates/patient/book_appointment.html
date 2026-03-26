@@ -14,12 +14,42 @@
                         <label class="form-label">Specialisation</label>
                         <select id="spec-select" class="form-control">
                             <option value="">No Preference</option>
-                            <option>General Practice</option><option>Dermatology</option><option>Cardiology</option>
-                            <option>Orthopaedics</option><option>ENT</option><option>Ophthalmology</option>
-                            <option>Gastroenterology</option><option>Neurology</option><option>Psychiatry</option>
-                            <option>Gynaecology</option><option>Paediatrics</option>
+                            <option>General Practice</option>
+                            <option>Dermatology</option>
+                            <option>Cardiology</option>
+                            <option>Orthopaedics</option>
+                            <option>ENT</option>
+                            <option>Ophthalmology</option>
+                            <option>Gastroenterology</option>
+                            <option>Neurology</option>
+                            <option>Psychiatry</option>
+                            <option>Gynaecology</option>
+                            <option>Paediatrics</option>
                         </select>
                     </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Doctor Preference</label>
+                        <div class="choice-row">
+                            <label class="choice-pill">
+                                <input type="radio" name="doctor-pref" value="any" checked onchange="onPreferenceChange()">
+                                <span>Any available doctor</span>
+                            </label>
+                            <label class="choice-pill">
+                                <input type="radio" name="doctor-pref" value="preferred" onchange="onPreferenceChange()">
+                                <span>Preferred doctor</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="doctor-select-group" style="display:none">
+                        <label class="form-label">Select Doctor</label>
+                        <select id="doctor-select" class="form-control">
+                            <option value="">Loading doctors...</option>
+                        </select>
+                        <div id="doctor-helper" class="hint-text"></div>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group flex-1">
                             <label class="form-label">Date *</label>
@@ -37,6 +67,7 @@
                         <textarea id="appt-reason" class="form-control" maxlength="300" rows="3" required placeholder="Briefly describe your concern"></textarea>
                     </div>
                     <div id="book-error" class="alert alert-error" style="display:none"></div>
+                    <div id="book-alt" class="alt-box" style="display:none"></div>
                     <button class="btn btn-primary btn-block" id="book-btn" onclick="bookAppt()">Book Appointment</button>
                 </div>
             </div>
@@ -51,184 +82,46 @@
 </div>
 
 <style>
-    /* Page layout */
-    .page-wrapper {
-        padding-top: var(--navbar-height);
-    }
-    .page-container {
-        max-width: 960px;
-        margin: 0 auto;
-        padding: 2rem 1.5rem;
-    }
-    .page-title {
-        font-size: var(--text-2xl);
-        font-weight: var(--weight-semibold);
-        color: var(--text);
-        margin: 0 0 1rem;
-    }
-
-    /* Two-column grid */
-    .two-col {
-        display: grid;
-        grid-template-columns: 55% 45%;
-        gap: 1.5rem;
-    }
-
-    /* Card */
-    .card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.5rem;
-        box-shadow: var(--shadow-card);
-    }
-    .card-heading {
-        font-size: var(--text-md);
-        font-weight: var(--weight-semibold);
-        margin: 0 0 1rem;
-        color: var(--text);
-    }
-
-    /* Form elements */
-    .form-group {
-        margin-bottom: 1rem;
-    }
-    .form-label {
-        display: block;
-        font-size: var(--text-base);
-        font-weight: var(--weight-medium);
-        margin-bottom: 0.375rem;
-        color: var(--text);
-    }
-    .form-control {
-        width: 100%;
-        padding: 0.625rem 0.75rem;
-        border: 1px solid var(--border);
-        border-radius: var(--radius-md);
-        font-size: var(--text-base);
-        box-sizing: border-box;
-        min-height: 44px;
-        font-family: inherit;
-        background: var(--surface);
-        color: var(--text);
-        transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
-    }
-    .form-control:focus {
-        outline: none;
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
-    }
-    textarea.form-control {
-        resize: vertical;
-    }
-    .form-row {
-        display: flex;
-        gap: 1rem;
-    }
-    .flex-1 {
-        flex: 1;
-    }
-
-    /* Buttons */
-    .btn {
-        padding: 0.625rem 1.25rem;
-        border-radius: var(--radius-md);
-        font-weight: var(--weight-semibold);
-        font-size: var(--text-base);
-        cursor: pointer;
-        border: none;
-        min-height: 44px;
-        transition: background var(--duration-fast), box-shadow var(--duration-fast);
-    }
-    .btn-primary {
-        background: var(--primary);
-        color: var(--text-inverse);
-    }
-    .btn-primary:hover {
-        background: var(--primary-hover);
-    }
-    .btn-block {
-        width: 100%;
-    }
-
-    /* Alert */
-    .alert-error {
-        background: var(--danger-bg);
-        border: 1px solid var(--danger-light);
-        color: var(--danger);
-        padding: 0.75rem;
-        border-radius: var(--radius-md);
-        font-size: var(--text-base);
-    }
-
-    /* AI recommendation banner */
-    .ai-banner {
-        background: var(--primary-subtle);
-        border: 1px solid var(--primary-light);
-        color: var(--primary);
-        padding: 0.75rem 1rem;
-        border-radius: var(--radius-md);
-        margin-bottom: 1rem;
-        font-size: var(--text-base);
-        font-weight: var(--weight-medium);
-    }
-
-    /* Badges */
-    .allergy-badge {
-        display: inline-block;
-        background: var(--danger-bg);
-        border: 1px solid var(--danger-light);
-        color: var(--danger);
-        border-radius: var(--radius-full);
-        padding: 0.125rem 0.5rem;
-        font-size: var(--text-xs);
-        margin: 0.125rem;
-    }
-    .history-badge {
-        display: inline-block;
-        background: var(--primary-subtle);
-        border: 1px solid var(--primary-light);
-        color: var(--primary);
-        border-radius: var(--radius-full);
-        padding: 0.125rem 0.5rem;
-        font-size: var(--text-xs);
-        margin: 0.125rem;
-    }
-
-    /* Profile fields */
-    .profile-field {
-        margin-bottom: 0.75rem;
-    }
-    .profile-field .label {
-        font-size: var(--text-xs);
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .profile-field .value {
-        font-size: var(--text-base);
-        color: var(--text);
-        font-weight: var(--weight-medium);
-    }
-
-    /* Utilities */
-    .text-muted {
-        color: var(--text-muted);
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-        .two-col {
-            grid-template-columns: 1fr;
-        }
-        .form-row {
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-    }
+    .page-wrapper { padding-top: var(--navbar-height); }
+    .page-container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .page-title { font-size: var(--text-2xl); font-weight: var(--weight-semibold); color: var(--text); margin: 0 0 1rem; }
+    .two-col { display: grid; grid-template-columns: 55% 45%; gap: 1.5rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: var(--shadow-card); }
+    .card-heading { font-size: var(--text-md); font-weight: var(--weight-semibold); margin: 0 0 1rem; color: var(--text); }
+    .form-group { margin-bottom: 1rem; }
+    .form-label { display: block; font-size: var(--text-base); font-weight: var(--weight-medium); margin-bottom: 0.375rem; color: var(--text); }
+    .form-control { width: 100%; padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: var(--text-base); box-sizing: border-box; min-height: 44px; font-family: inherit; background: var(--surface); color: var(--text); transition: border-color var(--duration-fast), box-shadow var(--duration-fast); }
+    .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+    textarea.form-control { resize: vertical; }
+    .form-row { display: flex; gap: 1rem; }
+    .flex-1 { flex: 1; }
+    .btn { padding: 0.625rem 1.25rem; border-radius: var(--radius-md); font-weight: var(--weight-semibold); font-size: var(--text-base); cursor: pointer; border: none; min-height: 44px; transition: background var(--duration-fast), box-shadow var(--duration-fast); }
+    .btn-primary { background: var(--primary); color: var(--text-inverse); }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-block { width: 100%; }
+    .alert-error { background: var(--danger-bg); border: 1px solid var(--danger-light); color: var(--danger); padding: 0.75rem; border-radius: var(--radius-md); font-size: var(--text-base); }
+    .ai-banner { background: var(--primary-subtle); border: 1px solid var(--primary-light); color: var(--primary); padding: 0.75rem 1rem; border-radius: var(--radius-md); margin-bottom: 1rem; font-size: var(--text-base); font-weight: var(--weight-medium); }
+    .choice-row { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .choice-pill { border: 1px solid var(--border); border-radius: var(--radius-md); padding: .5rem .75rem; display: flex; align-items: center; gap: .5rem; cursor: pointer; }
+    .choice-pill:hover { border-color: var(--primary); background: var(--primary-subtle); }
+    .hint-text { font-size: var(--text-xs); color: var(--text-muted); margin-top: .375rem; }
+    .alt-box { margin-top: .75rem; border: 1px solid var(--warning-light); background: var(--warning-bg); border-radius: var(--radius-md); padding: .75rem; }
+    .alt-title { margin: 0 0 .5rem; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--warning); }
+    .alt-group { margin-top: .625rem; }
+    .alt-chip { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: var(--radius-full); padding: .25rem .625rem; font-size: var(--text-xs); cursor: pointer; margin: 0 .375rem .375rem 0; }
+    .alt-chip:hover { border-color: var(--primary); color: var(--primary); }
+    .allergy-badge { display: inline-block; background: var(--danger-bg); border: 1px solid var(--danger-light); color: var(--danger); border-radius: var(--radius-full); padding: 0.125rem 0.5rem; font-size: var(--text-xs); margin: 0.125rem; }
+    .history-badge { display: inline-block; background: var(--primary-subtle); border: 1px solid var(--primary-light); color: var(--primary); border-radius: var(--radius-full); padding: 0.125rem 0.5rem; font-size: var(--text-xs); margin: 0.125rem; }
+    .profile-field { margin-bottom: 0.75rem; }
+    .profile-field .label { font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .profile-field .value { font-size: var(--text-base); color: var(--text); font-weight: var(--weight-medium); }
+    .text-muted { color: var(--text-muted); }
+    @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } .form-row { flex-direction: column; gap: 0.5rem; } .choice-row { grid-template-columns: 1fr; } }
 </style>
 
 <script>
+    var doctorOptions = [];
+
     fbAuth.onAuthStateChanged(async function(u) {
         if (!u) { location.href = "/auth/login"; return; }
         var snap = await fbDb.collection("users").doc(u.uid).get();
@@ -240,43 +133,85 @@
     });
 
     function initPage(user) {
-        var cfg = document.getElementById("svc-config").dataset;
-
-        // Time slots 09:00-17:00
         var sel = document.getElementById("appt-time");
         for (var h = 9; h < 17; h++) {
             for (var m = 0; m < 60; m += 30) {
-                var t = h.toString().padStart(2,"0") + ":" + m.toString().padStart(2,"0");
-                var opt = document.createElement("option"); opt.value = t; opt.textContent = t;
+                var t = h.toString().padStart(2, "0") + ":" + m.toString().padStart(2, "0");
+                var opt = document.createElement("option");
+                opt.value = t;
+                opt.textContent = t;
                 sel.appendChild(opt);
             }
         }
 
-        // Min date = tomorrow
-        var tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
-        document.getElementById("appt-date").min = tmr.toISOString().split("T")[0];
+        var tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        document.getElementById("appt-date").min = tomorrow.toISOString().split("T")[0];
 
-        // Check AI recommendation
         var sr = sessionStorage.getItem("symptomResult");
         if (sr) {
             try {
                 var result = JSON.parse(sr);
-                if (result.specialisation) {
+                if (result.specialisation && hasSpecOption(result.specialisation)) {
                     document.getElementById("spec-select").value = result.specialisation;
                     var banner = document.getElementById("ai-banner");
                     banner.textContent = "AI recommends: " + result.specialisation;
                     banner.style.display = "";
                 }
-            } catch(e) {}
+            } catch (e) {}
             sessionStorage.removeItem("symptomResult");
         }
 
-        // Load patient info
-        loadProfile(cfg, user);
+        var draft = sessionStorage.getItem("bookDraft");
+        if (draft) {
+            try {
+                var d = JSON.parse(draft);
+                if (d.specialisation && hasSpecOption(d.specialisation)) {
+                    document.getElementById("spec-select").value = d.specialisation;
+                }
+                if (d.date) document.getElementById("appt-date").value = d.date;
+                if (d.time) document.getElementById("appt-time").value = d.time;
+                if (d.doctorPreference === "preferred") {
+                    document.querySelector('input[name="doctor-pref"][value="preferred"]').checked = true;
+                    onPreferenceChange();
+                    if (d.doctorID) {
+                        setTimeout(function() { document.getElementById("doctor-select").value = d.doctorID; }, 350);
+                    }
+                }
+            } catch (e) {}
+            sessionStorage.removeItem("bookDraft");
+        }
+
+        document.getElementById("spec-select").addEventListener("change", loadDoctorOptions);
+        document.getElementById("appt-date").addEventListener("change", loadDoctorOptions);
+        document.getElementById("appt-time").addEventListener("change", loadDoctorOptions);
+
+        loadProfile(user);
+        loadDoctorOptions();
     }
 
-    async function loadProfile(cfg, user) {
+    function hasSpecOption(value) {
+        var sel = document.getElementById("spec-select");
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === value || sel.options[i].text === value) return true;
+        }
+        return false;
+    }
+
+    function getPreference() {
+        var selected = document.querySelector('input[name="doctor-pref"]:checked');
+        return selected ? selected.value : "any";
+    }
+
+    function onPreferenceChange() {
+        var isPreferred = getPreference() === "preferred";
+        document.getElementById("doctor-select-group").style.display = isPreferred ? "" : "none";
+        if (isPreferred) loadDoctorOptions();
+    }
+
+    async function loadProfile(user) {
         try {
+            var cfg = document.getElementById("svc-config").dataset;
             var token = await fbAuth.currentUser.getIdToken();
             var res = await fetch(cfg.patientUrl + "/patient/" + user.linkedID, { headers: { "Authorization": "Bearer " + token } });
             if (!res.ok) throw new Error();
@@ -287,29 +222,164 @@
                 '<div class="profile-field"><div class="label">Name</div><div class="value">' + (p.name || user.name) + '</div></div>' +
                 '<div class="profile-field"><div class="label">Allergies</div><div>' + allergies + '</div></div>' +
                 '<div class="profile-field"><div class="label">Medical History</div><div>' + history + '</div></div>';
-        } catch(e) {
+        } catch (e) {
             document.getElementById("profile-info").innerHTML = '<p class="text-muted">Could not load profile.</p>';
         }
     }
+
+    async function loadDoctorOptions() {
+        var cfg = document.getElementById("svc-config").dataset;
+        var spec = document.getElementById("spec-select").value;
+        var select = document.getElementById("doctor-select");
+        var helper = document.getElementById("doctor-helper");
+        select.innerHTML = '<option value="">Loading...</option>';
+        helper.textContent = "";
+
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var url = cfg.doctorUrl + "/doctor/available";
+            if (spec) url += "?specialisation=" + encodeURIComponent(spec);
+            var res = await fetch(url, { headers: { "Authorization": "Bearer " + token } });
+            if (!res.ok) throw new Error();
+            var data = await res.json();
+            doctorOptions = data.doctors || [];
+            if (!doctorOptions.length) {
+                select.innerHTML = '<option value="">No available doctors</option>';
+                helper.textContent = "No currently available doctors for this specialisation. You can still choose any doctor to auto-match.";
+                return;
+            }
+            select.innerHTML = '<option value="">Select a doctor</option>' + doctorOptions.map(function(d) {
+                return '<option value="' + d.doctorID + '">' + (d.name || d.doctorID) + ' (' + (d.specialisation || "General Practice") + ')</option>';
+            }).join("");
+            helper.textContent = doctorOptions.length + " available doctor(s) found.";
+        } catch (e) {
+            select.innerHTML = '<option value="">Could not load doctors</option>';
+            helper.textContent = "Unable to load doctor list now.";
+        }
+    }
+
+    function combineSlot(date, time) {
+        var startRaw = date + "T" + time + ":00";
+        var end = new Date(startRaw);
+        end.setMinutes(end.getMinutes() + 30);
+        var eh = end.getHours().toString().padStart(2, "0");
+        var em = end.getMinutes().toString().padStart(2, "0");
+        var endRaw = end.getFullYear() + "-" + (end.getMonth() + 1).toString().padStart(2, "0") + "-" + end.getDate().toString().padStart(2, "0")
+            + "T" + eh + ":" + em + ":00";
+        return { slotStart: startRaw, slotEnd: endRaw };
+    }
+
+    function clearAlternatives() {
+        var alt = document.getElementById("book-alt");
+        alt.style.display = "none";
+        alt.innerHTML = "";
+    }
+
+    function renderAlternatives(alternatives) {
+        if (!alternatives) return;
+        var alt = document.getElementById("book-alt");
+        var html = '<p class="alt-title">Suggested alternatives</p>';
+
+        var sameDoctors = alternatives.sameSlotDoctors || [];
+        if (sameDoctors.length) {
+            html += '<div class="alt-group"><strong>Other doctors at the same time:</strong><div>';
+            html += sameDoctors.map(function(d) {
+                var label = (d.name || d.doctorID) + (d.specialisation ? " - " + d.specialisation : "");
+                return '<button type="button" class="alt-chip" onclick="applyAlternativeDoctor(\'' + d.doctorID + '\')">' + label + '</button>';
+            }).join("");
+            html += '</div></div>';
+        }
+
+        var prefSlots = alternatives.preferredDoctorOtherTimes || [];
+        if (prefSlots.length) {
+            html += '<div class="alt-group"><strong>Other times for your preferred doctor:</strong><div>';
+            html += prefSlots.map(function(s) {
+                return '<button type="button" class="alt-chip" onclick="applyAlternativeSlot(\'' + s.slotStart + '\', \'' + s.slotEnd + '\')">' + fmtSlot(s.slotStart) + '</button>';
+            }).join("");
+            html += '</div></div>';
+        }
+
+        var otherSlots = alternatives.otherTimeslots || [];
+        if (otherSlots.length) {
+            html += '<div class="alt-group"><strong>Other available times:</strong><div>';
+            html += otherSlots.map(function(s) {
+                var label = fmtSlot(s.slotStart) + (s.doctorName ? " (" + s.doctorName + ")" : "");
+                return '<button type="button" class="alt-chip" onclick="applyAlternativeDoctorSlot(\'' + (s.doctorID || "") + '\', \'' + s.slotStart + '\', \'' + s.slotEnd + '\')">' + label + '</button>';
+            }).join("");
+            html += '</div></div>';
+        }
+
+        if (!sameDoctors.length && !prefSlots.length && !otherSlots.length) {
+            html += '<div>No alternatives found yet. Try another date or time.</div>';
+        }
+
+        alt.innerHTML = html;
+        alt.style.display = "";
+    }
+
+    function fmtSlot(iso) {
+        var d = new Date(iso);
+        return d.toLocaleString("en-SG", { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+    }
+
+    window.applyAlternativeDoctor = function(doctorID) {
+        document.querySelector('input[name="doctor-pref"][value="preferred"]').checked = true;
+        onPreferenceChange();
+        document.getElementById("doctor-select").value = doctorID;
+    };
+
+    window.applyAlternativeSlot = function(slotStart, slotEnd) {
+        var start = new Date(slotStart);
+        document.getElementById("appt-date").value = start.toISOString().split("T")[0];
+        var hh = start.getHours().toString().padStart(2, "0");
+        var mm = start.getMinutes().toString().padStart(2, "0");
+        document.getElementById("appt-time").value = hh + ":" + mm;
+    };
+
+    window.applyAlternativeDoctorSlot = function(doctorID, slotStart, slotEnd) {
+        applyAlternativeSlot(slotStart, slotEnd);
+        if (doctorID) applyAlternativeDoctor(doctorID);
+    };
 
     async function bookAppt() {
         var date = document.getElementById("appt-date").value;
         var time = document.getElementById("appt-time").value;
         var reason = document.getElementById("appt-reason").value.trim();
         var spec = document.getElementById("spec-select").value;
+        var pref = getPreference();
+        var doctorID = document.getElementById("doctor-select").value;
         var errDiv = document.getElementById("book-error");
         errDiv.style.display = "none";
+        clearAlternatives();
 
-        if (!date || !time || !reason) { errDiv.textContent = "Please fill all required fields."; errDiv.style.display = ""; return; }
+        if (!date || !time || !reason) {
+            errDiv.textContent = "Please fill all required fields.";
+            errDiv.style.display = "";
+            return;
+        }
+        if (pref === "preferred" && !doctorID) {
+            errDiv.textContent = "Please select a preferred doctor.";
+            errDiv.style.display = "";
+            return;
+        }
 
+        var slot = combineSlot(date, time);
         var btn = document.getElementById("book-btn");
-        btn.disabled = true; btn.textContent = "Booking...";
+        btn.disabled = true;
+        btn.textContent = "Booking...";
         var cfg = document.getElementById("svc-config").dataset;
 
         try {
             var token = await fbAuth.currentUser.getIdToken();
-            var body = { patientID: window.currentUser.linkedID, dateTime: date + "T" + time + ":00" };
+            var body = {
+                patientID: window.currentUser.linkedID,
+                slotStart: slot.slotStart,
+                slotEnd: slot.slotEnd,
+                reason: reason,
+                doctorPreference: pref
+            };
             if (spec) body.specialisation = spec;
+            if (pref === "preferred" && doctorID) body.doctorID = doctorID;
 
             var res = await fetch(cfg.bookAppointmentUrl + "/book-appointment", {
                 method: "POST",
@@ -317,14 +387,18 @@
                 body: JSON.stringify(body)
             });
             var data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.message || "Booking failed");
+            if (!res.ok) {
+                if (data.alternatives) renderAlternatives(data.alternatives);
+                throw new Error(data.error || data.message || "Booking failed");
+            }
 
-            if (typeof showToast === "function") showToast("Appointment booked successfully!");
-            setTimeout(function() { location.href = "/patient/appointments"; }, 2000);
-        } catch(e) {
-            errDiv.textContent = e.message;
+            if (typeof showToast === "function") showToast("Appointment request submitted. Awaiting doctor approval.");
+            setTimeout(function() { location.href = "/patient/appointments"; }, 1800);
+        } catch (e) {
+            errDiv.textContent = e.message || "Booking failed";
             errDiv.style.display = "";
-            btn.disabled = false; btn.textContent = "Book Appointment";
+            btn.disabled = false;
+            btn.textContent = "Book Appointment";
         }
     }
 </script>

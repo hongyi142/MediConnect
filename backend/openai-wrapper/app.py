@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
@@ -10,6 +11,76 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:8080", "http://frontend:8080", "*"])
+
+BOOKING_SPECIALISATIONS = [
+    "General Practice",
+    "Dermatology",
+    "Cardiology",
+    "Orthopaedics",
+    "ENT",
+    "Ophthalmology",
+    "Gastroenterology",
+    "Neurology",
+    "Psychiatry",
+    "Gynaecology",
+    "Paediatrics",
+]
+
+SPECIALISATION_SYNONYMS = {
+    "general": "General Practice",
+    "gp": "General Practice",
+    "family medicine": "General Practice",
+    "skin": "Dermatology",
+    "heart": "Cardiology",
+    "ortho": "Orthopaedics",
+    "bone": "Orthopaedics",
+    "ear nose throat": "ENT",
+    "ent": "ENT",
+    "eye": "Ophthalmology",
+    "stomach": "Gastroenterology",
+    "digestive": "Gastroenterology",
+    "brain": "Neurology",
+    "mental": "Psychiatry",
+    "women": "Gynaecology",
+    "gynae": "Gynaecology",
+    "child": "Paediatrics",
+    "pediatric": "Paediatrics",
+}
+
+MEDICAL_KEYWORDS = {
+    "pain",
+    "ache",
+    "fever",
+    "cough",
+    "nausea",
+    "vomit",
+    "dizzy",
+    "dizziness",
+    "rash",
+    "diarrhea",
+    "diarrhoea",
+    "swelling",
+    "headache",
+    "migraine",
+    "breath",
+    "chest",
+    "throat",
+    "ear",
+    "eye",
+    "nose",
+    "fatigue",
+    "weakness",
+    "cramp",
+    "bleeding",
+    "infection",
+    "allergy",
+    "itch",
+    "injury",
+    "symptom",
+    "body",
+    "stomach",
+    "abdomen",
+}
 
 
 def client():
@@ -26,6 +97,40 @@ def generate(system_prompt, user_prompt):
         ],
     )
     return resp.choices[0].message.content or ""
+
+
+def looks_like_medical_symptom(text):
+    lowered = (text or "").lower()
+    tokens = set(re.findall(r"[a-zA-Z]+", lowered))
+    if not tokens:
+        return False
+    return any(keyword in lowered or keyword in tokens for keyword in MEDICAL_KEYWORDS)
+
+
+def normalise_specialisation(raw):
+    if not raw:
+        return "General Practice"
+
+    raw_str = str(raw).strip()
+    for choice in BOOKING_SPECIALISATIONS:
+        if raw_str.lower() == choice.lower():
+            return choice
+
+    raw_lower = raw_str.lower()
+    for key, mapped in SPECIALISATION_SYNONYMS.items():
+        if key in raw_lower:
+            return mapped
+
+    return "General Practice"
+
+
+def normalise_urgency(raw):
+    value = str(raw or "").strip().lower()
+    if value in {"emergency", "high", "urgent"}:
+        return "emergency"
+    if value in {"visit", "medium", "moderate", "in_person"}:
+        return "visit"
+    return "teleconsult"
 
 
 @app.errorhandler(Exception)
@@ -59,18 +164,33 @@ def symptom_check():
     symptoms = body.get("symptoms")
     if not symptoms:
         return jsonify({"error": "symptoms is required"}), 400
+    if not looks_like_medical_symptom(symptoms):
+        return jsonify(
+            {
+                "error": "Symptom checker accepts medical symptom descriptions only.",
+                "allowedSpecialisations": BOOKING_SPECIALISATIONS,
+            }
+        ), 400
 
     raw = generate(
-        "You are a medical triage assistant. Given patient symptoms, return a JSON object with: "
-        '{"specialisation":"<recommended doctor specialisation>","urgency":"<low|medium|high>",'
-        '"reasoning":"<brief clinical reasoning>","advice":"<what the patient should do>"}. '
-        "Be concise and helpful. Do not diagnose — recommend seeing a doctor. Raw JSON only, no markdown.",
+        "You are a medical triage assistant. Accept only symptom descriptions and do not respond to unrelated requests. "
+        f'Choose "specialisation" from this exact list: {", ".join(BOOKING_SPECIALISATIONS)}. '
+        'Return strict raw JSON with keys: "specialisation", "urgency", "reasoning", "advice". '
+        'urgency must be one of: "teleconsult", "visit", "emergency". '
+        "Keep it concise and avoid definitive diagnosis claims.",
         symptoms,
     )
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
         return jsonify({"error": "Failed to parse LLM response", "raw": raw}), 500
+
+    parsed["specialisation"] = normalise_specialisation(parsed.get("specialisation"))
+    parsed["urgency"] = normalise_urgency(parsed.get("urgency"))
+    if not parsed.get("reasoning"):
+        parsed["reasoning"] = "Based on your symptoms, a doctor should assess you to confirm the cause."
+    if not parsed.get("advice"):
+        parsed["advice"] = "Book a consultation for proper diagnosis and treatment."
     return jsonify(parsed)
 
 

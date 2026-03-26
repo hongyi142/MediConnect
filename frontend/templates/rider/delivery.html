@@ -124,7 +124,8 @@
             var token = await fbAuth.currentUser.getIdToken();
             var res = await fetch(cfg.deliveryUrl + "/delivery/" + deliveryID, { headers: { "Authorization": "Bearer " + token } });
             if (!res.ok) throw new Error("Not found");
-            deliveryData = await res.json();
+            var raw = await res.json();
+            deliveryData = raw.data || raw;
             deliveryData.deliveryID = deliveryID;
             renderDelivery();
         } catch(e) {

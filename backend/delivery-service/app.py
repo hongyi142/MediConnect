@@ -11,6 +11,14 @@ cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
+
+def to_json(data):
+    out = dict(data)
+    for key in ["createdAt", "completedAt"]:
+        if out.get(key) and hasattr(out[key], "isoformat"):
+            out[key] = out[key].isoformat()
+    return out
+
 @app.route("/delivery", methods=["POST"])
 def create_delivery():
     data = request.get_json()
@@ -31,12 +39,19 @@ def create_delivery():
     doc_ref.set(delivery)
     return jsonify({"code": 201, "data": delivery}), 201
 
+
+@app.route("/delivery", methods=["GET"])
+def list_deliveries():
+    docs = db.collection("deliveries").stream()
+    deliveries = [to_json(doc.to_dict()) for doc in docs]
+    return jsonify({"code": 200, "data": deliveries})
+
 @app.route("/delivery/<delivery_id>", methods=["GET"])
 def get_delivery(delivery_id):
     doc = db.collection("deliveries").document(delivery_id).get()
     if not doc.exists:
         return jsonify({"code": 404, "message": "Not found"}), 404
-    return jsonify({"code": 200, "data": doc.to_dict()})
+    return jsonify({"code": 200, "data": to_json(doc.to_dict())})
 
 @app.route("/delivery/<delivery_id>", methods=["PUT"])
 def update_delivery(delivery_id):

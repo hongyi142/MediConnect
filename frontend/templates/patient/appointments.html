@@ -174,6 +174,27 @@
         color: var(--text-muted);
     }
 
+    .alt-inline {
+        margin-top: .375rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: .375rem;
+    }
+
+    .alt-chip {
+        border: 1px solid var(--border);
+        background: var(--surface);
+        border-radius: var(--radius-full, 999px);
+        font-size: .6875rem;
+        padding: .2rem .5rem;
+        cursor: pointer;
+    }
+
+    .alt-chip:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
     .text-center { text-align: center; }
     .text-muted { color: var(--text-secondary); }
     .py-4 { padding: 2rem 0; }
@@ -208,17 +229,17 @@
     function renderTabs() {
         var now = new Date();
         var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        var upcoming = allAppts.filter(function(a) { return new Date(a.dateTime) >= now && a.status !== "cancelled"; })
-            .sort(function(a,b) { return new Date(a.dateTime) - new Date(b.dateTime); });
-        var past = allAppts.filter(function(a) { return new Date(a.dateTime) < now || a.status === "cancelled"; })
-            .sort(function(a,b) { return new Date(b.dateTime) - new Date(a.dateTime); });
+        var upcoming = allAppts.filter(function(a) { return new Date(a.slotStart || a.dateTime) >= now && a.status !== "cancelled"; })
+            .sort(function(a,b) { return new Date(a.slotStart || a.dateTime) - new Date(b.slotStart || b.dateTime); });
+        var past = allAppts.filter(function(a) { return new Date(a.slotStart || a.dateTime) < now || a.status === "cancelled"; })
+            .sort(function(a,b) { return new Date(b.slotStart || b.dateTime) - new Date(a.slotStart || a.dateTime); });
 
         document.getElementById("upcoming-tab").innerHTML = upcoming.length ? upcoming.map(function(a) { return renderCard(a, months, true); }).join("") : '<div class="empty-state">No upcoming appointments.</div>';
         document.getElementById("past-tab").innerHTML = past.length ? past.map(function(a) { return renderCard(a, months, false); }).join("") : '<div class="empty-state">No past appointments.</div>';
     }
 
     function renderCard(a, months, showActions) {
-        var d = new Date(a.dateTime);
+        var d = new Date(a.slotStart || a.dateTime);
         var id = a.appointmentID || a.id;
         var action = "";
         if (showActions && a.status === "confirmed") {
@@ -226,9 +247,55 @@
         } else if (showActions && a.status === "pending") {
             action = '<button class="btn btn-disabled" disabled>Awaiting Doctor</button>';
         }
+        var reason = "";
+        if (a.status === "cancelled" && a.cancellationReason) {
+            reason = '<div class="meta">Reason: ' + a.cancellationReason + '</div>';
+        }
+        var altHtml = renderAlternativesInline(a);
         return '<div class="appt-card"><div class="appt-left"><div class="date-block ' + a.status + '"><span class="day">' + d.getDate() + '</span><span>' + months[d.getMonth()] + '</span></div>' +
             '<div class="appt-details"><div class="time">' + d.getHours().toString().padStart(2,"0") + ':' + d.getMinutes().toString().padStart(2,"0") + '</div>' +
-            '<div class="meta"><span class="status-badge status-' + a.status + '">' + a.status + '</span></div></div></div>' + action + '</div>';
+            '<div class="meta"><span class="status-badge status-' + a.status + '">' + a.status + '</span></div>' + reason + altHtml + '</div></div>' + action + '</div>';
+    }
+
+    function renderAlternativesInline(appt) {
+        var alts = appt.alternativeOptions || {};
+        var chips = [];
+        (alts.sameSlotDoctors || []).slice(0, 3).forEach(function(d) {
+            chips.push('<button class="alt-chip" onclick="rebookWithDoctor(\'' + (d.doctorID || "") + '\', \'' + (appt.specialisation || "") + '\')">Try ' + (d.name || d.doctorID) + '</button>');
+        });
+        (alts.otherTimeslots || []).slice(0, 3).forEach(function(s) {
+            chips.push('<button class="alt-chip" onclick="rebookWithSlot(\'' + (s.doctorID || "") + '\', \'' + (s.slotStart || "") + '\', \'' + (appt.specialisation || "") + '\')">Try ' + fmtTime(s.slotStart) + '</button>');
+        });
+        if (!chips.length) return "";
+        return '<div class="alt-inline">' + chips.join("") + '</div>';
+    }
+
+    function fmtTime(iso) {
+        if (!iso) return "another slot";
+        var d = new Date(iso);
+        return d.toLocaleDateString("en-SG", { day: "2-digit", month: "short" }) + " " + d.toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function rebookWithDoctor(doctorID, specialisation) {
+        var draft = { doctorPreference: "preferred", doctorID: doctorID, specialisation: specialisation };
+        sessionStorage.setItem("bookDraft", JSON.stringify(draft));
+        location.href = "/patient/book";
+    }
+
+    function rebookWithSlot(doctorID, slotStart, specialisation) {
+        var dt = new Date(slotStart);
+        var hh = dt.getHours().toString().padStart(2, "0");
+        var mm = dt.getMinutes().toString().padStart(2, "0");
+        var localDate = dt.getFullYear() + "-" + (dt.getMonth() + 1).toString().padStart(2, "0") + "-" + dt.getDate().toString().padStart(2, "0");
+        var draft = {
+            doctorPreference: doctorID ? "preferred" : "any",
+            doctorID: doctorID || "",
+            specialisation: specialisation,
+            date: localDate,
+            time: hh + ":" + mm
+        };
+        sessionStorage.setItem("bookDraft", JSON.stringify(draft));
+        location.href = "/patient/book";
     }
 
     function switchTab(tab, btn) {

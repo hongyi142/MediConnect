@@ -10,12 +10,12 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-DELIVERY_URL     = os.environ.get("DELIVERY_URL", "http://delivery:5000")
-RIDER_URL        = os.environ.get("RIDER_URL",    "http://rider:5001")
+DELIVERY_URL     = os.environ.get("DELIVERY_URL", "http://delivery-service:5000")
+RIDER_URL        = os.environ.get("RIDER_URL",    "http://rider-service:5001")
 RABBITMQ_URL     = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
 GOOGLE_MAPS_KEY  = os.environ.get("GOOGLE_MAPS_API_KEY")
 
-gmaps = googlemaps.Client(key=GOOGLE_MAPS_KEY)
+gmaps = googlemaps.Client(key=GOOGLE_MAPS_KEY) if GOOGLE_MAPS_KEY else None
 
 # ── Geolocation helpers ─────────────────────────────────────────────────────
 
@@ -39,6 +39,10 @@ def find_nearest_rider(patient_address, available_riders, radius_km=1):
         (r["latitude"], r["longitude"])
         for r in riders_with_location
     ]
+
+    if not gmaps:
+        print("[Assign Delivery] GOOGLE_MAPS_API_KEY missing, skipping nearest rider logic")
+        return None
 
     # Call Google Maps Distance Matrix API
     result = gmaps.distance_matrix(
@@ -115,7 +119,7 @@ def on_order_paid(ch, method, properties, body):
         "orderID":        order["orderID"],
         "patientName":    order["patientName"],
         "patientAddress": order["patientAddress"],
-        "patientPhone":   order["patientPhone"],
+        "patientPhone":   order.get("patientPhone"),
         "patientEmail":   order["patientEmail"],
     })
     delivery = resp.json()["data"]
@@ -157,10 +161,19 @@ def start_amqp_listener():
     while True:
         try:
             conn, ch = get_channel()
-            ch.queue_declare(queue="order.paid", durable=True)
+            exchange_name = "service_exchange"
+            queue_name = "delivery_queue"
+            routing_key = "delivery.assign"
+            arguments = {
+                "x-dead-letter-exchange": "refund_exchange",
+                "x-message-ttl": 10000
+            }
+            ch.exchange_declare(exchange=exchange_name, exchange_type="direct", durable=True)
+            ch.queue_declare(queue=queue_name, durable=True, arguments=arguments)
+            ch.queue_bind(queue=queue_name, exchange=exchange_name, routing_key=routing_key)
             ch.basic_qos(prefetch_count=1)
-            ch.basic_consume(queue="order.paid", on_message_callback=on_order_paid)
-            print("[Assign Delivery] Listening on order.paid ...")
+            ch.basic_consume(queue=queue_name, on_message_callback=on_order_paid)
+            print("[Assign Delivery] Listening on delivery_queue ...")
             ch.start_consuming()
         except Exception as e:
             print(f"[Assign Delivery] AMQP error: {e} — retrying in 5s")

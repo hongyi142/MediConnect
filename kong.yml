@@ -20,6 +20,7 @@ services:
       - name: doctor-routes
         paths:
           - /doctor
+          - /doctor-schedule
         strip_path: false
 
   - name: appointment-service

@@ -7,8 +7,8 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-DELIVERY_URL = os.environ.get("DELIVERY_URL", "http://delivery:5000")
-RIDER_URL    = os.environ.get("RIDER_URL",    "http://rider:5001")
+DELIVERY_URL = os.environ.get("DELIVERY_URL", "http://delivery-service:5000")
+RIDER_URL    = os.environ.get("RIDER_URL",    "http://rider-service:5001")
 ORDER_URL    = os.environ.get("ORDER_URL",    "http://order:5003")  # P3's service
 RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
 

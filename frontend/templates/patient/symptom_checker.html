@@ -467,8 +467,8 @@
                 headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
                 body: JSON.stringify({ symptoms: parts.join(". ") })
             });
-            if (!res.ok) throw new Error("Analysis failed");
             var data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Analysis failed");
 
             document.getElementById("placeholder").style.display = "none";
             var content = document.getElementById("result-content");
@@ -489,7 +489,7 @@
                 window._symptomResult = { specialisation: data.specialisation };
             }
         } catch(e) {
-            alert("Could not complete analysis. Please try again.");
+            alert(e.message || "Could not complete analysis. Please try again.");
         }
         btn.disabled = false; btn.textContent = "Check Symptoms";
     }

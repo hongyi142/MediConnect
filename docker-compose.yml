@@ -60,9 +60,11 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: mediconnect-rabbitmq
+    profiles:
+      - internal-rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5673:5672"
+      - "15673:15672"
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 10s
@@ -93,15 +95,12 @@ services:
     container_name: process_payment_api
     environment:
       - PYTHONUNBUFFERED=1
-      # Internal Docker DNS routing (service-to-service, not through Kong)
-      - RABBITMQ_URL=amqp://rabbitmq/
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://host.docker.internal:5672/}
       - PAYMENT_WRAPPER_URL=http://payment_wrapper:5001
       - PAYMENT_ATOMIC_URL=http://payment_atomic:5000
       - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
       - PATIENT_URL=http://patient-service:5030
     depends_on:
-      rabbitmq:
-        condition: service_healthy
       payment_atomic:
         condition: service_started
       payment_wrapper:
@@ -115,15 +114,12 @@ services:
     # No ports exposed as this is a background worker pulling from the queue
     environment:
       - PYTHONUNBUFFERED=1
-      # Internal Docker DNS routing (service-to-service, not through Kong)
-      - RABBITMQ_URL=amqp://rabbitmq/
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://host.docker.internal:5672/}
       - PAYMENT_WRAPPER_URL=http://payment_wrapper:5001
       - PAYMENT_ATOMIC_URL=http://payment_atomic:5000
       - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
       - PATIENT_URL=http://patient-service:5030
     depends_on:
-      rabbitmq:
-        condition: service_healthy
       payment_atomic:
         condition: service_started
       payment_wrapper:
@@ -137,12 +133,9 @@ services:
     # No ports exposed as this is a background worker pulling from the queue
     environment:
       - PYTHONUNBUFFERED=1
-      - RABBITMQ_URL=amqp://rabbitmq/
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://host.docker.internal:5672/}
     env_file:
       - ./backend/notification_wrapper/.env
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
 
   # ──── Domain Services ────────────────────────────────────
   patient-service:
@@ -160,10 +153,17 @@ services:
   book-appointment:
     build: ./backend/book-appointment
     container_name: book-appointment
+    environment:
+      - PATIENT_SERVICE_URL=http://patient-service:5030
+      - DOCTOR_SERVICE_URL=http://doctor-service:5031
+      - APPOINTMENT_SERVICE_URL=http://appointment-service:5032
+      - NOTIFICATION_WRAPPER_URL=http://notification-wrapper:5011
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://host.docker.internal:5672/}
     depends_on:
       - patient-service
       - doctor-service
       - appointment-service
+      - notification-wrapper
 
   inventory-service:
     build: ./backend/inventory
@@ -181,6 +181,10 @@ services:
   assign-delivery:
     build: ./backend/assign-delivery-service
     container_name: assign-delivery
+    environment:
+      - DELIVERY_URL=http://delivery-service:5000
+      - RIDER_URL=http://rider-service:5001
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://host.docker.internal:5672/}
     depends_on:
       - delivery-service
       - rider-service
@@ -188,6 +192,10 @@ services:
   complete-delivery:
     build: ./backend/complete-delivery-service
     container_name: complete-delivery
+    environment:
+      - DELIVERY_URL=http://delivery-service:5000
+      - RIDER_URL=http://rider-service:5001
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://host.docker.internal:5672/}
     depends_on:
       - delivery-service
 

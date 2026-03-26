@@ -138,6 +138,7 @@ def verify_and_handoff():
             patient_name = patient_data.get("name", "Unknown")
             patient_address = patient_data.get("address", "Unknown")
             patient_email = patient_data.get("email", "Unknown")
+            patient_phone = patient_data.get("phone", "Unknown")
         except requests.exceptions.RequestException as e:
             return jsonify({"error": f"Failed communicating with Patient Service: {str(e)}"}), 503
 
@@ -202,6 +203,7 @@ def verify_and_handoff():
                 "patientName": patient_name,
                 "patientAddress": patient_address,
                 "patientEmail": patient_email,
+                "patientPhone": patient_phone,
                 "amount": amount,
                 "status": "payment_verified"
             }
