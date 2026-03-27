@@ -143,6 +143,17 @@ def update_rider(rider_id):
     doc = rider_doc_by_id(rider_id)
     if not doc:
         return jsonify({"code": 404, "error": "Rider not found"}), 404
+    current = doc.to_dict() or {}
+    expected_status = data.pop("expectedStatus", None)
+    if expected_status and current.get("status") != expected_status:
+        return jsonify(
+            {
+                "code": 409,
+                "error": "Rider status conflict",
+                "currentStatus": current.get("status"),
+                "expectedStatus": expected_status,
+            }
+        ), 409
     data["updatedAt"] = now_utc()
     doc.reference.update(data)
     return jsonify({"code": 200, "message": "Updated"})

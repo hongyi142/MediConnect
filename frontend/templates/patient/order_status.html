@@ -9,6 +9,7 @@
             <div class="col-left">
                 <div class="card">
                     <h2>Delivery Progress</h2>
+                    <p class="tracker-updated"><span class="tracker-dot" id="tracker-dot"></span><span id="tracker-updated">Last updated: --</span></p>
                     <div class="stepper" id="stepper">
                         <div class="step-row" data-step="placed"><div class="step-indicator done"></div><div class="step-content"><div class="step-title">Order Placed</div><div class="step-desc">Your order has been created</div></div></div>
                         <div class="step-row" data-step="paid"><div class="step-indicator"></div><div class="step-content"><div class="step-title">Payment Confirmed</div><div class="step-desc">Payment processed successfully</div></div></div>
@@ -44,6 +45,10 @@
     .two-col { display: grid; grid-template-columns: 60% 40%; gap: 1.5rem; }
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: var(--shadow-card); }
     .card h2 { font-size: var(--text-lg); font-weight: 600; margin: 0 0 1.25rem; color: var(--text); }
+    .tracker-updated { margin: -0.5rem 0 1rem; font-size: var(--text-xs); color: var(--text-muted); display: flex; align-items: center; gap: .5rem; }
+    .tracker-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); display: inline-block; }
+    .tracker-dot.syncing { background: var(--primary); animation: trackerPulse 1s infinite; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+    @keyframes trackerPulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
 
     /* Stepper */
     .stepper { padding: 0 .5rem; }
@@ -82,6 +87,7 @@
 
 <script>
     var pollTimer = null;
+    var currentOrderID = null;
 
     fbAuth.onAuthStateChanged(async function(u) {
         if (!u) { location.href = "/auth/login"; return; }
@@ -94,23 +100,28 @@
     });
 
     function initPage(user) {
-        var completionData = sessionStorage.getItem("completionData");
-        if (completionData) {
+        var rawOrder = sessionStorage.getItem("completionData") || sessionStorage.getItem("orderData");
+        if (rawOrder) {
             try {
-                var data = JSON.parse(completionData);
+                var data = JSON.parse(rawOrder);
                 renderOrderSummary(data);
+                currentOrderID = data.orderID || data.OrderId || data.Id || null;
+                if ((data.paymentStatus || "").toLowerCase() === "paid") {
+                    updateStepper("paid");
+                }
             } catch(e) {}
         } else {
             document.getElementById("order-summary").innerHTML = '<p class="text-muted">No order data available.</p>';
         }
 
-        var deliveryID = sessionStorage.getItem("deliveryID");
-        if (deliveryID) {
-            pollDelivery(deliveryID);
-            pollTimer = setInterval(function() { pollDelivery(deliveryID); }, 10000);
+        if (currentOrderID) {
+            pollOrderAndDelivery(currentOrderID);
+            pollTimer = setInterval(function() { pollOrderAndDelivery(currentOrderID); }, 10000);
         } else {
             updateStepper("placed");
         }
+        setTrackerSyncing(false);
+        setLastUpdated();
     }
 
     function renderOrderSummary(data) {
@@ -120,34 +131,94 @@
         document.getElementById("order-summary").innerHTML = html;
     }
 
-    async function pollDelivery(deliveryID) {
+    function stepRank(step) {
+        var map = { placed: 0, paid: 1, assigned: 2, enroute: 3, delivered: 4 };
+        return Object.prototype.hasOwnProperty.call(map, step) ? map[step] : -1;
+    }
+
+    function mapOrderStatusToStep(status) {
+        var s = (status || "").toLowerCase();
+        if (s === "paid") return "paid";
+        if (s === "delivered" || s === "completed") return "delivered";
+        return "placed";
+    }
+
+    function mapDeliveryStatusToStep(status, hasRider) {
+        var s = (status || "").toLowerCase();
+        if (s === "delivered" || s === "completed") return "delivered";
+        if (s === "delivering" || s === "enroute" || s === "in_transit") return "enroute";
+        if (s === "assigned" || s === "accepted" || hasRider) return "assigned";
+        if (s === "pending" || s === "ready") return "paid";
+        return "placed";
+    }
+
+    async function pollOrderAndDelivery(orderID) {
         var cfg = document.getElementById("svc-config").dataset;
+        var targetStep = "placed";
+        var riderShown = false;
+        setTrackerSyncing(true);
         try {
-            var token = await fbAuth.currentUser.getIdToken();
-            var res = await fetch(cfg.deliveryUrl + "/delivery/" + deliveryID, { headers: { "Authorization": "Bearer " + token } });
-            if (!res.ok) return;
-            var result = await res.json();
-            var d = result.data || result;
-            var status = (d.status || "").toLowerCase();
+            try {
+                var orderRes = await fetch(cfg.orderUrl + "/GetOrderDetails?OrderId=" + encodeURIComponent(orderID));
+                if (orderRes.ok) {
+                    var orderData = await orderRes.json();
+                    var orderStep = mapOrderStatusToStep(orderData.Status || orderData.status);
+                    if (stepRank(orderStep) > stepRank(targetStep)) targetStep = orderStep;
+                }
+            } catch(e) {}
 
-            if (status === "delivered" || status === "completed") {
-                updateStepper("delivered");
-                if (pollTimer) clearInterval(pollTimer);
-            } else if (status === "delivering" || status === "enroute") {
-                updateStepper("enroute");
-            } else if (d.riderID || d.riderName) {
-                updateStepper("assigned");
-                document.getElementById("rider-card").style.display = "flex";
-                if (d.riderName) document.getElementById("rider-name").textContent = d.riderName + " is on the way!";
-            } else {
-                updateStepper("paid");
-            }
+            try {
+                var token = await fbAuth.currentUser.getIdToken();
+                var res = await fetch(cfg.deliveryUrl + "/delivery", { headers: { "Authorization": "Bearer " + token } });
+                if (res.ok) {
+                    var result = await res.json();
+                    var deliveries = Array.isArray(result) ? result : (result.data || []);
+                    var d = null;
+                    for (var i = 0; i < deliveries.length; i++) {
+                        if (String(deliveries[i].orderID || "") === String(orderID)) {
+                            d = deliveries[i];
+                            break;
+                        }
+                    }
 
-            if (d.qrCode) {
-                document.getElementById("qr-section").style.display = "";
-                document.getElementById("qr-display").innerHTML = '<img src="' + d.qrCode + '" alt="Delivery QR Code">';
-            }
-        } catch(e) {}
+                    if (d) {
+                        var deliveryStep = mapDeliveryStatusToStep(d.status, !!(d.riderID || d.riderName));
+                        if (stepRank(deliveryStep) > stepRank(targetStep)) targetStep = deliveryStep;
+                        if (d.riderID || d.riderName) {
+                            riderShown = true;
+                            document.getElementById("rider-card").style.display = "flex";
+                            if (d.riderName) document.getElementById("rider-name").textContent = d.riderName + " is on the way!";
+                        }
+                        if (d.qrCode) {
+                            document.getElementById("qr-section").style.display = "";
+                            document.getElementById("qr-display").innerHTML = '<img src="' + d.qrCode + '" alt="Delivery QR Code">';
+                        }
+                        if (d.deliveryID) {
+                            sessionStorage.setItem("deliveryID", d.deliveryID);
+                        }
+                    }
+                }
+            } catch(e) {}
+        } finally {
+            if (!riderShown) document.getElementById("rider-card").style.display = "none";
+            updateStepper(targetStep);
+            setLastUpdated();
+            setTrackerSyncing(false);
+            if (targetStep === "delivered" && pollTimer) clearInterval(pollTimer);
+        }
+    }
+
+    function setTrackerSyncing(syncing) {
+        var dot = document.getElementById("tracker-dot");
+        if (!dot) return;
+        dot.className = syncing ? "tracker-dot syncing" : "tracker-dot";
+    }
+
+    function setLastUpdated() {
+        var el = document.getElementById("tracker-updated");
+        if (!el) return;
+        var now = new Date();
+        el.textContent = "Last updated: " + now.toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     }
 
     function updateStepper(activeStep) {

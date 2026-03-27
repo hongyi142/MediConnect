@@ -17,7 +17,7 @@ GOOGLE_MAPS_KEY  = os.environ.get("GOOGLE_MAPS_API_KEY")
 
 gmaps = googlemaps.Client(key=GOOGLE_MAPS_KEY) if GOOGLE_MAPS_KEY else None
 
-# ── Geolocation helpers ─────────────────────────────────────────────────────
+# â”€â”€ Geolocation helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def find_nearest_rider(patient_address, available_riders, radius_km=1):
     """
@@ -80,7 +80,7 @@ def find_nearest_rider(patient_address, available_riders, radius_km=1):
 
     return nearest_rider
 
-# ── AMQP setup ──────────────────────────────────────────────────────────────
+# â”€â”€ AMQP setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def get_channel():
     params = pika.URLParameters(RABBITMQ_URL)
@@ -88,7 +88,7 @@ def get_channel():
     return conn, conn.channel()
 
 def broadcast_to_riders(delivery_data):
-    """Fallback — broadcast to all riders if no nearby rider found."""
+    """Fallback â€” broadcast to all riders if no nearby rider found."""
     conn, ch = get_channel()
     ch.exchange_declare(exchange="delivery.available", exchange_type="fanout", durable=True)
     ch.basic_publish(
@@ -109,6 +109,44 @@ def notify_patient(payload):
         properties=pika.BasicProperties(delivery_mode=2)
     )
     conn.close()
+
+
+def assign_delivery_to_rider(delivery_id, rider_id):
+    rider_resp = requests.get(f"{RIDER_URL}/rider/{rider_id}")
+    if rider_resp.status_code >= 400:
+        return None, "Rider not found", 404
+    rider = rider_resp.json().get("data", {})
+    if (rider.get("status") or "").lower() != "available":
+        return None, "Rider already has an active delivery", 409
+
+    claim_resp = requests.put(
+        f"{RIDER_URL}/rider/{rider_id}",
+        json={"status": "delivering", "expectedStatus": "available"},
+    )
+    if claim_resp.status_code >= 400:
+        return None, "Rider already has an active delivery", 409
+
+    assign_resp = requests.put(
+        f"{DELIVERY_URL}/delivery/{delivery_id}",
+        json={
+            "riderID": rider_id,
+            "riderName": rider.get("name"),
+            "status": "assigned",
+        },
+    )
+    if assign_resp.status_code >= 400:
+        try:
+            requests.put(f"{RIDER_URL}/rider/{rider_id}", json={"status": "available"})
+        except Exception:
+            pass
+        msg = "Delivery assignment failed"
+        try:
+            msg = assign_resp.json().get("message", msg)
+        except Exception:
+            pass
+        return None, msg, assign_resp.status_code
+
+    return rider, None, 200
 
 def on_order_paid(ch, method, properties, body):
     order = json.loads(body)
@@ -134,20 +172,23 @@ def on_order_paid(ch, method, properties, body):
     if nearest:
         # Auto-assign nearest rider
         print(f"[Assign Delivery] Auto-assigning {nearest['name']}")
-        requests.put(f"{DELIVERY_URL}/delivery/{delivery['deliveryID']}", json={
-            "riderID":   nearest["riderID"],
-            "riderName": nearest["name"],
-            "status":    "assigned"
-        })
-        requests.put(f"{RIDER_URL}/rider/{nearest['riderID']}", json={"status": "delivering"})
-        notify_patient({
-            "email":   order["patientEmail"],
-            "phone":   order["patientPhone"],
-            "message": f"Rider {nearest['name']} has been assigned to your delivery!"
-        })
+        rider, err, _ = assign_delivery_to_rider(delivery["deliveryID"], nearest["riderID"])
+        if rider:
+            notify_patient({
+                "email":   order["patientEmail"],
+                "phone":   order["patientPhone"],
+                "message": f"Rider {rider['name']} has been assigned to your delivery!"
+            })
+        else:
+            print(f"[Assign Delivery] Auto-assignment failed: {err}; broadcasting instead")
+            broadcast_to_riders({
+                "deliveryID":     delivery["deliveryID"],
+                "patientAddress": delivery["patientAddress"],
+                "orderID":        delivery["orderID"],
+            })
     else:
-        # Fallback — broadcast to all riders manually
-        print("[Assign Delivery] No nearby rider — broadcasting to all")
+        # Fallback â€” broadcast to all riders manually
+        print("[Assign Delivery] No nearby rider â€” broadcasting to all")
         broadcast_to_riders({
             "deliveryID":     delivery["deliveryID"],
             "patientAddress": delivery["patientAddress"],
@@ -176,31 +217,30 @@ def start_amqp_listener():
             print("[Assign Delivery] Listening on delivery_queue ...")
             ch.start_consuming()
         except Exception as e:
-            print(f"[Assign Delivery] AMQP error: {e} — retrying in 5s")
+            print(f"[Assign Delivery] AMQP error: {e} â€” retrying in 5s")
             time.sleep(5)
 
-# ── HTTP endpoints ───────────────────────────────────────────────────────────
+# â”€â”€ HTTP endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/accept-delivery", methods=["POST"])
 def accept_delivery():
-    """Manual fallback — rider accepts from broadcast."""
-    data        = request.get_json()
-    delivery_id = data["deliveryID"]
-    rider_id    = data["riderID"]
+    """Manual fallback - rider accepts from broadcast."""
+    data = request.get_json() or {}
+    delivery_id = data.get("deliveryID")
+    rider_id = data.get("riderID")
+    if not delivery_id or not rider_id:
+        return jsonify({"code": 400, "message": "deliveryID and riderID are required"}), 400
 
-    rider = requests.get(f"{RIDER_URL}/rider/{rider_id}").json()["data"]
+    rider, err, err_code = assign_delivery_to_rider(delivery_id, rider_id)
+    if err:
+        code = err_code if isinstance(err_code, int) and err_code >= 100 else 409
+        return jsonify({"code": code, "message": err}), code
 
-    requests.put(f"{DELIVERY_URL}/delivery/{delivery_id}", json={
-        "riderID":   rider_id,
-        "riderName": rider["name"],
-        "status":    "assigned"
-    })
-    requests.put(f"{RIDER_URL}/rider/{rider_id}", json={"status": "delivering"})
-
-    delivery = requests.get(f"{DELIVERY_URL}/delivery/{delivery_id}").json()["data"]
+    delivery_resp = requests.get(f"{DELIVERY_URL}/delivery/{delivery_id}")
+    delivery = delivery_resp.json().get("data", {}) if delivery_resp.status_code < 400 else {}
     notify_patient({
-        "email":   delivery["patientEmail"],
-        "phone":   delivery["patientPhone"],
+        "email":   delivery.get("patientEmail"),
+        "phone":   delivery.get("patientPhone"),
         "message": f"Your rider {rider['name']} is on the way!"
     })
 
@@ -209,7 +249,7 @@ def accept_delivery():
 @app.route("/nearest-rider", methods=["POST"])
 def nearest_rider():
     """
-    Test endpoint — given an address, returns nearest available rider.
+    Test endpoint â€” given an address, returns nearest available rider.
     Body: { "address": "123 Orchard Road, Singapore" }
     """
     data    = request.get_json()

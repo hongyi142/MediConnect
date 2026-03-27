@@ -306,6 +306,15 @@
             document.querySelector(".col-left").style.display = "none";
             document.getElementById("payment-card").style.display = "none";
 
+            try {
+                var od = JSON.parse(sessionStorage.getItem("orderData") || "{}");
+                if (od && (od.orderID || paySession.orderID)) {
+                    od.orderID = od.orderID || paySession.orderID;
+                    od.paymentStatus = "paid";
+                    sessionStorage.setItem("orderData", JSON.stringify(od));
+                }
+            } catch (_) {}
+
             sessionStorage.removeItem("paymentSession");
             setTimeout(function () { location.href = "/patient/order-status"; }, 2500);
         } catch (e) {

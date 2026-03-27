@@ -55,8 +55,31 @@ def get_delivery(delivery_id):
 
 @app.route("/delivery/<delivery_id>", methods=["PUT"])
 def update_delivery(delivery_id):
-    data = request.get_json()
-    db.collection("deliveries").document(delivery_id).update(data)
+    data = request.get_json(silent=True) or {}
+    ref = db.collection("deliveries").document(delivery_id)
+    snap = ref.get()
+    if not snap.exists:
+        return jsonify({"code": 404, "message": "Not found"}), 404
+
+    current = snap.to_dict() or {}
+    current_status = (current.get("status") or "").lower()
+    incoming_status = (data.get("status") or current.get("status") or "").lower()
+    current_rider = current.get("riderID")
+    incoming_rider = data.get("riderID", current_rider)
+
+    # Prevent mutating completed deliveries.
+    if current_status in ["completed", "delivered"] and any(k in data for k in ["status", "riderID", "riderName"]):
+        return jsonify({"code": 409, "message": "Delivery is already completed"}), 409
+
+    # Prevent rider reassignment once a rider is already set.
+    if current_rider and incoming_rider and incoming_rider != current_rider:
+        return jsonify({"code": 409, "message": "Delivery already assigned to another rider"}), 409
+
+    # Restrict assignment transition to pending/ready (or idempotent same rider assignment).
+    if incoming_status == "assigned" and current_status not in ["pending", "ready", "assigned"]:
+        return jsonify({"code": 409, "message": f"Cannot assign delivery from status '{current_status}'"}), 409
+
+    ref.update(data)
     return jsonify({"code": 200, "message": "Updated"})
 
 @app.route("/delivery/<delivery_id>/delivered", methods=["PUT"])

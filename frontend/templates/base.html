@@ -68,7 +68,7 @@
   {% set show_navbar = show_navbar if show_navbar is defined else true %}
   {% block navbar %}
   <nav class="navbar" id="main-navbar" style="{% if not show_navbar %}display:none{% endif %}">
-    <a href="/" class="navbar-brand">
+    <a href="/" class="navbar-brand" id="nav-brand">
       <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
         <rect width="32" height="32" rx="8" fill="#2563EB"/>
         <path d="M16 7v18M7 16h18" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
@@ -105,15 +105,24 @@
       }
     })();
 
+    function roleHomePath(role) {
+      if (role === "patient") return "/patient/dashboard";
+      if (role === "doctor") return "/doctor/dashboard";
+      if (role === "rider") return "/rider/dashboard";
+      return "/";
+    }
+
     fbAuth.onAuthStateChanged(async function(firebaseUser) {
       var navName = document.getElementById("nav-name");
       var navRole = document.getElementById("nav-role");
       var navAvatar = document.getElementById("nav-avatar");
       var navLogout = document.getElementById("nav-logout");
+      var navBrand = document.getElementById("nav-brand");
       var navbar = document.getElementById("main-navbar");
 
       if (!firebaseUser) {
         if (navbar) navbar.style.display = "none";
+        if (navBrand) navBrand.setAttribute("href", "/");
         return;
       }
       if (navbar && navbar.style.display !== "none") {
@@ -133,6 +142,7 @@
         navRole.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
         navRole.className = "role-badge role-" + user.role;
       }
+      if (navBrand) navBrand.setAttribute("href", roleHomePath(user.role));
     });
 
     document.getElementById("nav-logout").addEventListener("click", function() {
