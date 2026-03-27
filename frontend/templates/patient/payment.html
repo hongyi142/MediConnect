@@ -177,6 +177,9 @@
         border-bottom: 1px solid var(--border-light);
         color: var(--text);
     }
+    .med-name-cell { display: inline-flex; align-items: center; gap: .5rem; }
+    .med-mini-thumb { width: 28px; height: 28px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); background: var(--slate-100); flex-shrink: 0; }
+    .med-mini-thumb-fallback { width: 28px; height: 28px; border-radius: 6px; border: 1px dashed var(--border); color: var(--text-muted); font-size: .625rem; display: inline-flex; align-items: center; justify-content: center; background: var(--slate-50); flex-shrink: 0; }
 
     .med-table .total-row td {
         border-top: 2px solid var(--border);
@@ -211,7 +214,39 @@
 </style>
 
 <script>
+    var CONSULTATION_FEE = 40;
     var orderData = null;
+
+    function normalizeBaseUrl(url) {
+        return (url || "").replace(/\/+$/, "");
+    }
+
+    async function parseApiPayload(res) {
+        var contentType = (res.headers.get("content-type") || "").toLowerCase();
+        var raw = await res.text();
+        var data = null;
+
+        if (!raw) return { data: null, raw: "", contentType: contentType };
+
+        if (contentType.indexOf("application/json") >= 0 || raw.trim().charAt(0) === "{") {
+            try { data = JSON.parse(raw); } catch (_) {}
+        }
+
+        return { data: data, raw: raw, contentType: contentType };
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function resolveMedicationImageUrl(med) {
+        return med.imageUrl || med.medicationImageUrl || med.photoUrl || "";
+    }
 
     fbAuth.onAuthStateChanged(async function (u) {
         if (!u) { location.href = "/auth/login"; return; }
@@ -237,16 +272,36 @@
 
     function renderOrder() {
         var meds = orderData.medications || [];
-        var total = orderData.totalAmount || 0;
+        var total = Number(orderData.totalAmount || 0);
+        var medSubtotal = Number(orderData.medicationSubtotal || 0);
+        var hasProvidedMedSubtotal = !!orderData.medicationSubtotal;
 
         var rows = meds.map(function (m) {
-            var sub = ((m.qty || m.Quantity || 1) * (m.unitPrice || m.UnitPrice || 0)).toFixed(2);
-            return '<tr><td>' + (m.medicationName || m.MedicationId || "Medication") + '</td><td>' + (m.qty || m.Quantity || 1) + '</td><td>$' + (m.unitPrice || m.UnitPrice || 0).toFixed(2) + '</td><td>$' + sub + '</td></tr>';
+            var qty = Number(m.qty || m.Quantity || 1);
+            var unitPrice = Number(m.unitPrice || m.UnitPrice || 0);
+            var sub = (qty * unitPrice).toFixed(2);
+            var medName = m.medicationName || m.MedicationId || "Medication";
+            var imageUrl = resolveMedicationImageUrl(m);
+            var thumb = imageUrl
+                ? '<img class="med-mini-thumb" src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(medName) + '">'
+                : '<span class="med-mini-thumb-fallback">N/A</span>';
+            if (!hasProvidedMedSubtotal) medSubtotal += qty * unitPrice;
+            return '<tr><td><span class="med-name-cell">' + thumb + '<span>' + escapeHtml(medName) + '</span></span></td><td>' + (m.qty || m.Quantity || 1) + '</td><td>$' + (m.unitPrice || m.UnitPrice || 0).toFixed(2) + '</td><td>$' + sub + '</td></tr>';
         }).join("");
+
+        var consultationFee = Number(orderData.consultationFee);
+        if (isNaN(consultationFee)) {
+            consultationFee = Math.max(0, total - medSubtotal);
+        }
+        if (!consultationFee && total > 0 && medSubtotal === 0 && meds.length === 0) {
+            consultationFee = CONSULTATION_FEE;
+        }
 
         document.getElementById("order-details").innerHTML =
             '<div style="margin-bottom:.75rem;font-size:var(--text-sm)"><span style="color:var(--text-muted)">Order ID:</span> <strong>' + (orderData.orderID || "N/A") + '</strong></div>' +
             '<table class="med-table"><thead><tr><th>Medication</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + rows +
+            '<tr><td colspan="3"><strong>Medication Subtotal</strong></td><td><strong>$' + Number(medSubtotal).toFixed(2) + '</strong></td></tr>' +
+            '<tr><td colspan="3"><strong>Consultation Fee</strong></td><td><strong>$' + Number(consultationFee).toFixed(2) + '</strong></td></tr>' +
             '<tr class="total-row"><td colspan="3">Total</td><td>$' + Number(total).toFixed(2) + '</td></tr></tbody></table>';
 
         document.getElementById("total-display").textContent = "SGD $" + Number(total).toFixed(2);
@@ -259,15 +314,35 @@
         setLoading(btn, true);
 
         var cfg = document.getElementById("svc-config").dataset;
+        var apiBase = normalizeBaseUrl(cfg.processPaymentUrl || "");
         try {
+            if (!apiBase) throw new Error("Payment API URL is not configured.");
+
             var token = await fbAuth.currentUser.getIdToken();
-            var res = await fetch(cfg.processPaymentUrl + "/api/checkout", {
+            var res = await fetch(apiBase + "/api/checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
                 body: JSON.stringify({ orderID: orderData.orderID, patientID: window.currentUser.linkedID })
             });
-            var data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.message || "Payment failed");
+            var parsed = await parseApiPayload(res);
+            var data = parsed.data || {};
+
+            if (!res.ok) {
+                var msg = data.error || data.message || "";
+                if (data.details) msg = msg ? (msg + " (" + data.details + ")") : String(data.details);
+                if (!msg) {
+                    if (parsed.contentType.indexOf("text/html") >= 0 || parsed.raw.toLowerCase().indexOf("<!doctype") >= 0) {
+                        msg = "Payment API returned HTML instead of JSON. Endpoint: " + (apiBase + "/api/checkout");
+                    } else {
+                        msg = "Payment failed (" + res.status + ").";
+                    }
+                }
+                throw new Error(msg);
+            }
+
+            if (!data.checkout_url || !data.session_id || !data.documentID) {
+                throw new Error("Payment API returned an invalid payload.");
+            }
 
             sessionStorage.setItem("paymentSession", JSON.stringify({
                 session_id: data.session_id,
@@ -286,11 +361,14 @@
 
     async function verifyPayment(sessionId) {
         var cfg = document.getElementById("svc-config").dataset;
+        var apiBase = normalizeBaseUrl(cfg.processPaymentUrl || "");
         var paySession = JSON.parse(sessionStorage.getItem("paymentSession") || "{}");
 
         try {
+            if (!apiBase) throw new Error("Payment API URL is not configured.");
+
             var token = await fbAuth.currentUser.getIdToken();
-            var res = await fetch(cfg.processPaymentUrl + "/api/verify", {
+            var res = await fetch(apiBase + "/api/verify", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
                 body: JSON.stringify({
@@ -300,7 +378,13 @@
                     patientID: paySession.patientID || window.currentUser.linkedID
                 })
             });
-            if (!res.ok) throw new Error("Verification failed");
+            if (!res.ok) {
+                var parsed = await parseApiPayload(res);
+                var data = parsed.data || {};
+                var msg = data.error || data.message || "";
+                if (data.details) msg = msg ? (msg + " (" + data.details + ")") : String(data.details);
+                throw new Error(msg || "Verification failed");
+            }
 
             document.getElementById("verify-card").style.display = "";
             document.querySelector(".col-left").style.display = "none";
@@ -318,7 +402,7 @@
             sessionStorage.removeItem("paymentSession");
             setTimeout(function () { location.href = "/patient/order-status"; }, 2500);
         } catch (e) {
-            document.getElementById("pay-error").textContent = "Payment verification failed. Contact support.";
+            document.getElementById("pay-error").textContent = e.message || "Payment verification failed. Contact support.";
             document.getElementById("pay-error").style.display = "";
         }
     }

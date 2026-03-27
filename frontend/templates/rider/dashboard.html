@@ -14,6 +14,16 @@
         </div>
     </div>
 
+    <div class="shift-panel">
+        <div class="shift-title">Shift</div>
+        <div class="shift-pills">
+            <label class="shift-pill" data-shift="day"><input type="radio" name="rider-shift" value="day"><span>Day 07:00-19:00</span></label>
+            <label class="shift-pill" data-shift="night"><input type="radio" name="rider-shift" value="night"><span>Night 19:00-07:00</span></label>
+            <label class="shift-pill" data-shift="off"><input type="radio" name="rider-shift" value="off"><span>Off Shift</span></label>
+        </div>
+        <button class="btn btn-primary btn-sm" id="save-shift-btn" onclick="saveShift()">Save Shift</button>
+    </div>
+
     <div class="stat-grid">
         <div class="stat-box"><div class="val" id="stat-active">0</div><div class="lbl">Active</div></div>
         <div class="stat-box"><div class="val" id="stat-available">0</div><div class="lbl">Available Jobs</div></div>
@@ -33,7 +43,7 @@
     <!-- Available Jobs -->
     <div class="section-header">
         <h2>Available Jobs</h2>
-        <span class="text-muted text-sm" id="refresh-info">Auto-refreshes every 15s</span>
+        <span class="text-muted text-sm" id="refresh-info">Auto-refreshes every 15s | Showing jobs within 15km</span>
     </div>
     <div id="jobs-list">
         <div class="empty-state"><p class="text-muted">Checking for deliveries...</p></div>
@@ -48,6 +58,12 @@
     .location-status{display:flex;align-items:center;gap:.375rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-full);padding:.375rem .75rem;font-size:var(--text-xs);font-weight:var(--weight-medium);color:var(--text-secondary)}
     .loc-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
     .loc-dot.grey{background:var(--text-muted)}.loc-dot.green{background:var(--success)}.loc-dot.amber{background:var(--warning)}
+    .shift-panel{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.75rem 1rem;margin-bottom:1rem;box-shadow:var(--shadow-card)}
+    .shift-title{font-size:var(--text-xs);font-weight:var(--weight-semibold);text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted)}
+    .shift-pills{display:flex;gap:.5rem;flex-wrap:wrap}
+    .shift-pill{border:1px solid var(--border);border-radius:var(--radius-full);padding:.3rem .6rem;font-size:var(--text-xs);cursor:pointer;background:var(--surface);color:var(--text-secondary)}
+    .shift-pill input{display:none}
+    .shift-pill.active{border-color:var(--primary);background:var(--primary-subtle);color:var(--primary);font-weight:var(--weight-semibold)}
     .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem}
     .stat-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;text-align:center}
     .stat-box .val{font-size:var(--text-2xl);font-weight:var(--weight-bold);color:var(--text)}.stat-box .lbl{font-size:var(--text-xs);color:var(--text-secondary);margin-top:.125rem}
@@ -66,12 +82,13 @@
     .btn-primary{background:var(--primary);color:var(--text-inverse)}.btn-primary:hover{background:var(--primary-hover)}
     .btn-amber{background:var(--accent);color:var(--text-inverse)}.btn-amber:hover{background:var(--accent-hover)}
     .btn-block{width:100%}
+    .btn-sm{min-height:34px;padding:.4rem .8rem;font-size:var(--text-xs)}
     .empty-state{text-align:center;padding:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg)}
     @media(max-width:640px){.stat-grid{grid-template-columns:1fr 1fr 1fr;gap:.5rem}.stat-box{padding:.75rem}}
 </style>
 
 <script>
-    var riderData = null, activeDelivery = null, watchId = null, currentLat = null, currentLng = null, pollTimer = null;
+    var riderData = null, activeDelivery = null, watchId = null, currentLat = null, currentLng = null, pollTimer = null, lastLocSync = 0;
 
     fbAuth.onAuthStateChanged(async function(u) {
         if (!u) { location.href = "/auth/login"; return; }
@@ -89,10 +106,67 @@
         document.getElementById("greeting").textContent = greet + ", " + (user.name || "Rider");
         document.getElementById("date-line").textContent = new Date().toLocaleDateString("en-SG", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
+        wireShiftInputs();
+        loadRiderProfile();
         startLocationTracking();
         loadAvailableJobs();
         checkActiveDelivery();
         pollTimer = setInterval(loadAvailableJobs, 15000);
+    }
+
+    function wireShiftInputs() {
+        document.querySelectorAll('input[name="rider-shift"]').forEach(function(i) {
+            i.addEventListener("change", syncShiftPills);
+        });
+    }
+
+    function syncShiftPills() {
+        var selected = document.querySelector('input[name="rider-shift"]:checked');
+        document.querySelectorAll(".shift-pill").forEach(function(pill) {
+            pill.classList.toggle("active", !!selected && selected.value === pill.dataset.shift);
+        });
+    }
+
+    async function loadRiderProfile() {
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.riderUrl + "/rider/" + encodeURIComponent(window.currentUser.linkedID), {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            if (!res.ok) return;
+            var payload = await res.json();
+            riderData = payload.data || payload || {};
+            var shift = String(riderData.shift || "off").toLowerCase();
+            var radio = document.querySelector('input[name="rider-shift"][value="' + shift + '"]');
+            if (radio) radio.checked = true;
+            syncShiftPills();
+            loadAvailableJobs();
+        } catch (_) {}
+    }
+
+    async function saveShift() {
+        var selected = document.querySelector('input[name="rider-shift"]:checked');
+        if (!selected) return;
+        var btn = document.getElementById("save-shift-btn");
+        setLoading(btn, true);
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.riderUrl + "/rider/" + encodeURIComponent(window.currentUser.linkedID) + "/shift", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({ shift: selected.value })
+            });
+            var data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message || "Unable to update shift");
+            riderData = data.data || riderData;
+            showToast("Shift updated.");
+            loadAvailableJobs();
+        } catch (e) {
+            showToast(e.message || "Unable to update shift.", "error");
+        }
+        setLoading(btn, false);
     }
 
     function startLocationTracking() {
@@ -106,6 +180,7 @@
                 currentLng = pos.coords.longitude;
                 document.querySelector("#loc-status .loc-dot").className = "loc-dot green";
                 document.getElementById("loc-text").textContent = "Location active";
+                syncRiderLocation();
             },
             function() {
                 document.querySelector("#loc-status .loc-dot").className = "loc-dot amber";
@@ -113,6 +188,33 @@
             },
             { enableHighAccuracy: true, maximumAge: 30000 }
         );
+    }
+
+    async function syncRiderLocation() {
+        if (!currentLat || !currentLng) return;
+        var now = Date.now();
+        if (now - lastLocSync < 20000) return;
+        lastLocSync = now;
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            await fetch(cfg.riderUrl + "/rider/" + encodeURIComponent(window.currentUser.linkedID), {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({ latitude: currentLat, longitude: currentLng })
+            });
+        } catch (_) {}
+    }
+
+    function haversineKm(lat1, lon1, lat2, lon2) {
+        var toRad = function(v) { return v * Math.PI / 180; };
+        var dLat = toRad(lat2 - lat1);
+        var dLon = toRad(lon2 - lon1);
+        var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return 6371 * c;
     }
 
     async function checkActiveDelivery() {
@@ -143,23 +245,59 @@
     async function loadAvailableJobs() {
         var cfg = document.getElementById("svc-config").dataset;
         try {
+            var selectedShift = (document.querySelector('input[name="rider-shift"]:checked') || {}).value || (riderData && riderData.shift) || "off";
+            if (String(selectedShift).toLowerCase() === "off") {
+                document.getElementById("stat-available").textContent = "0";
+                document.getElementById("jobs-list").innerHTML = '<div class="empty-state"><p class="text-muted">You are off shift. Switch to day/night to accept jobs.</p></div>';
+                return;
+            }
+
             var token = await fbAuth.currentUser.getIdToken();
             var res = await fetch(cfg.deliveryUrl + "/delivery", { headers: { "Authorization": "Bearer " + token } });
             var data = await res.json();
             var deliveries = (Array.isArray(data) ? data : data.data || data.deliveries || []);
+            var today = new Date().toISOString().split("T")[0];
+            var completedToday = deliveries.filter(function(d) {
+                var status = String(d.status || "").toLowerCase();
+                if (!(status === "completed" || status === "delivered")) return false;
+                var when = d.completedAt || d.updatedAt || d.createdAt || "";
+                return String(when).slice(0, 10) === today;
+            }).length;
+            document.getElementById("stat-completed").textContent = completedToday;
             var pending = deliveries.filter(function(d) { return d.status === "pending" || d.status === "ready"; });
-            document.getElementById("stat-available").textContent = pending.length;
+            var withDistance = pending.map(function(d) {
+                var lat = Number(d.patientLat);
+                var lng = Number(d.patientLng);
+                var distance = null;
+                if (!isNaN(lat) && !isNaN(lng) && currentLat !== null && currentLng !== null) {
+                    distance = haversineKm(currentLat, currentLng, lat, lng);
+                }
+                d._distanceKm = distance;
+                return d;
+            });
+            var filtered = withDistance.filter(function(d) {
+                return d._distanceKm === null || d._distanceKm <= 15;
+            });
+            filtered.sort(function(a, b) {
+                if (a._distanceKm === null && b._distanceKm === null) return 0;
+                if (a._distanceKm === null) return 1;
+                if (b._distanceKm === null) return -1;
+                return a._distanceKm - b._distanceKm;
+            });
+            document.getElementById("stat-available").textContent = filtered.length;
 
-            if (!pending.length) {
+            if (!filtered.length) {
                 document.getElementById("jobs-list").innerHTML = '<div class="empty-state"><p class="text-muted">No deliveries available right now.</p></div>';
                 return;
             }
 
-            document.getElementById("jobs-list").innerHTML = pending.map(function(d) {
+            document.getElementById("jobs-list").innerHTML = filtered.map(function(d) {
                 var id = d.deliveryID || d.id || d.DeliveryId || "";
+                var distanceText = d._distanceKm === null ? "Distance unavailable" : (d._distanceKm.toFixed(1) + " km away");
                 return '<div class="job-card">' +
                     '<div class="job-info"><div class="job-id">Delivery #' + id + '</div>' +
-                    '<div class="job-addr">' + (d.address || d.patientAddress || "Address on accept") + '</div></div>' +
+                    '<div class="job-addr">' + (d.address || d.patientAddress || "Address on accept") + '</div>' +
+                    '<div class="job-addr">' + distanceText + '</div></div>' +
                     '<button class="btn btn-amber" onclick="acceptJob(\'' + id + '\')">Accept</button>' +
                     '</div>';
             }).join("");

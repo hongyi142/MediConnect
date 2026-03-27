@@ -54,6 +54,16 @@
                 </div>
                 <svg class="action-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
             </a>
+            <a href="/patient/history" class="action-card">
+                <div class="action-icon blue">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3.75 5.25h16.5M3.75 12h16.5M3.75 18.75h16.5"/></svg>
+                </div>
+                <div class="action-text">
+                    <h3>Care History</h3>
+                    <p>Appointments, payments and MCs</p>
+                </div>
+                <svg class="action-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
         </div>
 
         <!-- Upcoming Appointments -->
@@ -313,9 +323,16 @@
     async function loadPendingOrders(cfg, user) {
         if (!cfg.orderUrl) return;
         try {
-            var res = await fetch(cfg.orderUrl + "/GetOrdersByPatient?PatientId=" + encodeURIComponent(user.linkedID));
-            if (!res.ok) throw new Error("Failed to load orders");
-            var orders = await res.json();
+            var candidates = [String(user.linkedID || "")];
+            var hashed = toOrderPatientId(user.linkedID);
+            if (hashed && candidates.indexOf(hashed) < 0) candidates.push(hashed);
+            var orders = [];
+            for (var i = 0; i < candidates.length; i++) {
+                var res = await fetch(cfg.orderUrl + "/GetOrdersByPatient?PatientId=" + encodeURIComponent(candidates[i]));
+                if (!res.ok) continue;
+                var payload = await res.json();
+                if (Array.isArray(payload) && payload.length > orders.length) orders = payload;
+            }
             var pending = (orders || []).filter(function(o) { return (o.Status || "").toLowerCase() === "pending"; });
             
             var list = document.getElementById("order-list");
@@ -332,6 +349,22 @@
         }
     }
 
+    function toOrderPatientId(raw) {
+        var text = String(raw || "").trim();
+        if (/^\d+$/.test(text)) return text;
+        var crc = 0 ^ (-1);
+        for (var i = 0; i < text.length; i++) {
+            var c = text.charCodeAt(i);
+            crc = crc ^ c;
+            for (var j = 0; j < 8; j++) {
+                var mask = -(crc & 1);
+                crc = (crc >>> 1) ^ (0xEDB88320 & mask);
+            }
+        }
+        var val = ((crc ^ (-1)) >>> 0) % 900000000 + 100000000;
+        return String(val);
+    }
+
     async function payOrder(orderId, total) {
         var btn = document.getElementById("pay-btn-" + orderId);
         btn.disabled = true;
@@ -341,10 +374,16 @@
             var res = await fetch(cfg.orderUrl + "/GetItemsByOrder?OrderId=" + encodeURIComponent(orderId));
             if (!res.ok) throw new Error();
             var items = await res.json();
+            var medSubtotal = (items || []).reduce(function(sum, i) {
+                return sum + (Number(i.Quantity || 0) * Number(i.UnitPrice || 0));
+            }, 0);
+            var orderTotal = Number(total || 0);
             
             var orderData = {
                 orderID: orderId,
-                totalAmount: total,
+                totalAmount: orderTotal,
+                medicationSubtotal: medSubtotal,
+                consultationFee: Math.max(0, orderTotal - medSubtotal),
                 medications: items.map(function(i) {
                     return {
                         medicationName: i.MedicationId, // the swagger has MedicationId which might just be string ID, but frontend can display it

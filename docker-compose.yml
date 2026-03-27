@@ -39,6 +39,8 @@ services:
   notification-wrapper:
     build: ./backend/notification_wrapper
     env_file: ./backend/notification_wrapper/.env
+    environment:
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
 
   start-consultation:
     build: ./backend/start-consultation-composite
@@ -77,6 +79,10 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - FIREBASE_CRED_PATH=./serviceAccountKey.json
+    networks:
+      default:
+        aliases:
+          - payment-atomic
 
   payment_wrapper:
     build:
@@ -86,6 +92,10 @@ services:
       - PYTHONUNBUFFERED=1
     env_file:
       - ./backend/payment_wrapper/.env
+    networks:
+      default:
+        aliases:
+          - payment-wrapper
 
   process_payment:
     build:
@@ -94,8 +104,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
-      - PAYMENT_WRAPPER_URL=http://payment_wrapper:5001
-      - PAYMENT_ATOMIC_URL=http://payment_atomic:5000
+      - PAYMENT_WRAPPER_URL=http://payment-wrapper:5001
+      - PAYMENT_ATOMIC_URL=http://payment-atomic:5000
       - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
       - PATIENT_URL=http://patient-service:5030
     depends_on:
@@ -103,6 +113,10 @@ services:
         condition: service_started
       payment_wrapper:
         condition: service_started
+    networks:
+      default:
+        aliases:
+          - process-payment
 
   process_payment_worker:
     build:
@@ -113,8 +127,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
-      - PAYMENT_WRAPPER_URL=http://payment_wrapper:5001
-      - PAYMENT_ATOMIC_URL=http://payment_atomic:5000
+      - PAYMENT_WRAPPER_URL=http://payment-wrapper:5001
+      - PAYMENT_ATOMIC_URL=http://payment-atomic:5000
       - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
       - PATIENT_URL=http://patient-service:5030
     depends_on:
@@ -122,18 +136,6 @@ services:
         condition: service_started
       payment_wrapper:
         condition: service_started
-
-  notification_worker:
-    build:
-      context: ./backend/notification_wrapper
-    container_name: notification_worker
-    command: ["python", "worker.py"]
-    # No ports exposed as this is a background worker pulling from the queue
-    environment:
-      - PYTHONUNBUFFERED=1
-      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
-    env_file:
-      - ./backend/notification_wrapper/.env
 
   # ──── Domain Services ────────────────────────────────────
   patient-service:
@@ -166,6 +168,7 @@ services:
   inventory-service:
     build: ./backend/inventory
     container_name: inventory-service
+    env_file: ./backend/inventory/.env
 
   # ──── Delivery Services ──────────────────────────────────
   delivery-service:
@@ -193,6 +196,7 @@ services:
     environment:
       - DELIVERY_URL=http://delivery-service:5000
       - RIDER_URL=http://rider-service:5001
+      - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
       - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
     depends_on:
       - delivery-service

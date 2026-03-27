@@ -80,6 +80,23 @@ def find_nearest_rider(patient_address, available_riders, radius_km=1):
 
     return nearest_rider
 
+
+def geocode_address(address):
+    if not gmaps or not address:
+        return None, None
+    try:
+        results = gmaps.geocode(address)
+        if not results:
+            return None, None
+        loc = results[0].get("geometry", {}).get("location", {})
+        lat = loc.get("lat")
+        lng = loc.get("lng")
+        if lat is None or lng is None:
+            return None, None
+        return float(lat), float(lng)
+    except Exception:
+        return None, None
+
 # â”€â”€ AMQP setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def get_channel():
@@ -101,10 +118,12 @@ def broadcast_to_riders(delivery_data):
 
 def notify_patient(payload):
     conn, ch = get_channel()
-    ch.queue_declare(queue="delivery.assigned", durable=True)
+    ch.exchange_declare(exchange="service_exchange", exchange_type="direct", durable=True)
+    ch.queue_declare(queue="notification_queue", durable=True)
+    ch.queue_bind(queue="notification_queue", exchange="service_exchange", routing_key="notification")
     ch.basic_publish(
-        exchange="",
-        routing_key="delivery.assigned",
+        exchange="service_exchange",
+        routing_key="notification",
         body=json.dumps(payload),
         properties=pika.BasicProperties(delivery_mode=2)
     )
@@ -153,12 +172,16 @@ def on_order_paid(ch, method, properties, body):
     print(f"[Assign Delivery] Received paid order: {order['orderID']}")
 
     # 1. Create delivery record
+    patient_lat, patient_lng = geocode_address(order["patientAddress"])
     resp = requests.post(f"{DELIVERY_URL}/delivery", json={
         "orderID":        order["orderID"],
         "patientName":    order["patientName"],
+        "patientID":      order.get("patientID"),
         "patientAddress": order["patientAddress"],
         "patientPhone":   order.get("patientPhone"),
         "patientEmail":   order["patientEmail"],
+        "patientLat":     patient_lat,
+        "patientLng":     patient_lng,
     })
     delivery = resp.json()["data"]
 
@@ -175,9 +198,13 @@ def on_order_paid(ch, method, properties, body):
         rider, err, _ = assign_delivery_to_rider(delivery["deliveryID"], nearest["riderID"])
         if rider:
             notify_patient({
-                "email":   order["patientEmail"],
-                "phone":   order["patientPhone"],
-                "message": f"Rider {rider['name']} has been assigned to your delivery!"
+                "event_type": "rider_assigned",
+                "orderID": order.get("orderID"),
+                "patientName": order.get("patientName"),
+                "patientEmail": order.get("patientEmail"),
+                "patientPhone": order.get("patientPhone"),
+                "riderName": rider.get("name"),
+                "message": f"Rider {rider['name']} has been assigned to your delivery!",
             })
         else:
             print(f"[Assign Delivery] Auto-assignment failed: {err}; broadcasting instead")
@@ -239,9 +266,13 @@ def accept_delivery():
     delivery_resp = requests.get(f"{DELIVERY_URL}/delivery/{delivery_id}")
     delivery = delivery_resp.json().get("data", {}) if delivery_resp.status_code < 400 else {}
     notify_patient({
-        "email":   delivery.get("patientEmail"),
-        "phone":   delivery.get("patientPhone"),
-        "message": f"Your rider {rider['name']} is on the way!"
+        "event_type": "rider_assigned",
+        "orderID": delivery.get("orderID"),
+        "patientName": delivery.get("patientName"),
+        "patientEmail": delivery.get("patientEmail"),
+        "patientPhone": delivery.get("patientPhone"),
+        "riderName": rider.get("name"),
+        "message": f"Your rider {rider['name']} is on the way!",
     })
 
     return jsonify({"code": 200, "message": "Rider assigned"}), 200

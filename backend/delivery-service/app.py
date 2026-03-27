@@ -30,9 +30,12 @@ def create_delivery():
         "riderID": None,
         "riderName": None,
         "patientName": data["patientName"],
+        "patientID": data.get("patientID"),
         "patientAddress": data["patientAddress"],
         "patientPhone": data["patientPhone"],
         "patientEmail": data["patientEmail"],
+        "patientLat": data.get("patientLat"),
+        "patientLng": data.get("patientLng"),
         "status": "pending",   # pending → assigned → completed
         "createdAt": datetime.now(timezone.utc).isoformat()
     }

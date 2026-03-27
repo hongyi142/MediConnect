@@ -14,9 +14,39 @@ PAYMENT_ATOMIC_URL = os.getenv("PAYMENT_ATOMIC_URL", "http://127.0.0.1:5000")
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://localhost/")
 ORDER_URL = os.getenv("ORDER_URL", "https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI")
 PATIENT_URL = os.getenv("PATIENT_URL", "http://patient-service:5030")
+CONSULTATION_FEE = float(os.getenv("CONSULTATION_FEE", "40"))
 
 app = Flask(__name__)
 CORS(app)
+# Allow reverse-proxy host headers (Kong -> process_payment) in Flask/Werkzeug.
+app.config["TRUSTED_HOSTS"] = [
+    "localhost",
+    "localhost:8000",
+    "127.0.0.1",
+    "127.0.0.1:8000",
+    "process-payment",
+    "process-payment:5002",
+    "process_payment",
+    "process_payment:5002",
+]
+
+def _safe_json_response(resp):
+    try:
+        return resp.json()
+    except Exception:
+        return {}
+
+def _extract_order_total(order_data):
+    if not isinstance(order_data, dict):
+        return None
+    for key in ["TotalAmount", "totalAmount", "Amount", "amount"]:
+        val = order_data.get(key)
+        if val is not None and str(val).strip() != "":
+            return val
+    nested = order_data.get("data")
+    if isinstance(nested, dict):
+        return _extract_order_total(nested)
+    return None
 
 @app.route('/api/checkout', methods=['POST'])
 def initiate_checkout():
@@ -26,7 +56,7 @@ def initiate_checkout():
     and stores the intent atomically in the Database.
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({"error": "Invalid JSON payload"}), 400
 
@@ -34,7 +64,10 @@ def initiate_checkout():
         patient_id = data.get('patientID')
 
         if not all([order_id, patient_id]):
-            return jsonify({"error": "Missing required fields: orderID, patientID"}), 400
+            return jsonify({
+                "error": "Missing required fields: orderID, patientID",
+                "received": {"orderID": order_id, "patientID": patient_id}
+            }), 400
 
         # Step 0: Fetch Order Details from External Outsystems API
         try:
@@ -43,14 +76,44 @@ def initiate_checkout():
                 return jsonify({"error": f"Order {order_id} not found"}), 404
             order_response.raise_for_status()
             
-            order_data = order_response.json()
-            total_amount = order_data.get("TotalAmount")
-            
+            order_data = _safe_json_response(order_response)
+            total_amount = _extract_order_total(order_data)
+
+            # Fallback: derive total from order items if total field is missing.
             if total_amount is None:
-                return jsonify({"error": "Order TotalAmount is missing from Response"}), 502
+                items_response = requests.get(f"{ORDER_URL}/GetItemsByOrder?OrderId={order_id}", timeout=10)
+                items_response.raise_for_status()
+                items = _safe_json_response(items_response)
+                if isinstance(items, list):
+                    total_amount = sum(
+                        float(i.get("Quantity", i.get("qty", 0)) or 0) *
+                        float(i.get("UnitPrice", i.get("unitPrice", 0)) or 0)
+                        for i in items
+                    )
+
+            if total_amount is None:
+                return jsonify({"error": "Order total amount is missing from Order Service response"}), 502
 
             # Convert to cents
             amount = int(float(total_amount) * 100)
+            if amount <= 0:
+                # Last fallback for legacy/bad orders: derive from order items + consultation fee.
+                items_response = requests.get(f"{ORDER_URL}/GetItemsByOrder?OrderId={order_id}", timeout=10)
+                items_response.raise_for_status()
+                items = _safe_json_response(items_response)
+                items_total = 0
+                if isinstance(items, list):
+                    items_total = sum(
+                        float(i.get("Quantity", i.get("qty", 0)) or 0) *
+                        float(i.get("UnitPrice", i.get("unitPrice", 0)) or 0)
+                        for i in items
+                    )
+                recomputed_total = round(items_total + CONSULTATION_FEE, 2)
+                amount = int(recomputed_total * 100)
+                if amount <= 0:
+                    return jsonify({
+                        "error": f"Order {order_id} has invalid total amount ({float(total_amount):.2f})."
+                    }), 400
             item_name = f"Medical Order #{order_id}"
         except requests.exceptions.RequestException as e:
             return jsonify({"error": f"Failed communicating with Order Service: {str(e)}"}), 503
@@ -63,9 +126,13 @@ def initiate_checkout():
         }
         
         wrapper_response = requests.post(f"{PAYMENT_WRAPPER_URL}/payment/checkout", json=wrapper_payload, timeout=10)
-        wrapper_response.raise_for_status()
-        
-        wrapper_data = wrapper_response.json()
+        wrapper_data = _safe_json_response(wrapper_response)
+        if wrapper_response.status_code >= 400:
+            return jsonify({
+                "error": wrapper_data.get("error", "Payment Wrapper checkout failed"),
+                "details": wrapper_data.get("details", (wrapper_response.text or "")[:300])
+            }), wrapper_response.status_code
+
         checkout_url = wrapper_data.get("checkout_url")
         session_id = wrapper_data.get("session_id")
 
@@ -80,9 +147,13 @@ def initiate_checkout():
         }
         
         atomic_response = requests.post(f"{PAYMENT_ATOMIC_URL}/payment/create", json=atomic_payload, timeout=10)
-        atomic_response.raise_for_status()
-        
-        atomic_data = atomic_response.json()
+        atomic_data = _safe_json_response(atomic_response)
+        if atomic_response.status_code >= 400:
+            return jsonify({
+                "error": atomic_data.get("error", "Payment Atomic create failed"),
+                "details": atomic_data.get("details", (atomic_response.text or "")[:300])
+            }), atomic_response.status_code
+
         document_id = atomic_data.get("documentID")
 
         if not document_id:
@@ -115,7 +186,7 @@ def verify_and_handoff():
     triggers the delivery queue in RabbitMQ.
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({"error": "Invalid JSON payload"}), 400
 
@@ -149,8 +220,8 @@ def verify_and_handoff():
                 return jsonify({"error": f"Order {order_id} not found"}), 404
             order_response.raise_for_status()
             
-            order_data = order_response.json()
-            total_amount = order_data.get("TotalAmount", 0)
+            order_data = _safe_json_response(order_response)
+            total_amount = _extract_order_total(order_data) or 0
             amount = int(float(total_amount) * 100)
         except requests.exceptions.RequestException as e:
             return jsonify({"error": f"Failed communicating with Order Service: {str(e)}"}), 503

@@ -106,7 +106,7 @@ services:
         strip_path: true
 
   - name: process-payment
-    url: http://process_payment:5002
+    url: http://process-payment:5002
     routes:
       - name: process-payment-routes
         paths:

@@ -45,6 +45,8 @@
     .card h2{font-size:var(--text-lg);font-weight:600;margin:0 0 1rem;color:var(--text)}
     .med-card{border:1px solid var(--border);border-radius:var(--radius-md);padding:.75rem 1rem;margin-bottom:.5rem;display:flex;align-items:center;gap:.75rem;transition:all var(--duration-fast)}
     .med-card.selected{border-left:3px solid var(--primary);background:var(--primary-subtle)}
+    .med-thumb{width:52px;height:52px;border-radius:var(--radius-md);object-fit:cover;border:1px solid var(--border);background:var(--slate-100);flex-shrink:0}
+    .med-thumb-fallback{width:52px;height:52px;border-radius:var(--radius-md);border:1px dashed var(--border);background:var(--slate-50);color:var(--text-muted);font-size:.6875rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
     .med-card input[type="checkbox"]{width:18px;height:18px;accent-color:var(--primary);cursor:pointer}
     .med-info{flex:1}
     .med-name{font-weight:600;font-size:var(--text-base);color:var(--text)}
@@ -68,12 +70,33 @@
     .btn-block{width:100%}
     .alert-error{background:var(--danger-bg);border:1px solid var(--danger-light);color:var(--danger);padding:.75rem;border-radius:var(--radius-md);font-size:var(--text-base);margin-bottom:.75rem}
     .summary-item{display:flex;justify-content:space-between;font-size:var(--text-sm);padding:.25rem 0;border-bottom:1px solid var(--border-light)}
+    .summary-med{display:flex;align-items:center;gap:.5rem}
+    .summary-med-thumb{width:24px;height:24px;border-radius:6px;object-fit:cover;border:1px solid var(--border);background:var(--slate-100);flex-shrink:0}
+    .summary-med-thumb-fallback{width:24px;height:24px;border-radius:6px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:.625rem;color:var(--text-muted);background:var(--slate-50);flex-shrink:0}
     .summary-total{display:flex;justify-content:space-between;font-weight:700;font-size:var(--text-md);padding:.5rem 0;color:var(--primary);border-top:2px solid var(--border);margin-top:.5rem}
     @media(max-width:768px){.two-col{grid-template-columns:1fr}}
 </style>
 
 <script>
-    var medications = [], selected = {}, consultData = null, patientData = null;
+    var CONSULTATION_FEE = 40;
+    var medications = [], selected = {}, consultData = null, patientData = null, medById = {};
+
+    function getMedPrice(m) {
+        return Number(m.price || m.Price || m.unitPrice || m.UnitPrice || 0);
+    }
+
+    function resolveMedImageUrl(m) {
+        return m.imageUrl || m.photoUrl || m.medicationImageUrl || "";
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
 
     fbAuth.onAuthStateChanged(async function(u) {
         if (!u) { location.href = "/auth/login"; return; }
@@ -117,12 +140,19 @@
     }
 
     function renderMeds() {
+        medById = {};
         var html = medications.map(function(m, i) {
             var id = m.medicationID || m.id || i;
-            var price = m.price || m.unitPrice || 0;
-            var qty = m.quantity || m.Quantity || 0;
+            medById[String(id)] = m;
+            var price = getMedPrice(m);
+            var qty = Number(m.quantity || m.Quantity || 0);
+            var imageUrl = resolveMedImageUrl(m);
+            var thumb = imageUrl
+                ? '<img class="med-thumb" src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(m.name || "Medication") + '">'
+                : '<div class="med-thumb-fallback">No image</div>';
             return '<div class="med-card" id="mc-' + id + '">' +
-                '<input type="checkbox" onchange="toggleMed(\'' + id + '\',' + price + ',\'' + (m.name||"") + '\')">' +
+                thumb +
+                '<input type="checkbox" onchange="toggleMed(\'' + id + '\')">' +
                 '<div class="med-info"><div class="med-name">' + (m.name||"Unknown") + '</div><div class="med-price">$' + Number(price).toFixed(2) + '/unit &middot; ' + qty + ' in stock</div></div>' +
                 '<input type="number" class="med-qty" id="qty-' + id + '" min="1" max="' + qty + '" value="1" disabled onchange="updateTotals()">' +
                 '</div>';
@@ -130,13 +160,23 @@
         document.getElementById("med-list").innerHTML = html || '<p class="text-muted">No medications available.</p>';
     }
 
-    function toggleMed(id, price, name) {
+    function toggleMed(id) {
+        var med = medById[String(id)] || {};
+        var price = getMedPrice(med);
+        var name = med.name || "Medication";
+        var imageUrl = resolveMedImageUrl(med);
         if (selected[id]) {
             delete selected[id];
             document.getElementById("mc-" + id).classList.remove("selected");
             document.getElementById("qty-" + id).disabled = true;
         } else {
-            selected[id] = { medicationID: id, medicationName: name, unitPrice: price, qty: 1 };
+            selected[id] = {
+                medicationID: id,
+                medicationName: name,
+                unitPrice: price,
+                qty: 1,
+                imageUrl: imageUrl
+            };
             document.getElementById("mc-" + id).classList.add("selected");
             document.getElementById("qty-" + id).disabled = false;
         }
@@ -144,21 +184,30 @@
     }
 
     function updateTotals() {
-        var total = 0, count = 0;
+        var medicationTotal = 0, count = 0;
         Object.keys(selected).forEach(function(id) {
             var q = parseInt(document.getElementById("qty-" + id).value) || 1;
             selected[id].qty = q;
-            total += q * selected[id].unitPrice;
+            medicationTotal += q * selected[id].unitPrice;
             count++;
         });
-        document.getElementById("running-total").textContent = "Selected: " + count + " items | Total: $" + total.toFixed(2);
+        var grandTotal = medicationTotal + CONSULTATION_FEE;
+        document.getElementById("running-total").textContent =
+            "Selected: " + count + " items | Medications: $" + medicationTotal.toFixed(2) +
+            " | Consultation Fee: $" + CONSULTATION_FEE.toFixed(2) +
+            " | Total: $" + grandTotal.toFixed(2);
         document.getElementById("complete-btn").disabled = count === 0;
 
         var summaryHtml = Object.keys(selected).map(function(id) {
             var m = selected[id];
-            return '<div class="summary-item"><span>' + m.medicationName + ' x' + m.qty + '</span><span>$' + (m.qty * m.unitPrice).toFixed(2) + '</span></div>';
+            var thumb = m.imageUrl
+                ? '<img class="summary-med-thumb" src="' + escapeHtml(m.imageUrl) + '" alt="' + escapeHtml(m.medicationName || "Medication") + '">'
+                : '<span class="summary-med-thumb-fallback">N/A</span>';
+            return '<div class="summary-item"><span class="summary-med">' + thumb + '<span>' + m.medicationName + ' x' + m.qty + '</span></span><span>$' + (m.qty * m.unitPrice).toFixed(2) + '</span></div>';
         }).join("");
-        summaryHtml += '<div class="summary-total"><span>Total</span><span>$' + total.toFixed(2) + '</span></div>';
+        summaryHtml += '<div class="summary-item"><span>Medication Subtotal</span><span>$' + medicationTotal.toFixed(2) + '</span></div>';
+        summaryHtml += '<div class="summary-item"><span>Consultation Fee</span><span>$' + CONSULTATION_FEE.toFixed(2) + '</span></div>';
+        summaryHtml += '<div class="summary-total"><span>Total</span><span>$' + grandTotal.toFixed(2) + '</span></div>';
         document.getElementById("order-summary").innerHTML = count ? summaryHtml : '<p class="text-muted text-sm">Select medications to see summary.</p>';
     }
 

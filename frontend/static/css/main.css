@@ -58,7 +58,7 @@
   --text-inverse: #FFFFFF;
 
   /* Typography */
-  --font: 'Figtree', 'Inter', system-ui, -apple-system, sans-serif;
+  --font: 'Manrope', 'Figtree', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
   /* Type Scale */
@@ -152,7 +152,10 @@ body {
   font-size: var(--text-base);
   line-height: 1.6;
   color: var(--text);
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 700px at -10% -20%, #dbeafe 0%, transparent 60%),
+    radial-gradient(900px 500px at 110% -10%, #fff7ed 0%, transparent 60%),
+    linear-gradient(180deg, #f8fbff 0%, #f8fafc 50%, #f1f5f9 100%);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
@@ -285,7 +288,7 @@ h4 { font-size: var(--text-md); }
   left: 0;
   right: 0;
   height: var(--navbar-height);
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
@@ -390,7 +393,8 @@ h4 { font-size: var(--text-md); }
    6. Cards
    ------------------------------------------------------------ */
 .card {
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);

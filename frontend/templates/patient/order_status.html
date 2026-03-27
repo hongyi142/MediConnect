@@ -11,10 +11,7 @@
                     <h2>Delivery Progress</h2>
                     <p class="tracker-updated"><span class="tracker-dot" id="tracker-dot"></span><span id="tracker-updated">Last updated: --</span></p>
                     <div class="stepper" id="stepper">
-                        <div class="step-row" data-step="placed"><div class="step-indicator done"></div><div class="step-content"><div class="step-title">Order Placed</div><div class="step-desc">Your order has been created</div></div></div>
-                        <div class="step-row" data-step="paid"><div class="step-indicator"></div><div class="step-content"><div class="step-title">Payment Confirmed</div><div class="step-desc">Payment processed successfully</div></div></div>
-                        <div class="step-row" data-step="assigned"><div class="step-indicator"></div><div class="step-content"><div class="step-title">Rider Assigned</div><div class="step-desc">A rider is picking up your order</div></div></div>
-                        <div class="step-row" data-step="enroute"><div class="step-indicator"></div><div class="step-content"><div class="step-title">Out for Delivery</div><div class="step-desc">Your rider is on the way</div></div></div>
+                        <div class="step-row" data-step="assigned"><div class="step-indicator"></div><div class="step-content"><div class="step-title">Rider assigned and out for delivery</div><div class="step-desc">Your rider is on the way</div></div></div>
                         <div class="step-row" data-step="delivered"><div class="step-indicator"></div><div class="step-content"><div class="step-title">Delivered</div><div class="step-desc">Order delivered successfully</div></div></div>
                     </div>
                     <div id="rider-card" class="rider-card" style="display:none">
@@ -88,6 +85,7 @@
 <script>
     var pollTimer = null;
     var currentOrderID = null;
+    var qrLoadedForDeliveryID = null;
 
     fbAuth.onAuthStateChanged(async function(u) {
         if (!u) { location.href = "/auth/login"; return; }
@@ -107,7 +105,7 @@
                 renderOrderSummary(data);
                 currentOrderID = data.orderID || data.OrderId || data.Id || null;
                 if ((data.paymentStatus || "").toLowerCase() === "paid") {
-                    updateStepper("paid");
+                    updateStepper("assigned");
                 }
             } catch(e) {}
         } else {
@@ -118,7 +116,7 @@
             pollOrderAndDelivery(currentOrderID);
             pollTimer = setInterval(function() { pollOrderAndDelivery(currentOrderID); }, 10000);
         } else {
-            updateStepper("placed");
+            updateStepper("assigned");
         }
         setTrackerSyncing(false);
         setLastUpdated();
@@ -132,29 +130,72 @@
     }
 
     function stepRank(step) {
-        var map = { placed: 0, paid: 1, assigned: 2, enroute: 3, delivered: 4 };
+        var map = { assigned: 0, delivered: 1 };
         return Object.prototype.hasOwnProperty.call(map, step) ? map[step] : -1;
     }
 
     function mapOrderStatusToStep(status) {
         var s = (status || "").toLowerCase();
-        if (s === "paid") return "paid";
         if (s === "delivered" || s === "completed") return "delivered";
-        return "placed";
+        return "assigned";
     }
 
     function mapDeliveryStatusToStep(status, hasRider) {
         var s = (status || "").toLowerCase();
         if (s === "delivered" || s === "completed") return "delivered";
-        if (s === "delivering" || s === "enroute" || s === "in_transit") return "enroute";
+        if (s === "delivering" || s === "enroute" || s === "in_transit") return "assigned";
         if (s === "assigned" || s === "accepted" || hasRider) return "assigned";
-        if (s === "pending" || s === "ready") return "paid";
-        return "placed";
+        if (s === "pending" || s === "ready") return "assigned";
+        return "assigned";
+    }
+
+    function setAssignedStepCopy(waitingForRider) {
+        var row = document.querySelector('.step-row[data-step="assigned"]');
+        if (!row) return;
+        var titleEl = row.querySelector(".step-title");
+        var descEl = row.querySelector(".step-desc");
+        if (!titleEl || !descEl) return;
+        if (waitingForRider) {
+            titleEl.textContent = "Finding Rider";
+            descEl.textContent = "We are notifying nearby riders for your order.";
+        } else {
+            titleEl.textContent = "Rider assigned and out for delivery";
+            descEl.textContent = "Your rider is on the way";
+        }
+    }
+
+    function resolveQrImageSrc(rawQr) {
+        if (!rawQr) return "";
+        if (String(rawQr).indexOf("data:image") === 0) return rawQr;
+        return "data:image/png;base64," + rawQr;
+    }
+
+    async function ensureQrCode(deliveryID) {
+        if (!deliveryID || qrLoadedForDeliveryID === String(deliveryID)) return;
+        var cfg = document.getElementById("svc-config").dataset;
+        var patientID =
+            (window.currentUser && (window.currentUser.patientID || window.currentUser.patientId || window.currentUser.id || window.currentUser.userID)) ||
+            (fbAuth.currentUser && fbAuth.currentUser.uid) ||
+            "";
+        try {
+            var res = await fetch(cfg.completeDeliveryUrl + "/prepare-delivery", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ deliveryID: deliveryID, patientID: patientID })
+            });
+            if (!res.ok) return;
+            var data = await res.json();
+            if (!data || !data.qrCode) return;
+            document.getElementById("qr-section").style.display = "";
+            document.getElementById("qr-display").innerHTML =
+                '<img src="' + resolveQrImageSrc(data.qrCode) + '" alt="Delivery QR Code">';
+            qrLoadedForDeliveryID = String(deliveryID);
+        } catch(e) {}
     }
 
     async function pollOrderAndDelivery(orderID) {
         var cfg = document.getElementById("svc-config").dataset;
-        var targetStep = "placed";
+        var targetStep = "assigned";
         var riderShown = false;
         setTrackerSyncing(true);
         try {
@@ -182,19 +223,26 @@
                     }
 
                     if (d) {
+                        var dStatus = String(d.status || "").toLowerCase();
+                        setAssignedStepCopy((dStatus === "pending" || dStatus === "ready") && !(d.riderID || d.riderName));
                         var deliveryStep = mapDeliveryStatusToStep(d.status, !!(d.riderID || d.riderName));
                         if (stepRank(deliveryStep) > stepRank(targetStep)) targetStep = deliveryStep;
                         if (d.riderID || d.riderName) {
                             riderShown = true;
+                            setAssignedStepCopy(false);
                             document.getElementById("rider-card").style.display = "flex";
                             if (d.riderName) document.getElementById("rider-name").textContent = d.riderName + " is on the way!";
                         }
                         if (d.qrCode) {
                             document.getElementById("qr-section").style.display = "";
-                            document.getElementById("qr-display").innerHTML = '<img src="' + d.qrCode + '" alt="Delivery QR Code">';
+                            document.getElementById("qr-display").innerHTML = '<img src="' + resolveQrImageSrc(d.qrCode) + '" alt="Delivery QR Code">';
+                            qrLoadedForDeliveryID = String(d.deliveryID || "");
                         }
                         if (d.deliveryID) {
                             sessionStorage.setItem("deliveryID", d.deliveryID);
+                            if (!d.qrCode) {
+                                await ensureQrCode(d.deliveryID);
+                            }
                         }
                     }
                 }
@@ -222,7 +270,7 @@
     }
 
     function updateStepper(activeStep) {
-        var steps = ["placed", "paid", "assigned", "enroute", "delivered"];
+        var steps = ["assigned", "delivered"];
         var activeIdx = steps.indexOf(activeStep);
         var rows = document.querySelectorAll(".step-row");
         rows.forEach(function(row, i) {

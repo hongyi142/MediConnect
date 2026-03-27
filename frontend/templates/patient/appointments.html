@@ -3,7 +3,10 @@
 
 {% block content %}
 <div class="page-container">
-    <h1 class="page-title">My Appointments</h1>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap">
+        <h1 class="page-title" style="margin:0">My Appointments</h1>
+        <a class="btn btn-primary" href="/patient/history">View Care History</a>
+    </div>
     <div class="tab-bar">
         <button class="tab active" onclick="switchTab('upcoming',this)">Upcoming</button>
         <button class="tab" onclick="switchTab('past',this)">Past</button>

@@ -91,6 +91,11 @@ def patient_order_status():
     return render_template("patient/order_status.html")
 
 
+@app.route("/patient/history")
+def patient_history():
+    return render_template("patient/history.html")
+
+
 # ── Doctor ──
 @app.route("/doctor/dashboard")
 def doctor_dashboard():

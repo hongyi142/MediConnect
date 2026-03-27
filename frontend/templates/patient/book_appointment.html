@@ -50,6 +50,20 @@
                         <div id="doctor-helper" class="hint-text"></div>
                     </div>
 
+                    <div class="form-group">
+                        <label class="form-label">Consultation Timing</label>
+                        <div class="choice-row">
+                            <label class="choice-pill">
+                                <input type="radio" name="timing-mode" value="scheduled" checked onchange="onTimingChange()">
+                                <span>Specific timeslot</span>
+                            </label>
+                            <label class="choice-pill">
+                                <input type="radio" name="timing-mode" value="immediate" onchange="onTimingChange()">
+                                <span>Immediate consultation</span>
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group flex-1">
                             <label class="form-label">Date *</label>
@@ -134,7 +148,7 @@
 
     function initPage(user) {
         var sel = document.getElementById("appt-time");
-        for (var h = 9; h < 17; h++) {
+        for (var h = 0; h < 24; h++) {
             for (var m = 0; m < 60; m += 30) {
                 var t = h.toString().padStart(2, "0") + ":" + m.toString().padStart(2, "0");
                 var opt = document.createElement("option");
@@ -144,9 +158,10 @@
             }
         }
 
-        var tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        document.getElementById("appt-date").min = tomorrow.toISOString().split("T")[0];
+        var today = new Date();
+        var todayText = today.toISOString().split("T")[0];
+        document.getElementById("appt-date").min = todayText;
+        document.getElementById("appt-date").value = todayText;
 
         var sr = sessionStorage.getItem("symptomResult");
         if (sr) {
@@ -171,6 +186,10 @@
                 }
                 if (d.date) document.getElementById("appt-date").value = d.date;
                 if (d.time) document.getElementById("appt-time").value = d.time;
+                if (d.immediate) {
+                    document.querySelector('input[name="timing-mode"][value="immediate"]').checked = true;
+                    onTimingChange();
+                }
                 if (d.doctorPreference === "preferred") {
                     document.querySelector('input[name="doctor-pref"][value="preferred"]').checked = true;
                     onPreferenceChange();
@@ -188,6 +207,7 @@
 
         loadProfile(user);
         loadDoctorOptions();
+        onTimingChange();
     }
 
     function hasSpecOption(value) {
@@ -203,10 +223,21 @@
         return selected ? selected.value : "any";
     }
 
+    function getTimingMode() {
+        var selected = document.querySelector('input[name="timing-mode"]:checked');
+        return selected ? selected.value : "scheduled";
+    }
+
     function onPreferenceChange() {
         var isPreferred = getPreference() === "preferred";
         document.getElementById("doctor-select-group").style.display = isPreferred ? "" : "none";
         if (isPreferred) loadDoctorOptions();
+    }
+
+    function onTimingChange() {
+        var immediate = getTimingMode() === "immediate";
+        document.getElementById("appt-date").disabled = immediate;
+        document.getElementById("appt-time").disabled = immediate;
     }
 
     async function loadProfile(user) {
@@ -269,6 +300,34 @@
         return { slotStart: startRaw, slotEnd: endRaw };
     }
 
+    function buildImmediateSlot() {
+        var now = new Date();
+        now.setSeconds(0, 0);
+        var mins = now.getMinutes();
+        var rounded = mins <= 30 ? 30 : 60;
+        now.setMinutes(rounded);
+        if (rounded === 60) {
+            now.setHours(now.getHours() + 1);
+            now.setMinutes(0);
+        }
+        var end = new Date(now);
+        end.setMinutes(end.getMinutes() + 30);
+
+        return {
+            slotStart: localIso(now),
+            slotEnd: localIso(end)
+        };
+    }
+
+    function localIso(dt) {
+        var y = dt.getFullYear();
+        var m = (dt.getMonth() + 1).toString().padStart(2, "0");
+        var d = dt.getDate().toString().padStart(2, "0");
+        var hh = dt.getHours().toString().padStart(2, "0");
+        var mm = dt.getMinutes().toString().padStart(2, "0");
+        return y + "-" + m + "-" + d + "T" + hh + ":" + mm + ":00";
+    }
+
     function clearAlternatives() {
         var alt = document.getElementById("book-alt");
         alt.style.display = "none";
@@ -329,6 +388,9 @@
     };
 
     window.applyAlternativeSlot = function(slotStart, slotEnd) {
+        var timingRadio = document.querySelector('input[name="timing-mode"][value="scheduled"]');
+        if (timingRadio) timingRadio.checked = true;
+        onTimingChange();
         var start = new Date(slotStart);
         document.getElementById("appt-date").value = start.toISOString().split("T")[0];
         var hh = start.getHours().toString().padStart(2, "0");
@@ -345,6 +407,7 @@
         var date = document.getElementById("appt-date").value;
         var time = document.getElementById("appt-time").value;
         var reason = document.getElementById("appt-reason").value.trim();
+        var timingMode = getTimingMode();
         var spec = document.getElementById("spec-select").value;
         var pref = getPreference();
         var doctorID = document.getElementById("doctor-select").value;
@@ -352,8 +415,13 @@
         errDiv.style.display = "none";
         clearAlternatives();
 
-        if (!date || !time || !reason) {
+        if (!reason) {
             errDiv.textContent = "Please fill all required fields.";
+            errDiv.style.display = "";
+            return;
+        }
+        if (timingMode === "scheduled" && (!date || !time)) {
+            errDiv.textContent = "Please choose a date and timeslot.";
             errDiv.style.display = "";
             return;
         }
@@ -363,7 +431,12 @@
             return;
         }
 
-        var slot = combineSlot(date, time);
+        var slot = timingMode === "immediate" ? buildImmediateSlot() : combineSlot(date, time);
+        if (new Date(slot.slotStart) < new Date()) {
+            errDiv.textContent = "Please choose a future slot.";
+            errDiv.style.display = "";
+            return;
+        }
         var btn = document.getElementById("book-btn");
         btn.disabled = true;
         btn.textContent = "Booking...";
@@ -376,7 +449,8 @@
                 slotStart: slot.slotStart,
                 slotEnd: slot.slotEnd,
                 reason: reason,
-                doctorPreference: pref
+                doctorPreference: pref,
+                timingMode: timingMode
             };
             if (spec) body.specialisation = spec;
             if (pref === "preferred" && doctorID) body.doctorID = doctorID;

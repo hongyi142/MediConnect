@@ -406,6 +406,8 @@
 <script>
     var selectedSymptoms = [];
     var SYMPTOMS = ["Fever","Cough","Sore Throat","Headache","Runny Nose","Fatigue","Nausea","Vomiting","Diarrhoea","Chest Pain","Shortness of Breath","Rash","Joint Pain","Back Pain","Dizziness","Eye Irritation","Ear Pain"];
+    var ALLOWED_SPECS = ["General Practice","Dermatology","Cardiology","Orthopaedics","ENT","Ophthalmology","Gastroenterology","Neurology","Psychiatry","Gynaecology","Paediatrics"];
+    var MEDICAL_HINTS = ["pain","fever","cough","nausea","headache","rash","dizzy","vomit","diarr","fatigue","sore","throat","breath","chest","injury","itch","allergy","ear","eye","nose","stomach","abdomen"];
 
     fbAuth.onAuthStateChanged(async function(firebaseUser) {
         if (!firebaseUser) { window.location.href = "/auth/login"; return; }
@@ -449,12 +451,21 @@
         renderSelected();
     }
 
+    function looksLikeMedicalInput(text) {
+        var lowered = String(text || "").toLowerCase();
+        return MEDICAL_HINTS.some(function(h) { return lowered.indexOf(h) >= 0; });
+    }
+
     async function checkSymptoms() {
         var text = document.getElementById("extra-text").value.trim();
         var parts = [];
         if (selectedSymptoms.length) parts.push(selectedSymptoms.join(", "));
         if (text) parts.push(text);
         if (!parts.length) { alert("Please select at least one symptom."); return; }
+        if (!selectedSymptoms.length && text && !looksLikeMedicalInput(text)) {
+            if (typeof showToast === "function") showToast("Please enter medical symptom descriptions only.", "error");
+            return;
+        }
 
         var btn = document.getElementById("check-btn");
         btn.disabled = true; btn.textContent = "Analysing...";
@@ -480,13 +491,14 @@
             banner.textContent = urgency === "emergency" ? "Seek immediate medical attention" :
                 urgency === "visit" ? "In-person visit recommended" : "Teleconsultation recommended";
 
-            document.getElementById("result-spec").textContent = "Recommended: " + (data.specialisation || "General Practice");
+            var mappedSpec = ALLOWED_SPECS.indexOf(data.specialisation) >= 0 ? data.specialisation : "General Practice";
+            document.getElementById("result-spec").textContent = "Recommended: " + mappedSpec;
             document.getElementById("result-reasoning").textContent = data.reasoning || "";
             document.getElementById("result-advice").textContent = data.advice || "";
 
             if (urgency !== "emergency") {
                 document.getElementById("book-btn").style.display = "";
-                window._symptomResult = { specialisation: data.specialisation };
+                window._symptomResult = { specialisation: mappedSpec };
             }
         } catch(e) {
             alert(e.message || "Could not complete analysis. Please try again.");

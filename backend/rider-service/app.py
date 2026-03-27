@@ -13,6 +13,7 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 DEFAULT_STAFF_PASSWORD = "NewStaff123!"
+SHIFT_OPTIONS = {"day", "night", "off"}
 
 
 def now_utc():
@@ -21,10 +22,17 @@ def now_utc():
 
 def to_json(data):
     out = dict(data)
-    for key in ["createdAt", "updatedAt"]:
+    for key in ["createdAt", "updatedAt", "shiftUpdatedAt"]:
         if out.get(key) and hasattr(out[key], "isoformat"):
             out[key] = out[key].isoformat()
     return out
+
+
+def normalise_shift(value):
+    shift = str(value or "").strip().lower()
+    if shift in SHIFT_OPTIONS:
+        return shift
+    return None
 
 
 def rider_doc_by_id(rider_id):
@@ -62,6 +70,10 @@ def create_rider_record(data, create_auth=False):
         return None, jsonify({"code": 400, "error": f"Missing required fields: {', '.join(missing)}"}), 400
 
     firebase_uid = data.get("firebaseUID")
+    shift = normalise_shift(data.get("shift", "off")) or "off"
+    default_status = data.get("status")
+    if not default_status:
+        default_status = "off_shift" if shift == "off" else "available"
     auth_created = False
 
     try:
@@ -81,7 +93,9 @@ def create_rider_record(data, create_auth=False):
             "name": data["name"],
             "phone": data["phone"],
             "email": data.get("email"),
-            "status": data.get("status", "available"),  # available | delivering
+            "status": default_status,  # available | delivering | off_shift
+            "shift": shift,
+            "shiftUpdatedAt": now_utc(),
             "firebaseUID": firebase_uid,
             "createdAt": now_utc(),
             "updatedAt": now_utc(),
@@ -159,21 +173,52 @@ def update_rider(rider_id):
     return jsonify({"code": 200, "message": "Updated"})
 
 
+@app.route("/rider/<rider_id>/shift", methods=["PUT"])
+def update_rider_shift(rider_id):
+    data = request.get_json(silent=True) or {}
+    shift = normalise_shift(data.get("shift"))
+    if not shift:
+        return jsonify({"code": 400, "error": "shift must be one of: day, night, off"}), 400
+
+    doc = rider_doc_by_id(rider_id)
+    if not doc:
+        return jsonify({"code": 404, "error": "Rider not found"}), 404
+
+    current = doc.to_dict() or {}
+    updates = {
+        "shift": shift,
+        "shiftUpdatedAt": now_utc(),
+        "updatedAt": now_utc(),
+    }
+    if shift == "off" and current.get("status") != "delivering":
+        updates["status"] = "off_shift"
+    elif shift in {"day", "night"} and current.get("status") == "off_shift":
+        updates["status"] = "available"
+
+    doc.reference.update(updates)
+    updated = doc.reference.get().to_dict() or {}
+    return jsonify({"code": 200, "data": to_json(updated)})
+
+
 @app.route("/rider/free", methods=["GET"])
 def get_free_riders():
     docs = db.collection("Rider").where("status", "==", "available").stream()
     riders = [to_json(d.to_dict()) for d in docs]
+    riders = [r for r in riders if str(r.get("shift") or "").lower() != "off"]
     return jsonify({"code": 200, "data": riders})
 
 
 @app.route("/rider/list", methods=["GET"])
 def list_riders():
     status = request.args.get("status")
+    shift = normalise_shift(request.args.get("shift"))
     query = db.collection("Rider")
     if status:
         query = query.where("status", "==", status)
     docs = query.stream()
     riders = [to_json(d.to_dict()) for d in docs]
+    if shift:
+        riders = [r for r in riders if str(r.get("shift") or "").lower() == shift]
     return jsonify({"code": 200, "data": riders})
 
 

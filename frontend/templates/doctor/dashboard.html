@@ -6,6 +6,7 @@
     <div class="doc-container">
         <div class="dash-header">
             <div><h1 id="greeting"></h1><p class="dash-date" id="today-date"></p></div>
+            <div class="shift-chip" id="shift-chip">Shift: --</div>
         </div>
 
         <div class="stat-grid">
@@ -65,7 +66,8 @@
 <style>
     .doc-dashboard { padding-top: var(--navbar-height); background: var(--bg); min-height: 100vh; }
     .doc-container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
-    .dash-header { margin-bottom: 2rem; }
+    .dash-header { margin-bottom: 2rem; display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+    .shift-chip { display: inline-flex; align-items: center; background: var(--primary-subtle); color: var(--primary); border: 1px solid var(--primary-light); border-radius: var(--radius-full); padding: .3rem .75rem; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
     .dash-header h1 { font-size: var(--text-2xl); font-weight: 700; color: var(--text); margin: 0; letter-spacing: -0.02em; }
     .dash-date { color: var(--text-muted); font-size: var(--text-sm); margin: .25rem 0 0; }
     .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
@@ -137,6 +139,7 @@
         });
 
         var cfg = document.getElementById("svc-config").dataset;
+        loadDoctorProfile(cfg);
         loadInventoryAlerts(cfg);
         refreshAppointments(cfg);
         refreshDoctorNotifications(cfg);
@@ -185,6 +188,19 @@
             document.getElementById("stat-total").textContent = "0";
             document.getElementById("stat-pending").textContent = "0";
         }
+    }
+
+    async function loadDoctorProfile(cfg) {
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.doctorUrl + "/doctor/" + window.currentUser.linkedID, {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            if (!res.ok) return;
+            var d = await res.json();
+            var shift = String(d.shift || "day").toLowerCase();
+            document.getElementById("shift-chip").textContent = "Shift: " + shift;
+        } catch (_) {}
     }
 
     function toLocalIso(dt) {

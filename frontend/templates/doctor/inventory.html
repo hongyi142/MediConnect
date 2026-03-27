@@ -58,6 +58,10 @@
     .data-table tr.low { background: var(--warning-bg); }
     .data-table tr.out { background: var(--danger-bg); }
     .warn-icon { color: var(--warning); font-weight: var(--weight-bold); margin-left: 0.25rem; }
+    .med-cell { display: flex; align-items: center; gap: .625rem; }
+    .med-thumb { width: 44px; height: 44px; border-radius: var(--radius-md); object-fit: cover; border: 1px solid var(--border); flex-shrink: 0; background: var(--slate-100); }
+    .med-thumb-fallback { width: 44px; height: 44px; border-radius: var(--radius-md); border: 1px dashed var(--border); color: var(--text-muted); font-size: .6875rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--slate-50); }
+    .form-hint { margin: .375rem 0 0; color: var(--text-muted); font-size: var(--text-xs); }
 
     /* Buttons */
     .btn { padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: var(--weight-semibold); font-size: var(--text-sm); cursor: pointer; border: none; min-height: 44px; font-family: var(--font); transition: background var(--duration-fast), box-shadow var(--duration-fast), transform var(--duration-fast); display: inline-flex; align-items: center; justify-content: center; }
@@ -101,6 +105,7 @@
 
 <script>
     var allItems = [];
+    var activePhotoMedicationID = null;
 
     fbAuth.onAuthStateChanged(async function(u) {
         if (!u) { location.href = "/auth/login"; return; }
@@ -142,11 +147,17 @@
             var qty = item.quantity || item.Quantity || 0;
             var cls = qty === 0 ? "out" : qty < 5 ? "low" : "";
             var id = item.medicationID || item.id;
+            var name = item.name || "";
+            var imageUrl = item.imageUrl || item.photoUrl || "";
+            var imageHtml = imageUrl
+                ? '<img class="med-thumb" src="' + escapeAttr(imageUrl) + '" alt="' + escapeAttr(name || "Medication") + '">'
+                : '<span class="med-thumb-fallback">No image</span>';
             var warn = qty < 5 && qty > 0 ? '<span class="warn-icon">!</span>' : qty === 0 ? '<span style="color:#ef4444;font-weight:700"> OUT</span>' : '';
             var actions = '<div class="action-btns">';
-            if (qty < 10) actions += '<button class="btn btn-amber btn-sm" onclick="openRestock(\'' + id + '\',' + qty + ',\'' + (item.name||"") + '\')">Restock</button>';
+            if (qty < 10) actions += '<button class="btn btn-amber btn-sm" onclick="openRestock(\'' + id + '\',' + qty + ',\'' + encodeURIComponent(name) + '\')">Restock</button>';
+            actions += '<button class="btn btn-secondary btn-sm" onclick="openChangePhoto(\'' + id + '\',\'' + encodeURIComponent(name) + '\')">Change Photo</button>';
             actions += '</div>';
-            return '<tr class="' + cls + '"><td>' + (item.name||"") + '</td><td>' + (item.description||"") + '</td><td>' + qty + warn + '</td><td>$' + Number(item.price||0).toFixed(2) + '</td><td>' + actions + '</td></tr>';
+            return '<tr class="' + cls + '"><td><div class="med-cell">' + imageHtml + '<div>' + escapeHtml(name) + '</div></div></td><td>' + escapeHtml(item.description || "") + '</td><td>' + qty + warn + '</td><td>$' + Number(item.price||0).toFixed(2) + '</td><td>' + actions + '</td></tr>';
         }).join("");
     }
 
@@ -156,45 +167,85 @@
             '<div class="form-group"><label>Name *</label><input id="m-name"></div>' +
             '<div class="form-group"><label>Description</label><input id="m-desc"></div>' +
             '<div class="form-group"><label>Quantity *</label><input type="number" id="m-qty" min="0" value="0"></div>' +
-            '<div class="form-group"><label>Price *</label><input type="number" id="m-price" min="0" step="0.01" value="0"></div>';
+            '<div class="form-group"><label>Price *</label><input type="number" id="m-price" min="0" step="0.01" value="0"></div>' +
+            '<div class="form-group"><label>Medication Picture</label><input type="file" id="m-image" accept="image/png,image/jpeg,image/webp"><p class="form-hint">Optional. JPG, PNG or WEBP.</p></div>';
         document.getElementById("modal-error").style.display = "none";
+        document.getElementById("modal-submit").textContent = "Save";
         document.getElementById("modal-submit").onclick = submitAdd;
         document.getElementById("modal").style.display = "flex";
     }
 
-    function openRestock(id, currentQty, name) {
+    function openRestock(id, currentQty, encodedName) {
+        var name = decodeURIComponent(encodedName || "");
         document.getElementById("modal-title").textContent = "Restock: " + name;
         document.getElementById("modal-body").innerHTML =
             '<p style="font-size:.8125rem;color:#64748b;margin:0 0 1rem">Current stock: ' + currentQty + '</p>' +
             '<div class="form-group"><label>Add Quantity</label><input type="number" id="m-restock-qty" min="1" value="10"></div>';
         document.getElementById("modal-error").style.display = "none";
+        document.getElementById("modal-submit").textContent = "Save";
         document.getElementById("modal-submit").onclick = function() { submitRestock(id); };
         document.getElementById("modal").style.display = "flex";
     }
 
-    function closeModal() { document.getElementById("modal").style.display = "none"; }
+    function openChangePhoto(id, encodedName) {
+        var name = decodeURIComponent(encodedName || "");
+        activePhotoMedicationID = id;
+        document.getElementById("modal-title").textContent = "Change Photo: " + name;
+        document.getElementById("modal-body").innerHTML =
+            '<div class="form-group"><label>New Picture *</label><input type="file" id="m-photo" accept="image/png,image/jpeg,image/webp"></div>' +
+            '<p class="form-hint">Upload a new JPG, PNG or WEBP image for this medication.</p>';
+        document.getElementById("modal-error").style.display = "none";
+        document.getElementById("modal-submit").textContent = "Upload";
+        document.getElementById("modal-submit").onclick = submitPhotoChange;
+        document.getElementById("modal").style.display = "flex";
+    }
+
+    function closeModal() {
+        activePhotoMedicationID = null;
+        document.getElementById("modal-submit").textContent = "Save";
+        document.getElementById("modal-error").style.display = "none";
+        document.getElementById("modal").style.display = "none";
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function escapeAttr(value) {
+        return escapeHtml(value);
+    }
 
     async function submitAdd() {
         var cfg = document.getElementById("svc-config").dataset;
         var name = document.getElementById("m-name").value.trim();
         var errDiv = document.getElementById("modal-error");
         if (!name) { errDiv.textContent = "Name required."; errDiv.style.display = ""; return; }
+        var imageFile = document.getElementById("m-image").files[0] || null;
+        var formData = new FormData();
+        formData.append("name", name);
+        formData.append("description", document.getElementById("m-desc").value.trim());
+        formData.append("quantity", String(parseInt(document.getElementById("m-qty").value) || 0));
+        formData.append("price", String(parseFloat(document.getElementById("m-price").value) || 0));
+        if (imageFile) formData.append("image", imageFile);
         try {
             var token = await fbAuth.currentUser.getIdToken();
             var res = await fetch(cfg.invUrl + "/inventory", {
                 method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-                body: JSON.stringify({
-                    name: name,
-                    description: document.getElementById("m-desc").value.trim(),
-                    quantity: parseInt(document.getElementById("m-qty").value) || 0,
-                    price: parseFloat(document.getElementById("m-price").value) || 0
-                })
+                headers: { "Authorization": "Bearer " + token },
+                body: formData
             });
-            if (!res.ok) throw new Error("Failed");
+            if (!res.ok) {
+                var err = await res.json().catch(function(){ return {}; });
+                throw new Error(err.message || "Failed");
+            }
             closeModal(); loadInventory();
             if (typeof showToast === "function") showToast("Medication added!");
-        } catch(e) { errDiv.textContent = "Could not add medication."; errDiv.style.display = ""; }
+        } catch(e) { errDiv.textContent = e.message || "Could not add medication."; errDiv.style.display = ""; }
     }
 
     async function submitRestock(id) {
@@ -212,6 +263,44 @@
             closeModal(); loadInventory();
             if (typeof showToast === "function") showToast("Restocked!");
         } catch(e) { document.getElementById("modal-error").textContent = "Restock failed."; document.getElementById("modal-error").style.display = ""; }
+    }
+
+    async function submitPhotoChange() {
+        var errDiv = document.getElementById("modal-error");
+        if (!activePhotoMedicationID) {
+            errDiv.textContent = "Medication not selected.";
+            errDiv.style.display = "";
+            return;
+        }
+        var photoInput = document.getElementById("m-photo");
+        var photoFile = (photoInput && photoInput.files && photoInput.files[0]) ? photoInput.files[0] : null;
+        if (!photoFile) {
+            errDiv.textContent = "Please select an image file.";
+            errDiv.style.display = "";
+            return;
+        }
+
+        var cfg = document.getElementById("svc-config").dataset;
+        var formData = new FormData();
+        formData.append("image", photoFile);
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            var res = await fetch(cfg.invUrl + "/inventory/" + activePhotoMedicationID + "/image", {
+                method: "PUT",
+                headers: { "Authorization": "Bearer " + token },
+                body: formData
+            });
+            if (!res.ok) {
+                var err = await res.json().catch(function(){ return {}; });
+                throw new Error(err.message || "Upload failed.");
+            }
+            closeModal();
+            await loadInventory();
+            if (typeof showToast === "function") showToast("Medication photo updated!");
+        } catch (e) {
+            errDiv.textContent = e.message || "Photo update failed.";
+            errDiv.style.display = "";
+        }
     }
 </script>
 {% endblock %}

@@ -1,5 +1,4 @@
 import os
-import zlib
 from urllib.parse import urlencode
 
 import requests
@@ -11,6 +10,7 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:8080", "http://frontend:8080", "*"])
+CONSULTATION_FEE = float(os.environ.get("CONSULTATION_FEE", "40"))
 
 
 def call(method, url, **kwargs):
@@ -52,7 +52,13 @@ def _to_medication_selection(medications):
     for med in medications or []:
         med_id = med.get("medicationID") or med.get("MedicationId")
         qty = int(med.get("qty", med.get("Quantity", 0)) or 0)
-        unit_price = float(med.get("unitPrice", med.get("UnitPrice", 0)) or 0)
+        unit_price = float(
+            med.get(
+                "unitPrice",
+                med.get("UnitPrice", med.get("price", med.get("Price", 0))),
+            )
+            or 0
+        )
         if med_id and qty > 0:
             items.append(
                 {
@@ -66,10 +72,9 @@ def _to_medication_selection(medications):
 
 def _to_order_patient_key(patient_id):
     raw = str(patient_id or "").strip()
-    if raw.isdigit():
-        return raw
-    # OrderAPI GetOrdersByPatient expects an integer-compatible PatientId.
-    return str((zlib.crc32(raw.encode("utf-8")) % 900000000) + 100000000)
+    if not raw:
+        raise RuntimeError("patientID is required to create order")
+    return raw
 
 
 def _find_recent_order_id(order_url, patient_id, appt_id, doctor_id):
@@ -97,17 +102,19 @@ def _find_recent_order_id(order_url, patient_id, appt_id, doctor_id):
 
 def create_order(order_url, appt_id, patient_id, doctor_id, total_amount, medications):
     order_patient_id = _to_order_patient_key(patient_id)
+    total_amount = round(float(total_amount or 0), 2)
     query = urlencode(
         {
             "ApptId": appt_id,
             "PatientId": order_patient_id,
             "DoctorId": doctor_id,
+            "TotalAmount": f"{total_amount:.2f}",
         }
     )
     create_order_url = f"{order_url}/CreateOrder?{query}"
     # Create empty order first; add items via AddOrderItem afterwards.
     # This avoids CreateOrder hard-failing when external inventory lookup fails.
-    create_payload = {"Items": []}
+    create_payload = {"Items": [], "TotalAmount": total_amount}
     candidates = [
         ("POST", create_order_url, create_payload),
     ]
@@ -121,6 +128,7 @@ def create_order(order_url, appt_id, patient_id, doctor_id, total_amount, medica
                     "patientID": patient_id,
                     "doctorID": doctor_id,
                     "totalAmount": total_amount,
+                    "consultationFee": CONSULTATION_FEE,
                     "status": "pending",
                 },
             )
@@ -262,7 +270,12 @@ def complete_consultation():
             return jsonify({"error": f"Stock for {name} was just taken."}), 409
         deducted.append(med)
 
-    total_amount = sum(float(m.get("qty", 0)) * float(m.get("unitPrice", 0)) for m in medications)
+    medication_total = sum(
+        float(m.get("qty", m.get("Quantity", 0)) or 0)
+        * float(m.get("unitPrice", m.get("UnitPrice", m.get("price", m.get("Price", 0)))) or 0)
+        for m in medications
+    )
+    total_amount = round(medication_total + CONSULTATION_FEE, 2)
 
     # Step 4
     order_id = create_order(order_url, appt_id, patient_id, doctor_id, total_amount, medications)
@@ -306,6 +319,8 @@ def complete_consultation():
                 "patientID": patient_id,
                 "orderID": order_id,
                 "totalAmount": total_amount,
+                "medicationSubtotal": medication_total,
+                "consultationFee": CONSULTATION_FEE,
                 "mcIssued": mc_issued,
                 "mcDownloadUrl": mc_download,
                 "summary": summary,
@@ -320,6 +335,8 @@ def complete_consultation():
             "consultationID": consultation.get("consultationID"),
             "orderID": order_id,
             "totalAmount": total_amount,
+            "medicationSubtotal": medication_total,
+            "consultationFee": CONSULTATION_FEE,
             "orderItemsSynced": not item_sync_failed,
             "aiSummary": summary,
             "mcIssued": mc_issued,
