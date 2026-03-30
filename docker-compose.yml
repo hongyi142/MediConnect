@@ -142,6 +142,19 @@ services:
     build: ./backend/patient-service
     container_name: patient-service
 
+  telegram-wrapper:
+    build: ./backend/telegram_wrapper
+    container_name: telegram-wrapper
+    env_file: ./backend/telegram_wrapper/.env
+    environment:
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
+      - PATIENT_SERVICE_URL=http://patient-service:5030
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      patient-service:
+        condition: service_started
+
   doctor-service:
     build: ./backend/doctor-service
     container_name: doctor-service

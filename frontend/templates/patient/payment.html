@@ -289,12 +289,13 @@
             return '<tr><td><span class="med-name-cell">' + thumb + '<span>' + escapeHtml(medName) + '</span></span></td><td>' + (m.qty || m.Quantity || 1) + '</td><td>$' + (m.unitPrice || m.UnitPrice || 0).toFixed(2) + '</td><td>$' + sub + '</td></tr>';
         }).join("");
 
-        var consultationFee = Number(orderData.consultationFee);
-        if (isNaN(consultationFee)) {
-            consultationFee = Math.max(0, total - medSubtotal);
-        }
-        if (!consultationFee && total > 0 && medSubtotal === 0 && meds.length === 0) {
+        var consultationFee = parseFloat(orderData.consultationFee);
+        if (isNaN(consultationFee) || consultationFee === 0) {
             consultationFee = CONSULTATION_FEE;
+        }
+
+        if (!orderData.totalAmount || Number(orderData.totalAmount) === 0) {
+            total = medSubtotal + consultationFee;
         }
 
         document.getElementById("order-details").innerHTML =

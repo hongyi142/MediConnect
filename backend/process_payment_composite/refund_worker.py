@@ -38,6 +38,7 @@ def start_worker():
                 document_id = msg_payload.get('documentID')
                 patient_name = msg_payload.get('patientName')
                 patient_email = msg_payload.get('patientEmail')
+                patient_id = msg_payload.get('patientID')
                 amount = msg_payload.get('amount')
                 
                 print(f"Dead letter received for order {order_id}. Initiating refund saga...")
@@ -70,6 +71,7 @@ def start_worker():
                         "event_type": "payment_refunded",
                         "patientEmail": patient_email,
                         "patientName": patient_name,
+                        "patientID": patient_id,
                         "orderID": order_id,
                         "amount": amount
                     }

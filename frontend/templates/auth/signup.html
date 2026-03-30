@@ -77,6 +77,11 @@
                 <div class="form-group"><label for="s-phone">Phone Number</label><input id="s-phone" placeholder="+65XXXXXXXX"><small class="field-err" id="err-phone"></small></div>
                 <div class="form-group"><label for="s-address">Address</label><input id="s-address" placeholder="Block and street"></div>
                 <div class="form-group"><label for="s-postal">Postal Code</label><input id="s-postal" placeholder="6 digits" maxlength="6"><small class="field-err" id="err-postal"></small></div>
+                <div class="form-group">
+                    <label for="s-telegram">Telegram Chat ID <span class="optional">(optional)</span></label>
+                    <input id="s-telegram" placeholder="e.g. 123456789">
+                    <small style="color:var(--text-muted);font-size:var(--text-xs);margin-top:.25rem;display:block">Get your Chat ID by messaging <a href="https://t.me/userinfobot" target="_blank" rel="noopener" style="color:var(--primary)">@userinfobot</a> on Telegram.</small>
+                </div>
                 <div class="step-btns">
                     <button class="btn btn-ghost" onclick="goStep(1)">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
@@ -488,7 +493,8 @@
                     postalCode: document.getElementById("s-postal").value.trim(),
                     birthDate: document.getElementById("s-dob").value,
                     allergies: tags.allergies,
-                    pastHistory: tags.history
+                    pastHistory: tags.history,
+                    telegramChatID: document.getElementById("s-telegram").value.trim() || ""
                 })
             });
             if (!res.ok) {

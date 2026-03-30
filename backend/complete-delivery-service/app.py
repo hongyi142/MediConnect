@@ -99,6 +99,7 @@ def complete_delivery():
             "patientName": delivery.get("patientName"),
             "patientEmail": delivery.get("patientEmail"),
             "patientPhone": delivery.get("patientPhone"),
+            "patientID": delivery.get("patientID"),
             "message": "Your medication has been delivered!",
         })
     except Exception as e:

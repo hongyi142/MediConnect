@@ -52,3 +52,16 @@ services:
       - rabbitmq
       - delivery
       - rider
+
+  telegram_wrapper:
+    build: ./telegram_wrapper
+    ports:
+      - "5012:5012"
+    env_file:
+      - ./telegram_wrapper/.env
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PATIENT_SERVICE_URL: http://patient-service:5030
+    depends_on:
+      rabbitmq:
+        condition: service_healthy

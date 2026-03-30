@@ -203,6 +203,7 @@ def on_order_paid(ch, method, properties, body):
                 "patientName": order.get("patientName"),
                 "patientEmail": order.get("patientEmail"),
                 "patientPhone": order.get("patientPhone"),
+                "patientID": order.get("patientID"),
                 "riderName": rider.get("name"),
                 "message": f"Rider {rider['name']} has been assigned to your delivery!",
             })
@@ -271,6 +272,7 @@ def accept_delivery():
         "patientName": delivery.get("patientName"),
         "patientEmail": delivery.get("patientEmail"),
         "patientPhone": delivery.get("patientPhone"),
+        "patientID": delivery.get("patientID"),
         "riderName": rider.get("name"),
         "message": f"Your rider {rider['name']} is on the way!",
     })

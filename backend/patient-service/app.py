@@ -56,6 +56,7 @@ def create_patient():
         "birthDate": body.get("birthDate"),
         "allergies": body.get("allergies", []),
         "pastHistory": body.get("pastHistory", []),
+        "telegramChatID": body.get("telegramChatID", ""),
         "createdAt": datetime.utcnow(),
         "updatedAt": datetime.utcnow(),
     }
@@ -93,7 +94,7 @@ def update_patient(patient_id):
 
     updates = {
         key: body[key]
-        for key in ["name", "email", "phone", "NRIC", "address", "postalCode", "birthDate", "allergies", "pastHistory"]
+        for key in ["name", "email", "phone", "NRIC", "address", "postalCode", "birthDate", "allergies", "pastHistory", "telegramChatID"]
         if key in body
     }
     updates["updatedAt"] = datetime.utcnow()

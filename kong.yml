@@ -83,6 +83,14 @@ services:
           - /notify
         strip_path: false
 
+  - name: telegram-wrapper
+    url: http://telegram-wrapper:5012
+    routes:
+      - name: telegram-routes
+        paths:
+          - /telegram-notify
+        strip_path: true
+
   # ──────────────────────────────────────────────
   #  Payment Services
   #  payment_atomic and payment_wrapper both expose /payment/* routes,

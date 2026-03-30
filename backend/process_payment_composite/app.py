@@ -300,6 +300,7 @@ def verify_and_handoff():
                 "event_type": "payment_successful",
                 "patientEmail": patient_email,
                 "patientName": patient_name,
+                "patientID": patient_id,
                 "orderID": order_id
             }
             
