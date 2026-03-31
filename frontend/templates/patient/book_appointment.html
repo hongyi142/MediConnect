@@ -108,12 +108,12 @@
     }
     .two-col { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(280px, 1fr); gap: 1rem; align-items: start; }
     .card {
-        background: rgba(12, 38, 58, 0.88);
+        background: rgba(255, 255, 255, 0.96);
         border: 1px solid var(--border);
         border-radius: 1rem;
         padding: 1.25rem;
         box-shadow: var(--shadow-card);
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(8px);
     }
     .booking-card {
         position: relative;
@@ -124,7 +124,7 @@
         position: absolute;
         inset: 0 0 auto 0;
         height: 2px;
-        background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+        background: linear-gradient(90deg, #C4956A 0%, #D97757 100%);
         opacity: .9;
     }
     .profile-card {
@@ -149,14 +149,14 @@
         box-sizing: border-box;
         min-height: 44px;
         font-family: inherit;
-        background: rgba(6, 27, 42, 0.65);
+        background: #FAF8F5;
         color: var(--text);
         transition: border-color var(--duration-fast), box-shadow var(--duration-fast), background var(--duration-fast);
     }
     .form-control:focus {
         outline: none;
         border-color: var(--primary);
-        background: rgba(6, 27, 42, 0.85);
+        background: #FFFFFF;
         box-shadow: var(--shadow-glow);
     }
     textarea.form-control { resize: vertical; }
@@ -177,7 +177,7 @@
         align-items: center;
         gap: .5rem;
         cursor: pointer;
-        background: rgba(9, 30, 47, 0.45);
+        background: #F5EEE8;
         transition: border-color var(--duration-fast), background var(--duration-fast);
     }
     .choice-pill:hover { border-color: var(--primary); background: var(--primary-subtle); }
@@ -186,7 +186,7 @@
     .alt-box { margin-top: .75rem; border: 1px solid var(--warning-light); background: var(--warning-bg); border-radius: .75rem; padding: .75rem; }
     .alt-title { margin: 0 0 .5rem; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--warning); }
     .alt-group { margin-top: .625rem; }
-    .alt-chip { border: 1px solid var(--border); background: rgba(6, 27, 42, 0.7); color: var(--text); border-radius: var(--radius-full); padding: .3rem .65rem; font-size: var(--text-xs); cursor: pointer; margin: 0 .375rem .375rem 0; }
+    .alt-chip { border: 1px solid var(--border); background: #FFFFFF; color: var(--text); border-radius: var(--radius-full); padding: .3rem .65rem; font-size: var(--text-xs); cursor: pointer; margin: 0 .375rem .375rem 0; }
     .alt-chip:hover { border-color: var(--primary); color: var(--primary); }
     .allergy-badge { display: inline-block; background: var(--danger-bg); border: 1px solid var(--danger-light); color: var(--danger); border-radius: var(--radius-full); padding: 0.125rem 0.5rem; font-size: var(--text-xs); margin: 0.125rem; }
     .history-badge { display: inline-block; background: var(--primary-subtle); border: 1px solid var(--primary-light); color: var(--primary); border-radius: var(--radius-full); padding: 0.125rem 0.5rem; font-size: var(--text-xs); margin: 0.125rem; }
@@ -215,6 +215,35 @@
         initPage(user);
     });
 
+    function todayLocalStr() {
+        var d = new Date();
+        return d.getFullYear() + "-" + (d.getMonth()+1).toString().padStart(2,"0") + "-" + d.getDate().toString().padStart(2,"0");
+    }
+
+    function filterTimeOptions() {
+        var dateVal = document.getElementById("appt-date").value;
+        var sel = document.getElementById("appt-time");
+        var todayStr = todayLocalStr();
+        var now = new Date();
+        var nowMins = now.getHours() * 60 + now.getMinutes();
+        var firstEnabled = null;
+        for (var i = 1; i < sel.options.length; i++) {  // skip placeholder at index 0
+            var opt = sel.options[i];
+            var parts = opt.value.split(":");
+            var optMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+            if (dateVal === todayStr && optMins <= nowMins) {
+                opt.disabled = true;
+            } else {
+                opt.disabled = false;
+                if (!firstEnabled) firstEnabled = opt;
+            }
+        }
+        // If current selection is now disabled, move to first valid option
+        if (sel.value && sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].disabled) {
+            sel.value = firstEnabled ? firstEnabled.value : "";
+        }
+    }
+
     function initPage(user) {
         var sel = document.getElementById("appt-time");
         for (var h = 0; h < 24; h++) {
@@ -228,9 +257,10 @@
         }
 
         var today = new Date();
-        var todayText = today.toISOString().split("T")[0];
+        var todayText = todayLocalStr();
         document.getElementById("appt-date").min = todayText;
         document.getElementById("appt-date").value = todayText;
+        filterTimeOptions();
 
         var sr = sessionStorage.getItem("symptomResult");
         if (sr) {
@@ -349,7 +379,7 @@
                 return;
             }
             select.innerHTML = '<option value="">Select a doctor</option>' + doctorOptions.map(function(d) {
-                return '<option value="' + d.doctorID + '">' + (d.name || d.doctorID) + ' (' + (d.specialisation || "General Practice") + ')</option>';
+                return '<option value="' + d.doctorID + '">' + (d.name || d.doctorID) + ' (' + d.doctorID + ')</option>';
             }).join("");
             helper.textContent = doctorOptions.length + " available doctor(s) found.";
         } catch (e) {
@@ -373,9 +403,9 @@
         var now = new Date();
         now.setSeconds(0, 0);
         var mins = now.getMinutes();
-        var rounded = mins <= 30 ? 30 : 60;
-        now.setMinutes(rounded);
-        if (rounded === 60) {
+        if (mins <= 30) {
+            now.setMinutes(30);
+        } else {
             now.setHours(now.getHours() + 1);
             now.setMinutes(0);
         }
@@ -412,7 +442,7 @@
         if (sameDoctors.length) {
             html += '<div class="alt-group"><strong>Other doctors at the same time:</strong><div>';
             html += sameDoctors.map(function(d) {
-                var label = (d.name || d.doctorID) + (d.specialisation ? " - " + d.specialisation : "");
+                var label = (d.name || d.doctorID) + ' (' + d.doctorID + ')';
                 return '<button type="button" class="alt-chip" onclick="applyAlternativeDoctor(\'' + d.doctorID + '\')">' + label + '</button>';
             }).join("");
             html += '</div></div>';

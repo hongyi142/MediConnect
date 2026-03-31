@@ -102,15 +102,6 @@ def create_rider_record(data, create_auth=False):
         }
         doc_ref.set(rider)
 
-        if firebase_uid:
-            create_staff_user_doc(
-                firebase_uid=firebase_uid,
-                role="rider",
-                name=rider["name"],
-                linked_id=rider["riderID"],
-                email=rider.get("email"),
-            )
-
         response = to_json(rider)
         if auth_created:
             response["defaultPassword"] = DEFAULT_STAFF_PASSWORD

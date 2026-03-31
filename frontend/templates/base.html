@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}MediConnect{% endblock %}</title>
 
-  <!-- Google Fonts - Figtree -->
+  <!-- Google Fonts - Instrument Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
 
   <!-- Main stylesheet -->
   <link rel="stylesheet" href="/static/css/main.css">
@@ -70,7 +70,7 @@
   <nav class="navbar" id="main-navbar" style="{% if not show_navbar %}display:none{% endif %}">
     <a href="/" class="navbar-brand" id="nav-brand">
       <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-        <rect width="32" height="32" rx="8" fill="#06B6D4"/>
+        <rect width="32" height="32" rx="8" fill="#D97757"/>
         <path d="M16 7v18M7 16h18" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
       </svg>
       MediConnect
@@ -139,10 +139,15 @@
       return [];
     }
 
+    function roleSettingsLinks(role) {
+      if (!role) return [];
+      return [{ label: "Settings", href: "/account/settings" }];
+    }
+
     function renderNavLinks(role) {
       var container = document.getElementById("nav-links");
       if (!container) return;
-      var links = roleNavLinks(role);
+      var links = roleNavLinks(role).concat(roleSettingsLinks(role));
       var path = window.location.pathname || "/";
       container.innerHTML = links.map(function(link) {
         var active = path === link.href || path.indexOf(link.href + "/") === 0;

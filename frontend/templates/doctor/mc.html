@@ -71,9 +71,9 @@
             '<div class="detail-row"><span class="label">Order ID</span><span class="value">' + (data.orderID || "N/A") + '</span></div>' +
             '<div class="detail-row"><span class="label">Total Amount</span><span class="value">$' + Number(data.totalAmount||0).toFixed(2) + '</span></div>';
 
+        document.getElementById("download-btn").style.display = "none";
         if (!data.mcDownloadUrl) {
             document.getElementById("mc-warning").style.display = "";
-            document.getElementById("download-btn").style.display = "none";
         }
 
         window._mcUrl = data.mcDownloadUrl;

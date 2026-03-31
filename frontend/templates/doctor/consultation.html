@@ -63,9 +63,9 @@
         --teal-700: #0F766E;
     }
 
-    body { margin: 0; background: var(--slate-900); }
+    html, body { margin: 0; overflow: hidden; height: 100vh; background: var(--slate-900); }
 
-    .consult-layout { display: grid; grid-template-columns: 1fr 280px 220px; height: 100vh; }
+    .consult-layout { display: grid; grid-template-columns: 1fr 280px 220px; height: 100vh; overflow: hidden; }
 
     /* ── Video area ── */
     .video-area { display: flex; flex-direction: column; background: var(--slate-900); }
@@ -120,6 +120,7 @@
         border-left: 1px solid rgba(255,255,255,.06);
         padding: 1rem; overflow-y: auto;
         display: flex; flex-direction: column; gap: .75rem;
+        height: 100vh; box-sizing: border-box;
     }
 
     .panel-card {

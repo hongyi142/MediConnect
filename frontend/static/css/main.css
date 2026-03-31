@@ -7,58 +7,58 @@
    1. CSS Custom Properties
    ------------------------------------------------------------ */
 :root {
-  /* Primary */
-  --primary: #22D3EE;
-  --primary-hover: #06B6D4;
-  --primary-dark: #0E7490;
-  --primary-light: #11465C;
-  --primary-subtle: #0B2E42;
+  /* Primary - Claude orange/terracotta */
+  --primary: #D97757;
+  --primary-hover: #C46843;
+  --primary-dark: #A8532E;
+  --primary-light: #F5DDD2;
+  --primary-subtle: #FDF3EE;
 
-  /* Accent */
-  --accent: #2DD4BF;
-  --accent-hover: #14B8A6;
-  --accent-light: #0B3D3A;
+  /* Accent - warm sand/tan */
+  --accent: #C4956A;
+  --accent-hover: #AF7E53;
+  --accent-light: #FCF3E8;
 
   /* Neutral */
-  --slate-50: #F8FAFC;
-  --slate-100: #F1F5F9;
-  --slate-200: #E2E8F0;
-  --slate-300: #CBD5E1;
-  --slate-400: #94A3B8;
-  --slate-500: #64748B;
-  --slate-600: #475569;
-  --slate-700: #334155;
-  --slate-800: #1E293B;
-  --slate-900: #0F172A;
+  --slate-50: #F8F7F5;
+  --slate-100: #F2F0ED;
+  --slate-200: #E8E3DC;
+  --slate-300: #D4CCC3;
+  --slate-400: #A89E94;
+  --slate-500: #7A7068;
+  --slate-600: #5C544E;
+  --slate-700: #3E3830;
+  --slate-800: #28231C;
+  --slate-900: #1A1510;
 
   /* Semantic */
-  --success: #2DD4BF;
-  --success-light: #134E4A;
-  --success-bg: #0A2D2B;
-  --warning: #F59E0B;
-  --warning-light: #78350F;
-  --warning-bg: #2A1A08;
-  --danger: #F87171;
-  --danger-light: #7F1D1D;
-  --danger-bg: #331616;
-  --info: #38BDF8;
-  --info-light: #0C4A6E;
-  --info-bg: #08243B;
+  --success: #16A34A;
+  --success-light: #BBF7D0;
+  --success-bg: #F0FDF4;
+  --warning: #D97706;
+  --warning-light: #FDE68A;
+  --warning-bg: #FFFBEB;
+  --danger: #DC2626;
+  --danger-light: #FECACA;
+  --danger-bg: #FEF2F2;
+  --info: #0369A1;
+  --info-light: #BAE6FD;
+  --info-bg: #F0F9FF;
 
-  /* Surfaces */
-  --bg: #061625;
-  --surface: #0E2438;
-  --border: #28516A;
-  --border-light: #1A3C53;
+  /* Surfaces - warm cream */
+  --bg: #FAF8F5;
+  --surface: #FFFFFF;
+  --border: #E8DDD4;
+  --border-light: #F2EDE8;
 
-  /* Text */
-  --text: #E6F5FF;
-  --text-secondary: #B3CCDC;
-  --text-muted: #87A5BA;
-  --text-inverse: #062231;
+  /* Text - warm near-black */
+  --text: #1C1B18;
+  --text-secondary: #6B6560;
+  --text-muted: #9C9690;
+  --text-inverse: #FFFFFF;
 
   /* Typography */
-  --font: 'Manrope', 'Figtree', system-ui, -apple-system, sans-serif;
+  --font: 'Instrument Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
   /* Type Scale */
@@ -103,15 +103,15 @@
   --radius-full: 999px;
 
   /* Shadows - multi-layer for depth */
-  --shadow-xs: 0 1px 2px rgba(1, 8, 18, 0.32);
-  --shadow-sm: 0 1px 3px rgba(1, 8, 18, 0.38), 0 1px 2px rgba(1, 8, 18, 0.3);
-  --shadow-md: 0 6px 10px -1px rgba(1, 8, 18, 0.4), 0 2px 4px -2px rgba(1, 8, 18, 0.32);
-  --shadow-lg: 0 12px 18px -3px rgba(1, 8, 18, 0.42), 0 4px 7px -4px rgba(1, 8, 18, 0.34);
-  --shadow-xl: 0 24px 30px -6px rgba(1, 8, 18, 0.44), 0 10px 12px -8px rgba(1, 8, 18, 0.34);
-  --shadow-card: 0 2px 5px rgba(1, 8, 18, 0.35), 0 10px 20px rgba(1, 8, 18, 0.35);
-  --shadow-card-hover: 0 4px 8px rgba(1, 8, 18, 0.38), 0 16px 30px rgba(1, 8, 18, 0.38);
-  --shadow-glow: 0 0 0 3px rgba(34, 211, 238, 0.24);
-  --shadow-glow-accent: 0 0 0 3px rgba(45, 212, 191, 0.24);
+  --shadow-xs: 0 1px 2px rgba(28, 27, 24, 0.06);
+  --shadow-sm: 0 2px 6px rgba(28, 27, 24, 0.08);
+  --shadow-md: 0 8px 16px rgba(28, 27, 24, 0.08);
+  --shadow-lg: 0 12px 26px rgba(28, 27, 24, 0.1);
+  --shadow-xl: 0 20px 36px rgba(28, 27, 24, 0.14);
+  --shadow-card: 0 2px 10px rgba(28, 27, 24, 0.07);
+  --shadow-card-hover: 0 10px 26px rgba(28, 27, 24, 0.11);
+  --shadow-glow: 0 0 0 3px rgba(217, 119, 87, 0.2);
+  --shadow-glow-accent: 0 0 0 3px rgba(196, 149, 106, 0.2);
 
   /* Transitions */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -128,7 +128,7 @@
   --z-toast: 500;
 
   /* Navbar */
-  --navbar-height: 74px;
+  --navbar-height: 84px;
 }
 
 
@@ -153,9 +153,9 @@ body {
   line-height: 1.6;
   color: var(--text);
   background:
-    radial-gradient(1200px 700px at -10% -20%, rgba(34, 211, 238, 0.14) 0%, transparent 60%),
-    radial-gradient(900px 500px at 110% -10%, rgba(45, 212, 191, 0.14) 0%, transparent 60%),
-    linear-gradient(180deg, #071a2b 0%, #061625 50%, #071423 100%);
+    radial-gradient(1200px 700px at -10% -20%, #F5E9DC 0%, transparent 65%),
+    radial-gradient(900px 500px at 110% -10%, #FCF0E6 0%, transparent 65%),
+    linear-gradient(180deg, #FAF8F5 0%, #F7F5F1 55%, #F3F0EB 100%);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
@@ -166,8 +166,8 @@ a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 ::selection {
-  background: var(--primary);
-  color: #042130;
+  background: var(--primary-light);
+  color: var(--primary-dark);
 }
 
 :focus-visible {
@@ -288,11 +288,11 @@ h4 { font-size: var(--text-md); }
   left: 50%;
   transform: translateX(-50%);
   width: min(1240px, calc(100% - 20px));
-  height: var(--navbar-height);
-  background: rgba(8, 29, 46, 0.86);
+  height: 74px;
+  background: rgba(252, 250, 247, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
+  border: 1px solid #E5DDD4;
   border-radius: var(--radius-full);
   display: flex;
   align-items: center;
@@ -314,7 +314,7 @@ h4 { font-size: var(--text-md); }
   text-decoration: none;
   font-size: var(--text-md);
   font-weight: var(--weight-bold);
-  color: var(--text);
+  color: #1C1B18;
   letter-spacing: -0.02em;
 }
 
@@ -328,8 +328,8 @@ h4 { font-size: var(--text-md); }
   gap: 6px;
   padding: 4px;
   border-radius: var(--radius-full);
-  border: 1px solid var(--border-light);
-  background: rgba(6, 24, 38, 0.6);
+  border: 1px solid #EAE0D7;
+  background: #F5EEE8;
 }
 
 .navbar-link {
@@ -340,21 +340,21 @@ h4 { font-size: var(--text-md); }
   padding: 0 12px;
   border-radius: var(--radius-full);
   text-decoration: none;
-  color: var(--text-secondary);
+  color: #6B6560;
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
 }
 
 .navbar-link:hover {
-  color: var(--text);
+  color: #1C1B18;
   text-decoration: none;
-  background: var(--primary-subtle);
+  background: #EDE4DB;
 }
 
 .navbar-link.active {
-  color: var(--text-inverse);
-  background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+  color: #fff;
+  background: #1C1B18;
 }
 
 .navbar-user {
@@ -367,8 +367,8 @@ h4 { font-size: var(--text-md); }
   width: 36px;
   height: 36px;
   border-radius: var(--radius-full);
-  background: var(--primary-light);
-  color: var(--primary);
+  background: #F5DDD2;
+  color: #D97757;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -399,13 +399,13 @@ h4 { font-size: var(--text-md); }
 }
 
 .role-badge.role-doctor {
-  background: rgba(45, 212, 191, 0.18);
-  color: #89F3E6;
+  background: #E8F5E9;
+  color: #16A34A;
 }
 
 .role-badge.role-rider {
-  background: rgba(34, 211, 238, 0.2);
-  color: #88EEFF;
+  background: #E8F0FD;
+  color: #3B5EC6;
 }
 
 .navbar-logout {
@@ -414,17 +414,17 @@ h4 { font-size: var(--text-md); }
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
-  background: rgba(9, 31, 48, 0.78);
-  color: var(--text-secondary);
+  background: #FFFFFF;
+  color: #6B6560;
   cursor: pointer;
   font-weight: var(--weight-semibold);
   transition: all var(--duration-fast) var(--ease-out);
 }
 
 .navbar-logout:hover {
-  border-color: var(--primary-light);
-  color: var(--text);
-  background: rgba(10, 45, 66, 0.9);
+  border-color: #D4C4B8;
+  color: #1C1B18;
+  background: #F5EEE8;
 }
 
 @media (max-width: 1024px) {
@@ -446,7 +446,7 @@ h4 { font-size: var(--text-md); }
    6. Cards
    ------------------------------------------------------------ */
 .card {
-  background: rgba(12, 38, 58, 0.9);
+  background: rgba(249, 252, 245, 0.94);
   backdrop-filter: blur(6px);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -543,8 +543,8 @@ h4 { font-size: var(--text-md); }
 }
 
 .btn-secondary:hover {
-  border-color: var(--primary-light);
-  background: var(--primary-subtle);
+  border-color: #D4C4B8;
+  background: #F5EEE8;
   text-decoration: none;
   color: var(--text);
 }

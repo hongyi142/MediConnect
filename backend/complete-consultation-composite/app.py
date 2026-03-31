@@ -114,7 +114,7 @@ def create_order(order_url, appt_id, patient_id, doctor_id, total_amount, medica
     create_order_url = f"{order_url}/CreateOrder?{query}"
     # Create empty order first; add items via AddOrderItem afterwards.
     # This avoids CreateOrder hard-failing when external inventory lookup fails.
-    create_payload = {"Items": [], "TotalAmount": total_amount}
+    create_payload = {"Items": []}
     candidates = [
         ("POST", create_order_url, create_payload),
     ]

@@ -153,7 +153,7 @@
             return '<div class="med-card" id="mc-' + id + '">' +
                 thumb +
                 '<input type="checkbox" onchange="toggleMed(\'' + id + '\')">' +
-                '<div class="med-info"><div class="med-name">' + (m.name||"Unknown") + '</div><div class="med-price">$' + Number(price).toFixed(2) + '/unit &middot; ' + qty + ' in stock</div></div>' +
+                '<div class="med-info"><div class="med-name">' + (m.name||"Unknown") + ' (' + id + ')</div><div class="med-price">$' + Number(price).toFixed(2) + '/unit &middot; ' + qty + ' in stock</div></div>' +
                 '<input type="number" class="med-qty" id="qty-' + id + '" min="1" max="' + qty + '" value="1" disabled onchange="updateTotals()">' +
                 '</div>';
         }).join("");
@@ -203,7 +203,7 @@
             var thumb = m.imageUrl
                 ? '<img class="summary-med-thumb" src="' + escapeHtml(m.imageUrl) + '" alt="' + escapeHtml(m.medicationName || "Medication") + '">'
                 : '<span class="summary-med-thumb-fallback">N/A</span>';
-            return '<div class="summary-item"><span class="summary-med">' + thumb + '<span>' + m.medicationName + ' x' + m.qty + '</span></span><span>$' + (m.qty * m.unitPrice).toFixed(2) + '</span></div>';
+            return '<div class="summary-item"><span class="summary-med">' + thumb + '<span>' + m.medicationName + ' (' + id + ') x' + m.qty + '</span></span><span>$' + (m.qty * m.unitPrice).toFixed(2) + '</span></div>';
         }).join("");
         summaryHtml += '<div class="summary-item"><span>Medication Subtotal</span><span>$' + medicationTotal.toFixed(2) + '</span></div>';
         summaryHtml += '<div class="summary-item"><span>Consultation Fee</span><span>$' + CONSULTATION_FEE.toFixed(2) + '</span></div>';

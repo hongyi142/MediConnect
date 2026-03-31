@@ -180,8 +180,11 @@
             }
             _lastPendingCount = pending.length;
 
-            renderPending(pending);
-            renderTodaySchedule(todays);
+            var allIds = [];
+            pending.concat(todays).forEach(function(a) { if (a.patientID && allIds.indexOf(a.patientID) < 0) allIds.push(a.patientID); });
+            var patientNames = await fetchPatientNames(cfg, token, allIds);
+            renderPending(pending, patientNames);
+            renderTodaySchedule(todays, patientNames);
         } catch (e) {
             document.getElementById("pending-list").innerHTML = '<p class="text-muted">Could not load pending requests.</p>';
             document.getElementById("schedule-list").innerHTML = '<p class="text-muted">Could not load schedule.</p>';
@@ -213,7 +216,25 @@
         return y + "-" + m + "-" + d + "T" + hh + ":" + mm + ":" + ss;
     }
 
-    function renderPending(list) {
+    async function fetchPatientNames(cfg, token, ids) {
+        var map = {};
+        await Promise.all(ids.map(async function(id) {
+            try {
+                var res = await fetch(cfg.patientUrl + "/patient/" + encodeURIComponent(id), { headers: { "Authorization": "Bearer " + token } });
+                if (!res.ok) return;
+                var p = await res.json();
+                if (p.name) map[id] = p.name;
+            } catch (_) {}
+        }));
+        return map;
+    }
+
+    function patientLabel(id, names) {
+        var name = names && names[id];
+        return name ? 'Patient ' + name + ' (' + id + ')' : 'Patient ' + (id || '-');
+    }
+
+    function renderPending(list, names) {
         if (!list.length) {
             document.getElementById("pending-list").innerHTML = '<p class="text-muted">No pending appointment requests.</p>';
             return;
@@ -221,8 +242,8 @@
         document.getElementById("pending-list").innerHTML = list.map(function(a) {
             var d = new Date(a.slotStart || a.dateTime);
             var time = d.toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" });
-            var date = d.toLocaleDateString("en-SG", { day: "2-digit", month: "short" });
-            var title = "Patient " + (a.patientID || "-") + (a.specialisation ? " • " + a.specialisation : "");
+            var date = d.toLocaleDateString("en-SG", { day: "2-digit", month: "short", year: "numeric" });
+            var title = patientLabel(a.patientID, names) + (a.specialisation ? " • " + a.specialisation : "");
             var reason = a.reason ? ('<div>' + a.reason + '</div>') : "";
             return '<div class="appt-row">' +
                 '<div class="time">' + date + '<br>' + time + '</div>' +
@@ -235,7 +256,7 @@
         }).join("");
     }
 
-    function renderTodaySchedule(list) {
+    function renderTodaySchedule(list, names) {
         if (!list.length) {
             document.getElementById("schedule-list").innerHTML = '<p class="text-muted">No appointments for today.</p>';
             return;
@@ -251,7 +272,7 @@
             }
             return '<div class="appt-row">' +
                 '<div class="time">' + time + '</div>' +
-                '<div class="info"><div><strong>Patient ' + (a.patientID || "-") + '</strong></div>' +
+                '<div class="info"><div><strong>' + patientLabel(a.patientID, names) + '</strong></div>' +
                 '<div><span class="status-badge status-' + status + '">' + status + '</span></div></div>' +
                 '<div class="row-actions">' + action + '</div>' +
                 '</div>';

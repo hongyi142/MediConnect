@@ -12,6 +12,37 @@
             </div>
         </div>
 
+        <!-- Stats -->
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value" id="stat-upcoming">-</div>
+                    <div class="stat-label">Upcoming Appointments</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value" id="stat-history">-</div>
+                    <div class="stat-label">Past Consultations</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon amber">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/></svg>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value" id="stat-payments">-</div>
+                    <div class="stat-label">Pending Payments</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Quick Actions -->
         <div class="quick-actions">
             <a href="/patient/symptom-checker" class="action-card">
@@ -123,6 +154,17 @@
         font-size: var(--text-sm);
         margin: .25rem 0 0;
     }
+
+    /* Stat Grid */
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; display: flex; align-items: center; gap: .875rem; box-shadow: var(--shadow-card); transition: transform .15s, box-shadow .15s; }
+    .stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+    .stat-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stat-icon.blue { background: var(--primary-light); color: var(--primary); }
+    .stat-icon.green { background: var(--success-bg); color: var(--success); }
+    .stat-icon.amber { background: var(--warning-bg); color: var(--warning); }
+    .stat-info .stat-value { font-size: var(--text-2xl); font-weight: 700; color: var(--text); line-height: 1.2; }
+    .stat-info .stat-label { font-size: var(--text-xs); color: var(--text-muted); margin-top: 2px; }
 
     /* Quick Actions */
     .quick-actions {
@@ -257,6 +299,7 @@
     }
 
     @media(max-width: 640px) {
+        .stat-grid { grid-template-columns: 1fr 1fr; }
         .quick-actions { grid-template-columns: 1fr; }
         .dashboard-container { padding: 1.5rem 1rem; }
     }
@@ -296,9 +339,15 @@
             if (!res.ok) throw new Error("Failed to load");
             var data = await res.json();
             var appts = data.appointments || data || [];
-            var upcoming = appts.filter(function(a) { return a.status !== "cancelled" && new Date(a.dateTime) >= new Date(); })
-                .sort(function(a, b) { return new Date(a.dateTime) - new Date(b.dateTime); })
-                .slice(0, 3);
+            var now = new Date();
+            var allUpcoming = appts.filter(function(a) { return a.status !== "cancelled" && new Date(a.dateTime) >= now; });
+            var pastCount = appts.filter(function(a) { return new Date(a.dateTime) < now; }).length;
+            var statUpcoming = document.getElementById("stat-upcoming");
+            var statHistory = document.getElementById("stat-history");
+            if (statUpcoming) statUpcoming.textContent = allUpcoming.length;
+            if (statHistory) statHistory.textContent = pastCount;
+
+            var upcoming = allUpcoming.sort(function(a, b) { return new Date(a.dateTime) - new Date(b.dateTime); }).slice(0, 3);
 
             var list = document.getElementById("appt-list");
             if (upcoming.length === 0) {
@@ -317,6 +366,8 @@
             }).join("");
         } catch(e) {
             document.getElementById("appt-empty").style.display = "";
+            var su = document.getElementById("stat-upcoming"); if (su) su.textContent = "0";
+            var sh = document.getElementById("stat-history"); if (sh) sh.textContent = "0";
         }
     }
 
@@ -334,7 +385,8 @@
                 if (Array.isArray(payload) && payload.length > orders.length) orders = payload;
             }
             var pending = (orders || []).filter(function(o) { return (o.Status || "").toLowerCase() === "pending"; });
-            
+            var sp = document.getElementById("stat-payments"); if (sp) sp.textContent = pending.length;
+
             var list = document.getElementById("order-list");
             if (pending.length === 0) {
                 document.getElementById("order-empty").style.display = "";
@@ -346,6 +398,7 @@
             }).join("");
         } catch(e) {
             document.getElementById("order-empty").style.display = "";
+            var sp = document.getElementById("stat-payments"); if (sp) sp.textContent = "0";
         }
     }
 

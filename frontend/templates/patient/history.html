@@ -4,26 +4,73 @@
 {% block content %}
 <div class="history-page">
     <div class="history-container">
+
         <div class="history-header">
             <div>
                 <h1>My Care History</h1>
-                <p class="text-muted">Review past appointments, orders, deliveries, payments, and download issued MCs.</p>
+                <p class="subtitle">Appointments, orders, deliveries, payments, and issued MCs.</p>
             </div>
             <a href="/patient/book" class="btn btn-primary">Book New Appointment</a>
         </div>
 
-        <div class="history-stats" id="history-stats">
-            <div class="hist-stat"><div class="label">Appointments</div><div class="value" id="stat-appts">0</div></div>
-            <div class="hist-stat"><div class="label">Orders</div><div class="value" id="stat-orders">0</div></div>
-            <div class="hist-stat"><div class="label">Pending Payments</div><div class="value" id="stat-pending">0</div></div>
-            <div class="hist-stat"><div class="label">Delivered</div><div class="value" id="stat-delivered">0</div></div>
+        <!-- Stats -->
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value" id="stat-appts">-</div>
+                    <div class="stat-label">Appointments</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon amber">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value" id="stat-orders">-</div>
+                    <div class="stat-label">Total Orders</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon red">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/></svg>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value" id="stat-pending">-</div>
+                    <div class="stat-label">Pending Payments</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"/></svg>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value" id="stat-delivered">-</div>
+                    <div class="stat-label">Delivered</div>
+                </div>
+            </div>
         </div>
 
+        <!-- Active Order Tracker — shown only when pending orders exist -->
+        <div id="order-tracker-card" class="card tracker-card" style="display:none">
+            <div class="card-top">
+                <div class="tracker-heading">
+                    <span class="tracker-pulse"></span>
+                    <h2>Active Orders</h2>
+                </div>
+                <a href="/patient/order-status" class="text-link">Open tracker →</a>
+            </div>
+            <div id="tracker-list" class="list-body"></div>
+        </div>
+
+        <!-- History Grid -->
         <div class="history-grid">
             <div class="card">
                 <div class="card-top">
                     <h2>Appointments & MC</h2>
-                    <a href="/patient/appointments" class="text-link">Open appointments</a>
+                    <a href="/patient/appointments" class="text-link">View all →</a>
                 </div>
                 <div id="appt-history" class="list-body"><p class="text-muted">Loading...</p></div>
             </div>
@@ -31,7 +78,6 @@
             <div class="card">
                 <div class="card-top">
                     <h2>Orders & Payments</h2>
-                    <a href="/patient/order-status" class="text-link">Open tracker</a>
                 </div>
                 <div id="order-history" class="list-body"><p class="text-muted">Loading...</p></div>
             </div>
@@ -44,43 +90,82 @@
                 <div id="delivery-history" class="list-body"><p class="text-muted">Loading...</p></div>
             </div>
         </div>
+
     </div>
 </div>
 
 <style>
     .history-page { padding-top: var(--navbar-height); min-height: 100vh; }
     .history-container { max-width: 1080px; margin: 0 auto; padding: 2rem 1.5rem; }
-    .history-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.25rem; }
+
+    /* Header */
+    .history-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem; }
     .history-header h1 { margin: 0; font-size: var(--text-2xl); }
-    .text-muted { color: var(--text-muted); margin-top: .25rem; }
-    .history-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin-bottom: 1.25rem; }
-    .hist-stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: .875rem 1rem; box-shadow: var(--shadow-xs); }
-    .hist-stat .label { font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
-    .hist-stat .value { font-size: var(--text-xl); font-weight: var(--weight-bold); color: var(--text); margin-top: .125rem; }
+    .history-header .subtitle { color: var(--text-muted); font-size: var(--text-sm); margin-top: .25rem; }
+
+    /* Stat grid — reuse main.css pattern */
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .875rem; margin-bottom: 1.5rem; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.125rem 1.25rem; display: flex; align-items: center; gap: .875rem; box-shadow: var(--shadow-xs); transition: transform .15s, box-shadow .15s; }
+    .stat-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+    .stat-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stat-icon.blue  { background: var(--primary-light);  color: var(--primary); }
+    .stat-icon.amber { background: var(--warning-bg);     color: var(--warning); }
+    .stat-icon.red   { background: var(--danger-bg);      color: var(--danger); }
+    .stat-icon.green { background: var(--success-bg);     color: var(--success); }
+    .stat-info .stat-value { font-size: var(--text-2xl); font-weight: 700; color: var(--text); line-height: 1.2; }
+    .stat-info .stat-label { font-size: var(--text-xs); color: var(--text-muted); margin-top: 2px; }
+
+    /* Active Order Tracker card */
+    .tracker-card { margin-bottom: 1.5rem; border-color: var(--primary-light); background: var(--primary-subtle); }
+    .tracker-heading { display: flex; align-items: center; gap: .5rem; }
+    .tracker-heading h2 { margin: 0; font-size: var(--text-lg); color: var(--text); }
+    .tracker-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; box-shadow: 0 0 0 0 rgba(217, 119, 87, .4); animation: pulse 1.8s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 87, .4); } 50% { box-shadow: 0 0 0 6px rgba(217, 119, 87, 0); } }
+
+    /* History grid */
     .history-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1rem; box-shadow: var(--shadow-card); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.125rem 1.25rem; box-shadow: var(--shadow-card); }
     .card-full { grid-column: 1 / -1; }
-    .card-top { display: flex; justify-content: space-between; align-items: center; gap: .75rem; margin-bottom: .75rem; }
-    .card-top h2 { margin: 0; font-size: var(--text-lg); }
-    .text-link { color: var(--primary); font-size: var(--text-xs); font-weight: var(--weight-semibold); }
+    .card-top { display: flex; justify-content: space-between; align-items: center; gap: .75rem; margin-bottom: .875rem; }
+    .card-top h2 { margin: 0; font-size: var(--text-base); font-weight: var(--weight-semibold); color: var(--text); }
+    .text-link { color: var(--primary); font-size: var(--text-xs); font-weight: var(--weight-semibold); white-space: nowrap; }
+    .text-link:hover { text-decoration: underline; }
+    .text-muted { color: var(--text-muted); font-size: var(--text-sm); }
+
+    /* List rows */
     .list-body { display: flex; flex-direction: column; gap: .5rem; }
-    .row-item { border: 1px solid var(--border); border-radius: var(--radius-md); padding: .75rem; display: flex; justify-content: space-between; gap: .75rem; align-items: center; }
-    .row-main { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+    .row-item { border: 1px solid var(--border); border-radius: var(--radius-md); padding: .75rem; display: flex; justify-content: space-between; gap: .75rem; align-items: center; background: var(--surface); transition: border-color .15s; }
+    .row-item:hover { border-color: var(--slate-300); }
+    .tracker-card .row-item { background: #fff; }
+    .row-main { display: flex; flex-direction: column; gap: .175rem; min-width: 0; }
     .row-title { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text); }
     .row-sub { font-size: var(--text-xs); color: var(--text-secondary); }
-    .row-actions { display: flex; align-items: center; gap: .375rem; flex-wrap: wrap; justify-content: flex-end; }
-    .badge { display: inline-flex; align-items: center; padding: .125rem .5rem; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: var(--weight-semibold); text-transform: capitalize; }
-    .badge.pending { background: var(--warning-bg); color: var(--warning); }
-    .badge.confirmed, .badge.paid, .badge.delivered, .badge.completed { background: var(--success-bg); color: var(--success); }
-    .badge.cancelled, .badge.failed { background: var(--danger-bg); color: var(--danger); }
-    .badge.assigned, .badge.ready, .badge.enroute { background: var(--primary-subtle); color: var(--primary); }
-    .btn-mini { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: var(--radius-md); padding: .25rem .55rem; font-size: var(--text-xs); font-weight: var(--weight-semibold); cursor: pointer; text-decoration: none; }
+    .row-actions { display: flex; align-items: center; gap: .375rem; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+
+    /* Badges */
+    .badge { display: inline-flex; align-items: center; padding: .125rem .55rem; border-radius: var(--radius-full); font-size: 11px; font-weight: var(--weight-semibold); text-transform: capitalize; }
+    .badge.pending   { background: var(--warning-bg);     color: var(--warning); }
+    .badge.confirmed, .badge.paid, .badge.delivered, .badge.completed
+                     { background: var(--success-bg);     color: var(--success); }
+    .badge.cancelled, .badge.failed
+                     { background: var(--danger-bg);      color: var(--danger); }
+    .badge.assigned, .badge.ready, .badge.enroute
+                     { background: var(--primary-subtle); color: var(--primary); }
+
+    /* Mini button */
+    .btn-mini { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: var(--radius-md); padding: .25rem .6rem; font-size: var(--text-xs); font-weight: var(--weight-semibold); cursor: pointer; text-decoration: none; transition: border-color .15s, color .15s; }
     .btn-mini:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* Responsive */
     @media (max-width: 860px) {
-        .history-stats { grid-template-columns: 1fr 1fr; }
+        .stat-grid { grid-template-columns: 1fr 1fr; }
         .history-grid { grid-template-columns: 1fr; }
         .card-full { grid-column: auto; }
         .history-header { flex-direction: column; }
+    }
+    @media (max-width: 480px) {
+        .stat-grid { grid-template-columns: 1fr 1fr; }
+        .history-container { padding: 1.5rem 1rem; }
     }
 </style>
 
@@ -123,7 +208,8 @@
         if (!value) return "-";
         var d = new Date(value);
         if (isNaN(d.getTime())) return String(value);
-        return d.toLocaleString("en-SG", { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+        return d.toLocaleDateString("en-SG", { day: "2-digit", month: "short", year: "numeric" }) + " " +
+               d.toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" });
     }
 
     async function initPage(user) {
@@ -203,6 +289,7 @@
         }));
 
         renderStats(appts, orders, deliveries);
+        renderTracker(orders);
         renderAppointments(appts, mcMap);
         renderOrders(orders);
         renderDeliveries(deliveries);
@@ -224,6 +311,31 @@
         document.getElementById("stat-delivered").textContent = delivered;
     }
 
+    function renderTracker(orders) {
+        var pending = orders.filter(function (o) {
+            var s = String(o.Status || o.status || "").toLowerCase();
+            return s === "pending" || s === "unpaid";
+        });
+
+        var card = document.getElementById("order-tracker-card");
+        if (!pending.length) { card.style.display = "none"; return; }
+        card.style.display = "";
+
+        document.getElementById("tracker-list").innerHTML = pending.map(function (o) {
+            var id = o.Id || o.id || o.orderID || "-";
+            var total = Number(o.TotalAmount || 0).toFixed(2);
+            var created = o.Timestamp || o.CreatedOn || o.createdAt || o.CreatedAt;
+            var placedStr = created ? 'Placed ' + fmtDate(created) + ' &middot; ' : '';
+            return '<div class="row-item">' +
+                '<div class="row-main"><div class="row-title">Order #' + id + '</div>' +
+                '<div class="row-sub">' + placedStr + '$' + total + '</div></div>' +
+                '<div class="row-actions">' +
+                '<span class="badge pending">Pending</span>' +
+                '<a class="btn-mini" href="/patient/payment" onclick="sessionStorage.setItem(\'pendingOrderId\',\'' + id + '\')">Pay Now</a>' +
+                '</div></div>';
+        }).join("");
+    }
+
     function renderAppointments(appts, mcMap) {
         var host = document.getElementById("appt-history");
         if (!appts.length) {
@@ -238,8 +350,8 @@
             var mcUrl = mcMap[String(id)] || "";
             var link = mcUrl ? '<a class="btn-mini" target="_blank" rel="noopener" href="' + mcUrl + '">Download MC</a>' : '';
             return '<div class="row-item">' +
-                '<div class="row-main"><div class="row-title">Appointment ' + id + '</div>' +
-                '<div class="row-sub">' + fmtDate(a.slotStart || a.dateTime) + (a.specialisation ? ' | ' + a.specialisation : '') + '</div></div>' +
+                '<div class="row-main"><div class="row-title">Appointment #' + id + '</div>' +
+                '<div class="row-sub">' + fmtDate(a.slotStart || a.dateTime) + (a.specialisation ? ' &middot; ' + a.specialisation : '') + '</div></div>' +
                 '<div class="row-actions"><span class="badge ' + status + '">' + status + '</span>' + link + '</div></div>';
         }).join("");
     }
@@ -255,10 +367,12 @@
         host.innerHTML = orders.slice(0, 12).map(function (o) {
             var id = o.Id || o.id || o.orderID || "-";
             var status = String(o.Status || o.status || "pending").toLowerCase();
-            var total = Number(o.TotalAmount || o.totalAmount || 0).toFixed(2);
-            var created = o.CreatedOn || o.createdAt || o.CreatedAt;
+            var total = Number(o.TotalAmount || 0).toFixed(2);
+            var created = o.Timestamp || o.CreatedOn || o.createdAt || o.CreatedAt;
+            var createdStr = created ? fmtDate(created) + ' &middot; ' : '';
             return '<div class="row-item">' +
-                '<div class="row-main"><div class="row-title">Order ' + id + '</div><div class="row-sub">' + fmtDate(created) + ' | $' + total + '</div></div>' +
+                '<div class="row-main"><div class="row-title">Order #' + id + '</div>' +
+                '<div class="row-sub">' + createdStr + '$' + total + '</div></div>' +
                 '<div class="row-actions"><span class="badge ' + status + '">' + status + '</span></div></div>';
         }).join("");
     }
@@ -277,8 +391,8 @@
         host.innerHTML = deliveries.slice(0, 16).map(function (d) {
             var status = String(d.status || "pending").toLowerCase();
             return '<div class="row-item">' +
-                '<div class="row-main"><div class="row-title">Delivery ' + (d.deliveryID || "-") + '</div>' +
-                '<div class="row-sub">Order ' + (d.orderID || "-") + ' | ' + fmtDate(d.completedAt || d.createdAt) + (d.riderName ? ' | Rider: ' + d.riderName : '') + '</div></div>' +
+                '<div class="row-main"><div class="row-title">Delivery #' + (d.deliveryID || "-") + '</div>' +
+                '<div class="row-sub">Order #' + (d.orderID || "-") + ' &middot; ' + fmtDate(d.completedAt || d.createdAt) + (d.riderName ? ' &middot; ' + d.riderName : '') + '</div></div>' +
                 '<div class="row-actions"><span class="badge ' + status + '">' + status + '</span></div></div>';
         }).join("");
     }

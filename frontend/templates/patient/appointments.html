@@ -256,7 +256,7 @@
         }
         var altHtml = renderAlternativesInline(a);
         return '<div class="appt-card"><div class="appt-left"><div class="date-block ' + a.status + '"><span class="day">' + d.getDate() + '</span><span>' + months[d.getMonth()] + '</span></div>' +
-            '<div class="appt-details"><div class="time">' + d.getHours().toString().padStart(2,"0") + ':' + d.getMinutes().toString().padStart(2,"0") + '</div>' +
+            '<div class="appt-details"><div class="time">' + d.toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" }) + '</div>' +
             '<div class="meta"><span class="status-badge status-' + a.status + '">' + a.status + '</span></div>' + reason + altHtml + '</div></div>' + action + '</div>';
     }
 
@@ -264,7 +264,7 @@
         var alts = appt.alternativeOptions || {};
         var chips = [];
         (alts.sameSlotDoctors || []).slice(0, 3).forEach(function(d) {
-            chips.push('<button class="alt-chip" onclick="rebookWithDoctor(\'' + (d.doctorID || "") + '\', \'' + (appt.specialisation || "") + '\')">Try ' + (d.name || d.doctorID) + '</button>');
+            chips.push('<button class="alt-chip" onclick="rebookWithDoctor(\'' + (d.doctorID || "") + '\', \'' + (appt.specialisation || "") + '\')">Try ' + (d.name || d.doctorID) + ' (' + d.doctorID + ')' + '</button>');
         });
         (alts.otherTimeslots || []).slice(0, 3).forEach(function(s) {
             chips.push('<button class="alt-chip" onclick="rebookWithSlot(\'' + (s.doctorID || "") + '\', \'' + (s.slotStart || "") + '\', \'' + (appt.specialisation || "") + '\')">Try ' + fmtTime(s.slotStart) + '</button>');

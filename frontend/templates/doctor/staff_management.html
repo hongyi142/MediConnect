@@ -167,6 +167,12 @@
                 });
                 responseData = await res.json();
                 if (!res.ok) { throw new Error(responseData.error || "Failed"); }
+                var firebaseUID = responseData.firebaseUID;
+                if (firebaseUID) {
+                    await fbDb.collection("users").doc(firebaseUID).set({
+                        uid: firebaseUID, role: "doctor", name: name, email: email, linkedID: responseData.doctorID
+                    });
+                }
                 loadDoctors(cfg);
             } else {
                 var res = await fetch(cfg.riderUrl + "/rider/register", {
@@ -176,6 +182,13 @@
                 });
                 responseData = await res.json();
                 if (!res.ok) { throw new Error((responseData && responseData.error) || "Failed"); }
+                var riderData = responseData.data || {};
+                var firebaseUID = riderData.firebaseUID;
+                if (firebaseUID) {
+                    await fbDb.collection("users").doc(firebaseUID).set({
+                        uid: firebaseUID, role: "rider", name: name, email: email, linkedID: riderData.riderID
+                    });
+                }
                 loadRiders(cfg);
             }
             closeModal();
