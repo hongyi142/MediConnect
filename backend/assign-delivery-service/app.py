@@ -233,13 +233,12 @@ def start_amqp_listener():
             exchange_name = "service_exchange"
             queue_name = "delivery_queue"
             routing_key = "delivery.assign"
-            arguments = {
-                "x-dead-letter-exchange": "refund_exchange",
-                "x-message-ttl": 10000
-            }
+            
+            # REMOVED: Legacy TTL/DLX arguments to align with the new Auditor pattern
             ch.exchange_declare(exchange=exchange_name, exchange_type="direct", durable=True)
-            ch.queue_declare(queue=queue_name, durable=True, arguments=arguments)
+            ch.queue_declare(queue=queue_name, durable=True)
             ch.queue_bind(queue=queue_name, exchange=exchange_name, routing_key=routing_key)
+            
             ch.basic_qos(prefetch_count=1)
             ch.basic_consume(queue=queue_name, on_message_callback=on_order_paid)
             print("[Assign Delivery] Listening on delivery_queue ...")

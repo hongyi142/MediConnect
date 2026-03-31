@@ -103,16 +103,19 @@ services:
     container_name: process_payment_api
     environment:
       - PYTHONUNBUFFERED=1
-      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
       - PAYMENT_WRAPPER_URL=http://payment-wrapper:5001
       - PAYMENT_ATOMIC_URL=http://payment-atomic:5000
       - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
       - PATIENT_URL=http://patient-service:5030
     depends_on:
+      rabbitmq:
+        condition: service_healthy
       payment_atomic:
         condition: service_started
       payment_wrapper:
         condition: service_started
+    restart: on-failure
     networks:
       default:
         aliases:
@@ -126,16 +129,22 @@ services:
     # No ports exposed as this is a background worker pulling from the queue
     environment:
       - PYTHONUNBUFFERED=1
-      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
       - PAYMENT_WRAPPER_URL=http://payment-wrapper:5001
       - PAYMENT_ATOMIC_URL=http://payment-atomic:5000
       - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
       - PATIENT_URL=http://patient-service:5030
+      - DELIVERY_SERVICE_URL=http://delivery-service:5000
     depends_on:
+      rabbitmq:
+        condition: service_healthy
       payment_atomic:
         condition: service_started
       payment_wrapper:
         condition: service_started
+    restart: on-failure
+    networks:
+      - default
 
   # ──── Domain Services ────────────────────────────────────
   patient-service:

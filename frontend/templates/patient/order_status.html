@@ -21,6 +21,19 @@
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5"><path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
                         <span id="rider-name">Your rider is on the way!</span>
                     </div>
+                    <div id="refund-banner" class="refund-banner" style="display:none">
+                        <div class="refund-banner__icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"/>
+                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                        </div>
+                        <div class="refund-banner__body">
+                            <div class="refund-banner__title">Delivery Cancelled &mdash; Refund Initiated</div>
+                            <div class="refund-banner__desc">Unfortunately, no available rider accepted your delivery within the time window. Your payment has been automatically refunded. Please allow 5&ndash;10 business days for the amount to reflect in your account.</div>
+                        </div>
+                    </div>
                     <div id="qr-section" style="display:none" class="qr-section">
                         <h3>Delivery QR Code</h3>
                         <p class="qr-desc">Show this QR to your rider upon delivery.</p>
@@ -67,6 +80,57 @@
 
     /* Rider card */
     .rider-card { display: flex; align-items: center; gap: .75rem; background: var(--primary-subtle); border: 1px solid var(--primary-light); border-radius: var(--radius-md); padding: .875rem 1rem; margin-top: 1.25rem; color: var(--primary); font-weight: 500; font-size: var(--text-sm); }
+
+    /* Refund Banner */
+    .refund-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        background: var(--danger-bg);
+        border: 1px solid var(--danger-light);
+        border-radius: var(--radius-md);
+        padding: 1rem 1.125rem;
+        margin-top: 1.25rem;
+        animation: refundFadeIn .4s ease-out;
+    }
+    @keyframes refundFadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .refund-banner__icon {
+        flex-shrink: 0;
+        color: var(--danger);
+        margin-top: 1px;
+    }
+    .refund-banner__body { flex: 1; }
+    .refund-banner__title {
+        font-size: var(--text-sm);
+        font-weight: 700;
+        color: var(--danger);
+        margin-bottom: .25rem;
+    }
+    .refund-banner__desc {
+        font-size: var(--text-xs);
+        color: var(--danger);
+        opacity: .85;
+        line-height: 1.55;
+    }
+
+    /* Refunded stepper state overrides */
+    .step-row.refunded .step-indicator {
+        border-color: var(--danger);
+        background: var(--danger-bg);
+    }
+    .step-row.refunded .step-indicator::after {
+        content: "\00D7";
+        color: var(--danger);
+        font-size: var(--text-base);
+        font-weight: 700;
+        line-height: 1;
+    }
+    .step-row.refunded .step-title { color: var(--danger); }
+    .step-row.refunded .step-desc  { color: var(--danger); opacity: .75; }
+    .step-row.refunded::before     { background: var(--danger-light); }
 
     /* QR Section */
     .qr-section { text-align: center; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
@@ -132,13 +196,14 @@
     }
 
     function stepRank(step) {
-        var map = { created: 0, paid: 1, preparing: 2, assigned: 3, delivered: 4 };
+        var map = { created: 0, paid: 1, preparing: 2, assigned: 3, delivered: 4, refunded: -99 };
         return Object.prototype.hasOwnProperty.call(map, step) ? map[step] : -1;
     }
 
     function mapOrderStatusToStep(status, paymentStatus) {
         var s = (status || "").toLowerCase();
         var p = (paymentStatus || "").toLowerCase();
+        if (s === "refunded" || s === "payment_denied" || s === "cancelled_refunded") return "refunded";
         if (s === "delivered" || s === "completed") return "delivered";
         if (s === "assigned" || s === "out_for_delivery" || s === "dispatching") return "assigned";
         if (s === "ready" || s === "ready_for_delivery" || s === "ready_for_pickup" || s === "preparing" || s === "processing" || s === "packed") return "preparing";
@@ -222,7 +287,11 @@
                         orderData.Status || orderData.status,
                         orderData.PaymentStatus || orderData.paymentStatus
                     );
-                    if (stepRank(orderStep) > stepRank(targetStep)) targetStep = orderStep;
+                    if (orderStep === "refunded") {
+                        targetStep = "refunded";
+                    } else if (stepRank(orderStep) > stepRank(targetStep)) {
+                        targetStep = orderStep;
+                    }
                 }
             } catch(e) {}
 
@@ -244,7 +313,7 @@
                         var dStatus = String(d.status || "").toLowerCase();
                         setAssignedStepCopy((dStatus === "pending" || dStatus === "ready" || dStatus === "awaiting_rider" || dStatus === "searching_rider") && !(d.riderID || d.riderName));
                         var deliveryStep = mapDeliveryStatusToStep(d.status, !!(d.riderID || d.riderName));
-                        if (stepRank(deliveryStep) > stepRank(targetStep)) targetStep = deliveryStep;
+                        if (targetStep !== "refunded" && stepRank(deliveryStep) > stepRank(targetStep)) targetStep = deliveryStep;
                         if (d.riderID || d.riderName) {
                             riderShown = true;
                             setAssignedStepCopy(false);
@@ -266,12 +335,21 @@
                 }
             } catch(e) {}
         } finally {
-            if (stepRank(targetStep) < stepRank("assigned")) setAssignedStepCopy(true);
-            if (!riderShown) document.getElementById("rider-card").style.display = "none";
+            if (targetStep === "refunded") {
+                // Stop polling and show refund state
+                if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                document.getElementById("rider-card").style.display = "none";
+                document.getElementById("qr-section").style.display = "none";
+                document.getElementById("refund-banner").style.display = "flex";
+            } else {
+                document.getElementById("refund-banner").style.display = "none";
+                if (stepRank(targetStep) < stepRank("assigned")) setAssignedStepCopy(true);
+                if (!riderShown) document.getElementById("rider-card").style.display = "none";
+                if (targetStep === "delivered" && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+            }
             updateStepper(targetStep);
             setLastUpdated();
             setTrackerSyncing(false);
-            if (targetStep === "delivered" && pollTimer) clearInterval(pollTimer);
         }
     }
 
@@ -289,10 +367,51 @@
     }
 
     function updateStepper(activeStep) {
+        var rows = document.querySelectorAll(".step-row");
+
+        if (activeStep === "refunded") {
+            // Mark "Order placed" as done, "Payment confirmed" as done,
+            // then show a refunded state on the third step slot.
+            rows.forEach(function(row, i) {
+                var ind = row.querySelector(".step-indicator");
+                row.classList.remove("active", "refunded");
+                ind.classList.remove("done", "current");
+                if (i < 2) {
+                    // created + paid → done
+                    ind.classList.add("done");
+                } else if (i === 2) {
+                    // "Preparing medication" slot repurposed as the refunded marker
+                    row.classList.add("refunded");
+                    var titleEl = row.querySelector(".step-title");
+                    var descEl  = row.querySelector(".step-desc");
+                    if (titleEl) titleEl.textContent = "Refund Processed";
+                    if (descEl)  descEl.textContent  = "No rider accepted — your payment has been refunded.";
+                } else {
+                    // Remaining steps: hide (opacity) so focus stays on refund message
+                    row.style.opacity = "0.3";
+                    row.style.pointerEvents = "none";
+                }
+            });
+            return;
+        }
+
+        // Restore any steps that may have been faded out
+        rows.forEach(function(row) {
+            row.style.opacity = "";
+            row.style.pointerEvents = "";
+            row.classList.remove("refunded");
+            var titleEl = row.querySelector(".step-title");
+            var descEl  = row.querySelector(".step-desc");
+            // Restore original text if it was overwritten
+            if (row.dataset.step === "preparing" && titleEl && titleEl.textContent === "Refund Processed") {
+                titleEl.textContent = "Preparing medication";
+                if (descEl) descEl.textContent = "Clinic/pharmacy is preparing your items";
+            }
+        });
+
         var steps = ["created", "paid", "preparing", "assigned", "delivered"];
         var activeIdx = steps.indexOf(activeStep);
         if (activeIdx < 0) activeIdx = 0;
-        var rows = document.querySelectorAll(".step-row");
         rows.forEach(function(row, i) {
             var ind = row.querySelector(".step-indicator");
             row.classList.remove("active");

@@ -250,7 +250,7 @@ def verify_and_handoff():
         except requests.exceptions.RequestException as e:
             print(f"[Process Payment] Warning: Failed to update OutSystems Order status: {e}")
 
-        # Step 3: RabbitMQ Handoff
+        # --- RABBITMQ HANDOFF & TIMEOUT SETUP ---
         try:
             params = pika.URLParameters(RABBITMQ_URL)
             connection = pika.BlockingConnection(params)
@@ -258,20 +258,28 @@ def verify_and_handoff():
 
             exchange_name = 'service_exchange'
             refund_exchange = 'refund_exchange'
-            queue_name = 'delivery_queue'
+
+            delivery_queue = 'delivery_queue'
+            timeout_queue = 'delivery_timeout_queue'
+
             routing_key = 'delivery.assign'
 
             # Ensure exchanges exist
             channel.exchange_declare(exchange=exchange_name, exchange_type='direct', durable=True)
             channel.exchange_declare(exchange=refund_exchange, exchange_type='direct', durable=True)
 
-            # Declare the delivery_queue with DLX arguments
-            arguments = {
+            # 1. Declare the main delivery_queue (immediate processing)
+            channel.queue_declare(queue=delivery_queue, durable=True)
+            channel.queue_bind(queue=delivery_queue, exchange=exchange_name, routing_key=routing_key)
+
+            # 2. Declare the delivery_timeout_queue (The 10-second timer)
+            # This queue has NO consumers. Messages expire after 10s and go to refund_exchange.
+            timeout_arguments = {
                 'x-dead-letter-exchange': refund_exchange,
-                'x-message-ttl': 10000  # 10 seconds for testing
+                'x-dead-letter-routing-key': routing_key, # Keep routing key for the refund worker
+                'x-message-ttl': 10000  # 10 seconds
             }
-            channel.queue_declare(queue=queue_name, durable=True, arguments=arguments)
-            channel.queue_bind(queue=queue_name, exchange=exchange_name, routing_key=routing_key)
+            channel.queue_declare(queue=timeout_queue, durable=True, arguments=timeout_arguments)
 
             msg_payload = {
                 "orderID": order_id,
@@ -286,15 +294,22 @@ def verify_and_handoff():
                 "status": "payment_verified"
             }
 
+            # Publish to Path A: Immediate delivery assignment
             channel.basic_publish(
                 exchange=exchange_name,
                 routing_key=routing_key,
                 body=json.dumps(msg_payload),
-                properties=pika.BasicProperties(
-                    delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE
-                )
+                properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE)
             )
 
+            # Publish to Path B: The Timeout Auditor (to the timeout_queue directly)
+            # Note: We publish to the default exchange with the queue name as routing key for direct-to-queue
+            channel.basic_publish(
+                exchange='',
+                routing_key=timeout_queue,
+                body=json.dumps(msg_payload),
+                properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE)
+            )
             # --- NEW: Publish async event to notification_queue ---
             notification_payload = {
                 "event_type": "payment_successful",
