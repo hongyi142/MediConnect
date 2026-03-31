@@ -301,7 +301,7 @@
         }
 
         document.getElementById("spec-select").addEventListener("change", loadDoctorOptions);
-        document.getElementById("appt-date").addEventListener("change", loadDoctorOptions);
+        document.getElementById("appt-date").addEventListener("change", function() { filterTimeOptions(); loadDoctorOptions(); });
         document.getElementById("appt-time").addEventListener("change", loadDoctorOptions);
 
         loadProfile(user);
