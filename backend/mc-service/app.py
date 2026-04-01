@@ -13,18 +13,9 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:8080", "http://frontend:8080", "*"])
 
-S3_HEADERS = {
-    "Content-Type": "application/json",
-    "X-Contacts-Key": "4e46111f-f4a9-443b-bc63-cd0d52437c04",
-}
-
-
 def s3_post(path, payload):
-    base = os.environ.get(
-        "S3_BASE_URL",
-        "https://smuedu-dev.outsystemsenterprise.com/SMULab_AmazonS3/rest/AmazonS3",
-    ).rstrip("/")
-    return requests.post(f"{base}/{path.lstrip('/')}", json=payload, headers=S3_HEADERS, timeout=10)
+    base = os.environ.get("S3_WRAPPER_URL", "http://amazon-s3-wrapper:5020").rstrip("/")
+    return requests.post(f"{base}/{path.lstrip('/')}", json=payload, timeout=15)
 
 
 def render_mc_html(data):

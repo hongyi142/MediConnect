@@ -59,6 +59,14 @@ services:
   #  Wrapper / Integration Services
   # ──────────────────────────────────────────────
 
+  - name: amazon-s3-wrapper
+    url: http://amazon-s3-wrapper:5022
+    routes:
+      - name: amazon-s3-wrapper-routes
+        paths:
+          - /s3
+        strip_path: true
+
   - name: twilio-wrapper
     url: http://twilio-wrapper:5020
     routes:

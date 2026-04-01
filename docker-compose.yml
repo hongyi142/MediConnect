@@ -24,9 +24,18 @@ services:
     build: ./backend/consultation-service
     env_file: ./backend/consultation-service/.env
 
+  amazon-s3-wrapper:
+    build: ./backend/amazon-s3-wrapper
+    container_name: amazon-s3-wrapper
+    env_file: ./backend/amazon-s3-wrapper/.env
+
   mc-service:
     build: ./backend/mc-service
     env_file: ./backend/mc-service/.env
+    environment:
+      - S3_WRAPPER_URL=http://amazon-s3-wrapper:5022
+    depends_on:
+      - amazon-s3-wrapper
 
   twilio-wrapper:
     build: ./backend/twilio-wrapper
@@ -191,6 +200,10 @@ services:
     build: ./backend/inventory
     container_name: inventory-service
     env_file: ./backend/inventory/.env
+    environment:
+      - S3_WRAPPER_URL=http://amazon-s3-wrapper:5022
+    depends_on:
+      - amazon-s3-wrapper
 
   # ──── Delivery Services ──────────────────────────────────
   delivery-service:

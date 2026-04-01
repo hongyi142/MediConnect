@@ -17,19 +17,14 @@ cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-S3_BASE_URL = os.environ.get(
-    "S3_BASE_URL",
-    "https://smuedu-dev.outsystemsenterprise.com/SMULab_AmazonS3/rest/AmazonS3",
-).rstrip("/")
+S3_WRAPPER_URL = os.environ.get("S3_WRAPPER_URL", "http://amazon-s3-wrapper:5020").rstrip("/")
 S3_FOLDER = os.environ.get("S3_FOLDER", "mediconnect")
 S3_SUBFOLDER = os.environ.get("S3_SUBFOLDER", "medication-images")
-S3_X_CONTACTS_KEY = os.environ.get("S3_X_CONTACTS_KEY", "4e46111f-f4a9-443b-bc63-cd0d52437c04")
 ALLOWED_IMAGE_MIME_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 
 
 def s3_post(path: str, payload: Dict[str, Any]) -> requests.Response:
-    headers = {"Content-Type": "application/json", "X-Contacts-Key": S3_X_CONTACTS_KEY}
-    return requests.post(f"{S3_BASE_URL}/{path.lstrip('/')}", json=payload, headers=headers, timeout=15)
+    return requests.post(f"{S3_WRAPPER_URL}/{path.lstrip('/')}", json=payload, timeout=15)
 
 
 def fetch_s3_url(file_key: Optional[str]) -> Optional[str]:

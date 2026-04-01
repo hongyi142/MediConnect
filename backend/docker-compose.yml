@@ -51,6 +51,11 @@ services:
       - delivery
       - rider
 
+  amazon_s3_wrapper:
+    build: ./amazon-s3-wrapper
+    ports:
+      - "5020:5020"
+
   telegram_wrapper:
     build: ./telegram_wrapper
     ports:
