@@ -93,6 +93,17 @@ def start_worker():
                     except requests.exceptions.RequestException as e:
                         print(f"Warning: Failed to update OutSystems Order status: {e}")
 
+                    # --- NEW: Sybc Delivery Atomic Service ---
+                    if delivery_record:
+                        d_id = delivery_record.get("deliveryID")
+                        if d_id:
+                            try:
+                                print(f"Syncing Delivery Service {d_id} status to refunded...")
+                                d_up = requests.put(f"{DELIVERY_SERVICE_URL}/delivery/{d_id}", json={"status": "refunded"}, timeout=10)
+                                d_up.raise_for_status()
+                            except requests.exceptions.RequestException as e:
+                                print(f"Warning: Failed to update Delivery atomic service: {e}")
+
                     # --- NEW: Publish async event to notification_queue ---
                     if patient_email and patient_name and amount:
                         notification_payload = {

@@ -277,7 +277,7 @@ def verify_and_handoff():
             timeout_arguments = {
                 'x-dead-letter-exchange': refund_exchange,
                 'x-dead-letter-routing-key': routing_key, # Keep routing key for the refund worker
-                'x-message-ttl': 10000  # 10 seconds
+                'x-message-ttl': 60000  # 1 minute
             }
             channel.queue_declare(queue=timeout_queue, durable=True, arguments=timeout_arguments)
 

@@ -230,8 +230,12 @@
             if (!res.ok) { sessionStorage.removeItem("activeDelivery"); return; }
             var raw = await res.json();
             var delivery = raw.data || raw;
-            if (delivery.status === "delivered" || delivery.status === "completed") {
+            var s = String(delivery.status || "").toLowerCase();
+            if (s === "delivered" || s === "completed" || s === "refunded" || s === "cancelled") {
                 sessionStorage.removeItem("activeDelivery");
+                document.getElementById("active-delivery").style.display = "none";
+                activeDelivery = null;
+                document.getElementById("stat-active").textContent = "0";
                 return;
             }
             activeDelivery = delivery;
@@ -266,6 +270,28 @@
                 return String(when).slice(0, 10) === today;
             }).length;
             document.getElementById("stat-completed").textContent = completedToday;
+
+            // DYNAMIC SYNC: Check if Rider has an actively assigned delivery (e.g. auto-assigned)
+            var myLinkedID = window.currentUser.linkedID;
+            var myActiveDelivery = deliveries.find(function(d) {
+                var s = String(d.status || "").toLowerCase();
+                var isActive = (s === "assigned" || s === "processing" || s === "delivering" || s === "enroute");
+                return String(d.riderID) === String(myLinkedID) && isActive;
+            });
+
+            if (myActiveDelivery) {
+                if (!activeDelivery || activeDelivery.deliveryID !== myActiveDelivery.deliveryID) {
+                    sessionStorage.setItem("activeDelivery", JSON.stringify({ deliveryID: myActiveDelivery.deliveryID }));
+                    checkActiveDelivery();
+                }
+            } else if (activeDelivery) {
+                // Backend confirms no active delivery. Purge ghost cache.
+                sessionStorage.removeItem("activeDelivery");
+                document.getElementById("active-delivery").style.display = "none";
+                document.getElementById("stat-active").textContent = "0";
+                activeDelivery = null;
+            }
+
             var pending = deliveries.filter(function(d) { return d.status === "pending" || d.status === "ready"; });
             var withDistance = pending.map(function(d) {
                 var lat = Number(d.patientLat);

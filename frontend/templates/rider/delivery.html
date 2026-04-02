@@ -3,6 +3,7 @@
 
 {% block extra_head %}
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -125,6 +126,36 @@
         var data = JSON.parse(raw);
         await loadDelivery(data.deliveryID);
         pollTimer = setInterval(function() { loadDelivery(data.deliveryID); }, 10000);
+        initRealtimeTracking(data.deliveryID);
+    }
+
+    var socket = null;
+    var watchId = null;
+    function initRealtimeTracking(deliveryID) {
+        var cfg = document.getElementById("svc-config").dataset;
+        var host = new URL(cfg.deliveryUrl || "http://localhost:8000").hostname;
+        var kongUrl = "http://" + host + ":8000";
+        socket = io(kongUrl, { path: '/socket.io' });
+        socket.on('connect', function() {
+            socket.emit('join_delivery', deliveryID);
+            console.log("Connected to real-time tracking room: " + deliveryID);
+        });
+
+        if (navigator.geolocation) {
+            watchId = navigator.geolocation.watchPosition(
+                function(pos) {
+                    if (socket && socket.connected) {
+                        socket.emit('location_update', {
+                            deliveryID: deliveryID,
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude
+                        });
+                    }
+                },
+                function(err) { console.error("Geolocation error:", err); },
+                { enableHighAccuracy: true }
+            );
+        }
     }
 
     async function loadDelivery(deliveryID) {
@@ -220,6 +251,8 @@
 
     function showSuccess() {
         if (pollTimer) clearInterval(pollTimer);
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        if (socket) socket.disconnect();
         sessionStorage.removeItem("activeDelivery");
         document.getElementById("scanner-section").style.display = "none";
         document.getElementById("manual-section").style.display = "none";
