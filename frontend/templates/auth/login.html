@@ -2,240 +2,188 @@
 {% block title %}Login - MediConnect{% endblock %}
 {% block navbar %}{% endblock %}
 
+{% block dynamic_bg %}
+<div class="bg-mesh-full">
+    <div class="bg-mesh-blob bg-mesh-blob-1"></div>
+    <div class="bg-mesh-blob bg-mesh-blob-2"></div>
+    <div class="bg-mesh-blob bg-mesh-blob-3"></div>
+</div>
+{% endblock %}
+
 {% block content %}
-<div class="auth-layout">
-    <!-- Left Brand Panel -->
-    <div class="auth-brand">
-        <div class="auth-brand-content">
-            <a href="/" class="auth-brand-logo">
-                <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
-                    <rect width="32" height="32" rx="8" fill="#fff"/>
-                    <path d="M16 7v18M7 16h18" stroke="#06B6D4" stroke-width="3" stroke-linecap="round"/>
-                </svg>
-                <span>MediConnect</span>
-            </a>
-            <h2>Welcome back</h2>
-            <p>Access your healthcare dashboard to manage appointments, consultations, and prescriptions.</p>
-            <div class="auth-brand-features">
-                <div class="auth-brand-feat">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span>Secure video consultations</span>
-                </div>
-                <div class="auth-brand-feat">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span>AI-powered symptom analysis</span>
-                </div>
-                <div class="auth-brand-feat">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span>Medication delivery to your door</span>
-                </div>
-            </div>
+<div class="auth-page-centered">
+    <div class="auth-glass-card">
+        <a href="/" class="auth-logo-center">
+            <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
+                <rect width="32" height="32" rx="10" fill="url(#brandGrad)"/>
+                <path d="M16 7v18M7 16h18" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+                <defs>
+                    <linearGradient id="brandGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#0EA5E9"/>
+                        <stop offset="1" stop-color="#6366F1"/>
+                    </linearGradient>
+                </defs>
+            </svg>
+            MediConnect
+        </a>
+
+        <div class="auth-form-header">
+            <h1>Welcome back</h1>
+            <p>Access your healthcare dashboard</p>
         </div>
-    </div>
 
-    <!-- Right Form Panel -->
-    <div class="auth-form-panel">
-        <div class="auth-form-inner">
-            <div class="auth-form-header">
-                <h1>Sign in</h1>
-                <p>Enter your credentials to continue</p>
+        <div class="role-toggle" id="role-toggle">
+            <button class="role-pill active" data-role="patient">Patient</button>
+            <button class="role-pill" data-role="doctor">Doctor</button>
+            <button class="role-pill" data-role="rider">Rider</button>
+        </div>
+
+        <form id="login-form" onsubmit="return false">
+            <div class="form-group">
+                <label for="email">Email address</label>
+                <input type="email" id="email" required autocomplete="email" placeholder="name@example.com">
             </div>
-
-            <div class="role-toggle" id="role-toggle">
-                <button class="role-pill active" data-role="patient">Patient</button>
-                <button class="role-pill" data-role="doctor">Doctor</button>
-                <button class="role-pill" data-role="rider">Rider</button>
-            </div>
-
-            <form id="login-form" onsubmit="return false">
-                <div class="form-group">
-                    <label for="email">Email address</label>
-                    <input type="email" id="email" required autocomplete="email" placeholder="name@example.com">
+            <div class="form-group">
+                <div class="label-row">
+                    <label for="password">Password</label>
+                    <button type="button" class="link-subtle" id="forgot-btn">Forgot password?</button>
                 </div>
-                <div class="form-group">
-                    <div class="label-row">
-                        <label for="password">Password</label>
-                        <button type="button" class="link-subtle" id="forgot-btn">Forgot?</button>
-                    </div>
-                    <div class="input-password-wrap">
-                        <input type="password" id="password" required autocomplete="current-password" placeholder="Enter your password">
-                        <button type="button" class="password-toggle" id="toggle-pw" aria-label="Toggle password visibility">
-                            <svg id="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5"><path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            <svg id="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" style="display:none"><path d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
-                        </button>
-                    </div>
-                </div>
-
-                <div id="login-error" class="alert-banner" style="display:none"></div>
-
-                <button type="submit" class="btn btn-primary btn-block" id="login-btn">Sign in</button>
-            </form>
-
-            <div class="auth-footer-links">
-                <div class="auth-divider"><span>or</span></div>
-                <a href="/auth/signup" class="btn btn-outline btn-block">Create a patient account</a>
-                <p class="auth-admin-note">Doctors and riders: contact your administrator for access.</p>
-            </div>
-
-            <!-- Forgot Password Panel -->
-            <div id="forgot-panel" class="forgot-panel" style="display:none">
-                <div class="forgot-panel-header">
-                    <h3>Reset password</h3>
-                    <button type="button" class="forgot-close" id="cancel-reset-btn" aria-label="Close">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <div class="input-password-wrap">
+                    <input type="password" id="password" required autocomplete="current-password" placeholder="Enter your password">
+                    <button type="button" class="password-toggle" id="toggle-pw" aria-label="Toggle password visibility">
+                        <svg id="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5"><path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <svg id="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" style="display:none"><path d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
                     </button>
                 </div>
-                <p class="forgot-desc">Enter your email to receive a password reset link.</p>
-                <input type="email" id="forgot-email" placeholder="Email address" class="forgot-input">
-                <button class="btn btn-primary btn-block" id="send-reset-btn">Send Reset Link</button>
-                <div id="forgot-msg" class="forgot-msg" style="display:none"></div>
             </div>
+
+            <div id="login-error" class="alert-banner" style="display:none"></div>
+
+            <button type="submit" class="btn btn-primary v-btn-primary btn-block" id="login-btn">Sign in</button>
+        </form>
+
+        <div class="auth-footer-links">
+            <div class="auth-divider"><span>or</span></div>
+            <a href="/auth/signup" class="btn btn-glass btn-block">Create a patient account</a>
+            <p class="auth-admin-note">Doctors and riders: contact your administrator for initial access.</p>
+        </div>
+
+        <!-- Forgot Password Panel -->
+        <div id="forgot-panel" class="forgot-panel" style="display:none">
+            <div class="forgot-panel-header">
+                <h3>Reset password</h3>
+                <button type="button" class="forgot-close" id="cancel-reset-btn" aria-label="Close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <p class="forgot-desc">Enter your email to receive a password reset link.</p>
+            <input type="email" id="forgot-email" placeholder="Email address" class="forgot-input">
+            <button class="btn btn-primary v-btn-primary btn-block" id="send-reset-btn">Send Reset Link</button>
+            <div id="forgot-msg" class="forgot-msg" style="display:none"></div>
         </div>
     </div>
 </div>
 
 <style>
-    body { margin: 0; padding: 0; background: var(--bg); }
+    body { margin: 0; padding: 0; background: transparent; }
 
-    .auth-layout {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+    .auth-page-centered {
         min-height: 100vh;
-    }
-
-    /* Brand Panel */
-    .auth-brand {
-        background: linear-gradient(135deg, var(--slate-900) 0%, #0A3146 100%);
         display: flex;
         align-items: center;
         justify-content: center;
+        padding: var(--space-6);
+        position: relative;
+        z-index: 10;
+        animation: fadeIn 0.4s ease-out;
+    }
+
+    .auth-glass-card {
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        border-radius: var(--radius-2xl);
         padding: 3rem;
+        width: 100%;
+        max-width: 440px;
+        box-shadow: var(--shadow-xl);
         position: relative;
         overflow: hidden;
     }
-    .auth-brand::before {
-        content: "";
-        position: absolute;
-        top: -30%;
-        right: -20%;
-        width: 60%;
-        height: 100%;
-        background: radial-gradient(ellipse, rgba(34,211,238,.18) 0%, transparent 70%);
-        pointer-events: none;
-    }
-    .auth-brand-content {
-        position: relative;
-        z-index: 2;
-        max-width: 400px;
-    }
-    .auth-brand-logo {
-        display: inline-flex;
-        align-items: center;
-        gap: .625rem;
-        text-decoration: none;
-        margin-bottom: 2.5rem;
-    }
-    .auth-brand-logo span {
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: #fff;
-    }
-    .auth-brand h2 {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #fff;
-        margin: 0 0 .75rem;
-        letter-spacing: -0.02em;
-    }
-    .auth-brand > .auth-brand-content > p {
-        font-size: 1rem;
-        color: rgba(255,255,255,.6);
-        line-height: 1.6;
-        margin: 0 0 2rem;
-    }
-    .auth-brand-features {
-        display: flex;
-        flex-direction: column;
-        gap: .875rem;
-    }
-    .auth-brand-feat {
-        display: flex;
-        align-items: center;
-        gap: .625rem;
-        color: rgba(255,255,255,.8);
-        font-size: .875rem;
-        font-weight: 500;
-    }
-    .auth-brand-feat svg { color: #67E8F9; flex-shrink: 0; }
 
-    /* Form Panel */
-    .auth-form-panel {
+    .auth-logo-center {
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2rem;
-        background: var(--surface);
-    }
-    .auth-form-inner {
-        width: 100%;
-        max-width: 400px;
-    }
-    .auth-form-header { margin-bottom: 1.75rem; }
-    .auth-form-header h1 {
+        gap: 0.75rem;
+        margin-bottom: 2rem;
+        text-decoration: none;
+        font-family: var(--font-heading);
+        font-weight: 800;
         font-size: 1.5rem;
-        font-weight: 700;
+        color: var(--slate-900);
+        letter-spacing: -0.02em;
+    }
+
+    .auth-form-header { text-align: center; margin-bottom: 2rem; }
+    .auth-form-header h1 {
+        font-family: var(--font-heading);
+        font-size: 1.75rem;
+        font-weight: 800;
         color: var(--text);
-        margin: 0 0 .375rem;
+        margin: 0 0 0.5rem;
+        letter-spacing: -0.02em;
     }
     .auth-form-header p {
-        font-size: var(--text-sm);
-        color: var(--text-muted);
+        font-size: var(--text-base);
+        color: var(--text-secondary);
         margin: 0;
     }
 
     /* Role Toggle */
     .role-toggle {
         display: flex;
-        background: var(--slate-100);
-        border-radius: 10px;
+        background: rgba(226, 232, 240, 0.5);
+        border-radius: 12px;
         padding: 4px;
         margin-bottom: 1.5rem;
         gap: 4px;
     }
     .role-pill {
         flex: 1;
-        padding: .5rem;
+        padding: 0.625rem;
         border: none;
         background: transparent;
-        color: var(--text-secondary);
-        font-weight: 500;
+        color: var(--slate-600);
+        font-family: var(--font);
+        font-weight: 600;
         font-size: var(--text-sm);
         cursor: pointer;
         border-radius: 8px;
-        transition: all .2s ease;
+        transition: all var(--duration-fast) ease;
     }
     .role-pill.active {
-        background: var(--surface);
+        background: #ffffff;
         color: var(--primary);
-        box-shadow: 0 1px 3px rgba(0,0,0,.08);
-        font-weight: 600;
+        box-shadow: var(--shadow-sm);
     }
-    .role-pill:hover:not(.active) { color: var(--text); }
+    .role-pill:hover:not(.active) { color: var(--slate-900); }
 
     /* Form Groups */
-    .form-group { margin-bottom: 1.125rem; }
+    .form-group { margin-bottom: 1.25rem; }
     .form-group label {
         display: block;
         font-size: var(--text-sm);
-        font-weight: 500;
-        color: var(--text);
-        margin-bottom: .375rem;
+        font-weight: 600;
+        color: var(--slate-700);
+        margin-bottom: 0.5rem;
     }
     .label-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: .375rem;
+        margin-bottom: 0.5rem;
     }
     .label-row label { margin-bottom: 0; }
     .link-subtle {
@@ -243,35 +191,33 @@
         border: none;
         color: var(--primary);
         font-size: var(--text-xs);
-        font-weight: 500;
+        font-weight: 600;
         cursor: pointer;
         padding: 0;
     }
-    .link-subtle:hover { text-decoration: underline; }
+    .link-subtle:hover { text-decoration: underline; color: var(--primary-hover); }
     .form-group input {
         width: 100%;
-        padding: .75rem 1rem;
-        border: 1px solid var(--border);
-        border-radius: 10px;
+        padding: 0.875rem 1rem;
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        border-radius: 12px;
         font-size: var(--text-base);
         font-family: var(--font);
         box-sizing: border-box;
-        min-height: 44px;
-        transition: border-color .15s, box-shadow .15s;
-        background: var(--surface);
+        transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+        background: rgba(255,255,255,0.9);
         color: var(--text);
     }
     .form-group input:focus {
         outline: none;
         border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(34,211,238,.16);
+        box-shadow: 0 0 0 3px rgba(14,165,233,0.15);
     }
-    .form-group input::placeholder { color: var(--text-muted); }
     .input-password-wrap { position: relative; }
     .input-password-wrap input { padding-right: 3rem; }
     .password-toggle {
         position: absolute;
-        right: .75rem;
+        right: 0.75rem;
         top: 50%;
         transform: translateY(-50%);
         background: none;
@@ -283,137 +229,138 @@
     }
     .password-toggle:hover { background: var(--slate-100); }
 
-    /* Alert */
     .alert-banner {
         background: var(--danger-bg);
         border: 1px solid var(--danger-light);
         color: var(--danger);
-        padding: .75rem 1rem;
+        padding: 0.75rem 1rem;
         border-radius: 10px;
         font-size: var(--text-sm);
         margin-bottom: 1rem;
         line-height: 1.5;
     }
 
-    /* Buttons */
     .btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: .75rem 1.25rem;
-        border-radius: 10px;
+        padding: 0.875rem 1.25rem;
+        border-radius: 12px;
         font-weight: 600;
         font-size: var(--text-base);
         font-family: var(--font);
         cursor: pointer;
         border: none;
-        min-height: 44px;
-        transition: all .15s ease;
+        min-height: 48px;
+        transition: all var(--duration-fast) var(--ease-bounce);
+        text-decoration: none;
     }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover { background: var(--primary-hover); }
-    .btn-outline {
-        background: var(--surface);
-        color: var(--text);
-        border: 1px solid var(--border);
+    .v-btn-primary {
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        color: white;
+        box-shadow: 0 4px 12px rgba(14,165,233,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
     }
-    .btn-outline:hover { border-color: var(--slate-300); background: var(--slate-50); }
+    .v-btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(14,165,233,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+        color: white;
+    }
+    .btn-glass {
+        background: rgba(255,255,255,0.6);
+        border: 1px solid rgba(255,255,255,0.8);
+        color: var(--slate-800);
+    }
+    .btn-glass:hover {
+        background: rgba(255,255,255,0.9);
+        color: var(--primary);
+    }
     .btn-block { width: 100%; }
 
-    /* Footer links */
-    .auth-footer-links { margin-top: 1.5rem; }
+    .auth-footer-links { margin-top: 2rem; }
     .auth-divider {
         display: flex;
         align-items: center;
-        gap: .75rem;
-        margin-bottom: 1rem;
-        color: var(--text-muted);
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+        color: var(--slate-400);
         font-size: var(--text-xs);
+        font-weight: 600;
+        text-transform: uppercase;
     }
     .auth-divider::before, .auth-divider::after {
         content: "";
         flex: 1;
         height: 1px;
-        background: var(--border);
+        background: rgba(226,232,240,0.8);
     }
     .auth-admin-note {
         text-align: center;
         font-size: var(--text-xs);
-        color: var(--text-muted);
-        margin: 1rem 0 0;
+        color: var(--slate-500);
+        margin: 1.25rem 0 0;
     }
 
     /* Forgot Panel */
     .forgot-panel {
         position: absolute;
         inset: 0;
-        background: var(--surface);
-        padding: 2rem;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(24px);
+        padding: 3rem;
         display: flex;
         flex-direction: column;
         justify-content: center;
         z-index: 10;
-        animation: fadeIn .2s ease-out;
+        animation: fadeIn 0.2s ease-out;
     }
-    .auth-form-inner { position: relative; }
     .forgot-panel-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: .5rem;
+        margin-bottom: 1rem;
     }
     .forgot-panel-header h3 {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: var(--text);
+        font-family: var(--font-heading);
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--slate-900);
         margin: 0;
     }
     .forgot-close {
         background: none;
         border: none;
         cursor: pointer;
-        color: var(--text-muted);
+        color: var(--slate-400);
         padding: 4px;
         border-radius: 6px;
     }
-    .forgot-close:hover { background: var(--slate-100); color: var(--text); }
+    .forgot-close:hover { background: var(--slate-100); color: var(--slate-800); }
     .forgot-desc {
         font-size: var(--text-sm);
-        color: var(--text-secondary);
-        margin: 0 0 1.25rem;
+        color: var(--slate-600);
+        margin: 0 0 1.5rem;
     }
     .forgot-input {
         width: 100%;
-        padding: .75rem 1rem;
-        border: 1px solid var(--border);
-        border-radius: 10px;
+        padding: 0.875rem 1rem;
+        border: 1px solid rgba(226,232,240,0.8);
+        border-radius: 12px;
         font-size: var(--text-base);
         font-family: var(--font);
         box-sizing: border-box;
-        min-height: 44px;
-        margin-bottom: 1rem;
-        background: var(--surface);
-        color: var(--text);
+        margin-bottom: 1.25rem;
+        background: rgba(255,255,255,0.9);
     }
     .forgot-input:focus {
         outline: none;
         border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(34,211,238,.16);
-    }
-    .forgot-msg {
-        font-size: var(--text-sm);
-        padding: .75rem;
-        border-radius: 8px;
-        margin-top: .75rem;
+        box-shadow: 0 0 0 3px rgba(14,165,233,0.15);
     }
 
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* Responsive */
-    @media(max-width: 768px) {
-        .auth-layout { grid-template-columns: 1fr; }
-        .auth-brand { display: none; }
-        .auth-form-panel { min-height: 100vh; padding: 1.5rem; }
+    @media(max-width: 480px) {
+        .auth-glass-card { padding: 2rem 1.5rem; }
     }
 </style>
 
@@ -477,7 +424,7 @@
 
     // Forgot password
     document.getElementById("forgot-btn").addEventListener("click", function() {
-        document.getElementById("forgot-panel").style.display = "";
+        document.getElementById("forgot-panel").style.display = "flex";
         document.getElementById("forgot-email").value = document.getElementById("email").value;
         document.getElementById("forgot-email").focus();
     });

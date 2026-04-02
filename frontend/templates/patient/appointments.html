@@ -25,10 +25,11 @@
     }
 
     .page-title {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: var(--text);
+        font-size: clamp(2rem, 3vw, 2.5rem);
+        font-weight: 800;
+        color: var(--slate-900);
         margin: 0 0 1rem;
+        letter-spacing: -0.02em;
     }
 
     .tab-bar {
@@ -57,16 +58,20 @@
     }
 
     .appt-card {
-        background: var(--surface, #fff);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.25rem;
-        margin-bottom: .75rem;
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        border-radius: var(--radius-2xl);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        box-shadow: var(--shadow-card);
+        box-shadow: var(--shadow-md);
+        transition: transform 0.2s, box-shadow 0.2s;
     }
+    .appt-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-xl); }
 
     .appt-left {
         display: flex;
@@ -92,9 +97,9 @@
     }
 
     .date-block.confirmed {
-        background: var(--success-bg);
-        color: var(--success);
-        border: 1px solid var(--success-light);
+        background: var(--primary-subtle);
+        color: var(--primary);
+        border: 1px solid var(--primary-light);
     }
 
     .date-block.pending {
@@ -131,8 +136,8 @@
     }
 
     .status-confirmed {
-        background: var(--success-bg);
-        color: var(--success);
+        background: var(--primary-subtle);
+        color: var(--primary);
     }
 
     .status-pending {
@@ -157,12 +162,13 @@
     }
 
     .btn-primary {
-        background: var(--primary);
-        color: #fff;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        color: #fff; box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
     }
 
     .btn-primary:hover {
-        background: var(--primary-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(14, 165, 233, 0.4);
     }
 
     .btn-disabled {
@@ -185,17 +191,19 @@
     }
 
     .alt-chip {
-        border: 1px solid var(--border);
-        background: var(--surface);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        background: rgba(255, 255, 255, 0.6);
         border-radius: var(--radius-full, 999px);
-        font-size: .6875rem;
-        padding: .2rem .5rem;
+        font-size: .75rem;
+        padding: .3rem .75rem;
         cursor: pointer;
+        transition: all 0.2s;
     }
 
     .alt-chip:hover {
         border-color: var(--primary);
         color: var(--primary);
+        background: rgba(255, 255, 255, 0.9);
     }
 
     .text-center { text-align: center; }

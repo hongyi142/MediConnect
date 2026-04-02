@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}MediConnect{% endblock %}</title>
 
-  <!-- Google Fonts - Instrument Sans -->
+  <!-- Google Fonts - Outfit & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Main stylesheet -->
   <link rel="stylesheet" href="/static/css/main.css">
@@ -93,6 +93,15 @@
 
   <!-- Toast container -->
   <div id="toast-container" style="position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:var(--z-toast, 500);"></div>
+
+  <!-- Dynamic Background (default: subtle mesh) -->
+  {% block dynamic_bg %}
+  <div class="bg-mesh-subtle">
+    <div class="bg-mesh-blob bg-mesh-blob-1"></div>
+    <div class="bg-mesh-blob bg-mesh-blob-2"></div>
+    <div class="bg-mesh-blob bg-mesh-blob-3"></div>
+  </div>
+  {% endblock %}
 
   <!-- Navbar auth-state listener + scroll effect -->
   <script>
@@ -225,6 +234,17 @@
         toast.style.transform = "translateY(12px)";
         setTimeout(function() { toast.remove(); }, 300);
       }, 3500);
+    }
+
+    function fmtDate(val) {
+      var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+        var p = val.split("-");
+        return p[2] + " " + months[parseInt(p[1], 10) - 1] + " " + p[0];
+      }
+      var d = (val instanceof Date) ? val : new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      return d.getDate().toString().padStart(2, "0") + " " + months[d.getMonth()] + " " + d.getFullYear();
     }
 
     function showError(container, message) {

@@ -60,9 +60,12 @@
     .symptom-page {
         max-width: 1000px;
         margin: 0 auto;
-        padding: 2rem 1.5rem;
-        padding-top: var(--navbar-height);
+        padding: 2.5rem 1.5rem;
+        padding-top: calc(var(--navbar-height) + 2rem);
         font-family: var(--font);
+        position: relative;
+        z-index: 10;
+        animation: fadeIn 0.4s ease-out;
     }
 
     .symptom-page-header {
@@ -70,10 +73,11 @@
     }
 
     .symptom-page-title {
-        font-size: var(--text-2xl);
-        font-weight: 700;
-        color: var(--text);
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--slate-900);
         margin: 0 0 0.25rem;
+        letter-spacing: -0.02em;
     }
 
     .symptom-page-subtitle {
@@ -91,11 +95,13 @@
 
     /* Card */
     .symptom-card {
-        background: var(--surface, #fff);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.5rem;
-        box-shadow: var(--shadow-card);
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        border-radius: var(--radius-2xl);
+        padding: 2rem;
+        box-shadow: var(--shadow-xl);
     }
 
     .symptom-card-header {
@@ -121,30 +127,34 @@
     }
 
     .symptom-tag {
-        padding: 0.4375rem 0.875rem;
+        padding: 0.5rem 1rem;
         border-radius: var(--radius-full, 999px);
-        border: 1px solid var(--border);
-        background: var(--surface, #fff);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        background: rgba(255, 255, 255, 0.6);
         font-size: var(--text-sm);
         font-family: var(--font);
         cursor: pointer;
-        transition: all 0.15s ease;
-        color: var(--text);
-        min-height: 36px;
+        transition: all var(--duration-default) var(--ease-bounce);
+        color: var(--slate-700);
+        min-height: 40px;
         display: inline-flex;
         align-items: center;
+        backdrop-filter: blur(8px);
     }
 
     .symptom-tag:hover:not(.active) {
-        border-color: var(--primary);
-        color: var(--primary);
-        background: var(--primary-subtle);
+        border-color: #fff;
+        color: var(--primary-dark);
+        background: rgba(255, 255, 255, 0.9);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
     }
 
     .symptom-tag.active {
-        background: var(--primary);
-        color: var(--text-inverse, #fff);
-        border-color: var(--primary);
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        color: #fff;
+        border-color: transparent;
+        box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
     }
 
     /* Selected badges */
@@ -202,16 +212,16 @@
 
     .symptom-form-group textarea {
         width: 100%;
-        padding: 0.625rem 0.75rem;
-        border: 1px solid var(--border);
-        border-radius: var(--radius-md);
+        padding: 0.75rem 1rem;
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        border-radius: var(--radius-xl);
         font-size: var(--text-base);
         font-family: var(--font);
         resize: vertical;
         box-sizing: border-box;
-        min-height: 44px;
-        color: var(--text);
-        background: var(--surface, #fff);
+        min-height: 56px;
+        color: var(--slate-800);
+        background: rgba(255, 255, 255, 0.8);
         transition: border-color 0.15s, box-shadow 0.15s;
     }
 
@@ -251,12 +261,14 @@
     }
 
     .symptom-btn-primary {
-        background: var(--primary);
-        color: var(--text-inverse, #fff);
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
     }
 
     .symptom-btn-primary:hover {
-        background: var(--primary-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(14, 165, 233, 0.4);
     }
 
     .symptom-btn-primary:focus-visible {
@@ -391,6 +403,8 @@
     }
 
     /* Responsive */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
     @media (max-width: 768px) {
         .symptom-grid {
             grid-template-columns: 1fr;
@@ -398,7 +412,7 @@
 
         .symptom-page {
             padding: 1rem;
-            padding-top: var(--navbar-height);
+            padding-top: calc(var(--navbar-height) + 1rem);
         }
     }
 </style>

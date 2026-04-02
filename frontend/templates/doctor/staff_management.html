@@ -34,38 +34,43 @@
 </div>
 
 <style>
-    .page-container{max-width:900px;margin:0 auto;padding:var(--navbar-height) 1.5rem 2rem}
-    .page-title{font-size:var(--text-2xl);font-weight:var(--weight-semibold);color:var(--text);margin:0 0 1rem}
+    .page-container{max-width:960px;margin:0 auto;padding:var(--navbar-height) 1.5rem 3rem}
+    .page-title{font-size:clamp(2rem, 3vw, 2.5rem);font-weight:800;color:var(--slate-900);margin:1.5rem 0;letter-spacing:-0.02em;font-family:var(--font-heading)}
     .tab-bar{display:flex;border-bottom:2px solid var(--border);margin-bottom:1.5rem}
     .tab{padding:.625rem 1.25rem;background:none;border:none;font-family:var(--font);font-size:var(--text-base);font-weight:var(--weight-medium);color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all var(--duration-fast)}
     .tab:hover{color:var(--primary)}
     .tab.active{color:var(--primary);border-bottom-color:var(--primary)}
-    .table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
-    .table-header h2{font-size:var(--text-lg);font-weight:var(--weight-semibold);color:var(--text);margin:0}
-    .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-card)}
+    .table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem}
+    .table-header h2{font-size:var(--text-xl);font-weight:700;color:var(--slate-800);margin:0;letter-spacing:-0.01em;font-family:var(--font-heading)}
+    .table-wrap{background:rgba(255, 255, 255, 0.75);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255, 255, 255, 0.9);border-radius:var(--radius-2xl);overflow:hidden;box-shadow:var(--shadow-lg);padding:1rem}
     .data-table{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
-    .data-table th{text-align:left;padding:.75rem 1rem;background:var(--slate-50);color:var(--text-secondary);font-weight:var(--weight-medium);border-bottom:1px solid var(--border)}
-    .data-table td{padding:.75rem 1rem;border-bottom:1px solid var(--border-light);color:var(--text)}
+    .data-table th{text-align:left;padding:1rem 1.25rem;background:rgba(248, 250, 252, 0.5);color:var(--slate-500);font-weight:700;border-bottom:2px solid rgba(226, 232, 240, 0.8);text-transform:uppercase;letter-spacing:0.05em;font-size:var(--text-xs)}
+    .data-table td{padding:1rem 1.25rem;border-bottom:1px solid rgba(226, 232, 240, 0.5);color:var(--slate-800)}
+    .data-table tr:hover td{background:rgba(255,255,255,0.4)}
     .data-table tr:last-child td{border:none}
-    .status-available{color:var(--success);font-weight:var(--weight-medium)}.status-busy{color:var(--warning);font-weight:var(--weight-medium)}
-    .btn{padding:.5rem 1rem;border-radius:var(--radius-md);font-family:var(--font);font-weight:var(--weight-semibold);font-size:var(--text-sm);cursor:pointer;border:none;min-height:44px;transition:all var(--duration-fast)}
-    .btn-primary{background:var(--primary);color:var(--text-inverse)}.btn-primary:hover{background:var(--primary-hover)}
-    .btn-secondary{background:var(--surface);color:var(--primary);border:1px solid var(--primary)}
-    .btn-secondary:hover{background:var(--primary-subtle)}
-    .btn-sm{padding:.375rem .75rem;font-size:var(--text-sm);min-height:36px}
-    .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:var(--z-modal);padding:1rem}
-    .modal-card{background:var(--surface);border-radius:var(--radius-lg);width:100%;max-width:440px;box-shadow:var(--shadow-xl)}
-    .modal-header{display:flex;justify-content:space-between;align-items:center;padding:1.25rem 1.5rem;border-bottom:1px solid var(--border)}
-    .modal-header h3{margin:0;font-size:var(--text-lg);font-weight:var(--weight-semibold);color:var(--text)}
-    .modal-close{background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-secondary);padding:0;line-height:1;transition:color var(--duration-fast)}
-    .modal-close:hover{color:var(--text)}
-    .modal-body{padding:1.5rem}
-    .modal-footer{padding:.75rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:.5rem}
+    .status-available{color:var(--success);font-weight:600;background:var(--success-bg);padding:0.25rem 0.5rem;border-radius:var(--radius-full);font-size:0.75rem}
+    .status-busy{color:var(--warning);font-weight:600;background:var(--warning-bg);padding:0.25rem 0.5rem;border-radius:var(--radius-full);font-size:0.75rem}
+    .status-offline{color:var(--text-muted);font-weight:600;background:var(--slate-100);padding:0.25rem 0.5rem;border-radius:var(--radius-full);font-size:0.75rem}
+    .btn{padding:.625rem 1.25rem;border-radius:var(--radius-md);font-family:var(--font);font-weight:600;font-size:var(--text-sm);cursor:pointer;border:none;min-height:44px;transition:all var(--duration-fast);display:inline-flex;align-items:center;justify-content:center}
+    .btn-primary{background:linear-gradient(135deg, var(--primary), var(--accent));color:#fff;box-shadow:0 4px 12px rgba(14, 165, 233, 0.3)}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(14, 165, 233, 0.4)}
+    .btn-secondary{background:rgba(255,255,255,0.6);color:var(--slate-800);border:1px solid rgba(226, 232, 240, 0.8)}
+    .btn-secondary:hover{background:rgba(255,255,255,0.9);border-color:var(--primary);color:var(--primary)}
+    .btn-sm{padding:.375rem .75rem;font-size:var(--text-xs);min-height:32px;border-radius:var(--radius-sm)}
+
+    .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:var(--z-modal);padding:1rem}
+    .modal-card{background:rgba(255, 255, 255, 0.85);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.9);border-radius:var(--radius-2xl);width:100%;max-width:480px;box-shadow:var(--shadow-2xl)}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;padding:1.5rem 2rem;border-bottom:1px solid rgba(226, 232, 240, 0.6)}
+    .modal-header h3{margin:0;font-size:var(--text-xl);font-weight:700;color:var(--slate-900);letter-spacing:-0.01em}
+    .modal-close{background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-muted);padding:0;transition:color var(--duration-fast)}
+    .modal-close:hover{color:var(--slate-900)}
+    .modal-body{padding:2rem}
+    .modal-footer{padding:1.25rem 2rem;border-top:1px solid rgba(226, 232, 240, 0.6);display:flex;justify-content:flex-end;gap:0.75rem;background:rgba(248, 250, 252, 0.5);border-radius:0 0 var(--radius-2xl) var(--radius-2xl)}
     .form-group{margin-bottom:1rem}
-    .form-group label{display:block;font-size:var(--text-base);font-weight:var(--weight-medium);margin-bottom:.375rem;color:var(--text)}
-    .form-group input,.form-group select{width:100%;padding:.625rem;border:1px solid var(--border);border-radius:var(--radius-md);font-family:var(--font);font-size:var(--text-base);box-sizing:border-box;min-height:44px;color:var(--text);background:var(--surface);transition:border-color var(--duration-fast),box-shadow var(--duration-fast)}
-    .form-group input:focus,.form-group select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(34,211,238,.16)}
-    .alert-error{background:var(--danger-bg);border:1px solid var(--danger-light);color:var(--danger);padding:.75rem;border-radius:var(--radius-md);font-size:var(--text-base);margin:0 1.5rem 1rem}
+    .form-group label{display:block;font-size:var(--text-sm);font-weight:600;margin-bottom:.375rem;color:var(--slate-700)}
+    .form-group input,.form-group select{width:100%;padding:.625rem .75rem;border:1px solid rgba(226, 232, 240, 0.8);border-radius:var(--radius-md);font-size:var(--text-sm);box-sizing:border-box;min-height:44px;font-family:var(--font);transition:border-color var(--duration-fast),box-shadow var(--duration-fast);background:rgba(255,255,255,0.8)}
+    .form-group input:focus,.form-group select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(14, 165, 233, 0.16)}
+    .alert-error{background:var(--danger-bg);border:1px solid var(--danger-light);color:var(--danger);padding:.75rem;border-radius:var(--radius-md);font-size:var(--text-sm);margin:0 0 1rem}
     .text-muted{color:var(--text-muted);text-align:center;padding:1rem}.mt-2{margin-top:.5rem}
 </style>
 
@@ -96,7 +101,7 @@
             var docs = data.doctors || data || [];
             if (!docs.length) { document.getElementById("doctors-body").innerHTML = '<tr><td colspan="4" class="text-muted">No doctors found.</td></tr>'; return; }
             document.getElementById("doctors-body").innerHTML = docs.map(function(d) {
-                return '<tr><td>' + (d.name||"") + '</td><td>' + (d.specialisation||"") + '</td><td>' + (d.email||"") + '</td><td class="status-' + (d.status||"available") + '">' + (d.status||"available") + '</td></tr>';
+                return '<tr><td>' + (d.name||"") + '</td><td>' + (d.specialisation||"") + '</td><td>' + (d.email||"") + '</td><td><span class="status-' + (d.status||"available") + '">' + (d.status||"available") + '</span></td></tr>';
             }).join("");
         } catch(e) { document.getElementById("doctors-body").innerHTML = '<tr><td colspan="4" class="text-muted">Could not load doctors.</td></tr>'; }
     }
@@ -109,7 +114,7 @@
             var riders = data.data || data || [];
             if (!riders.length) { document.getElementById("riders-body").innerHTML = '<tr><td colspan="4" class="text-muted">No riders found.</td></tr>'; return; }
             document.getElementById("riders-body").innerHTML = riders.map(function(r) {
-                return '<tr><td>' + (r.name||"") + '</td><td>' + (r.email||"") + '</td><td>' + (r.phone||"") + '</td><td class="status-' + (r.status||"available") + '">' + (r.status||"available") + '</td></tr>';
+                return '<tr><td>' + (r.name||"") + '</td><td>' + (r.email||"") + '</td><td>' + (r.phone||"") + '</td><td><span class="status-' + (r.status||"available") + '">' + (r.status||"available") + '</span></td></tr>';
             }).join("");
         } catch(e) { document.getElementById("riders-body").innerHTML = '<tr><td colspan="4" class="text-muted">Could not load riders.</td></tr>'; }
     }
