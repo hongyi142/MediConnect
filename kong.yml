@@ -206,6 +206,14 @@ services:
           - /available-medications
         strip_path: false
 
+  - name: tracking-service
+    url: http://tracking-service:5050
+    routes:
+      - name: tracking-routes
+        paths:
+          - /socket.io
+        strip_path: false
+
 # ──────────────────────────────────────────────
 #  Global Plugins
 # ──────────────────────────────────────────────

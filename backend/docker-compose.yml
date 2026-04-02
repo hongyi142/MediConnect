@@ -68,3 +68,12 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+
+  tracking-service:
+    build: ./tracking-service
+    ports:
+      - "5050:5050"
+    environment:
+      DELIVERY_SERVICE_URL: http://delivery:5000
+    depends_on:
+      - delivery

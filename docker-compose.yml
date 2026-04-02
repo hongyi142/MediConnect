@@ -258,6 +258,18 @@ services:
     depends_on:
       - delivery-service
 
+  tracking-service:
+    build: ./backend/tracking-service
+    container_name: tracking-service
+    environment:
+      - DELIVERY_SERVICE_URL=http://delivery-service:5000
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      delivery-service:
+        condition: service_started
+
   # ──── Frontend ───────────────────────────────────────────
   frontend:
     build: ./frontend
