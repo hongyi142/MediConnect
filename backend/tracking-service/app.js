@@ -137,6 +137,13 @@ io.on('connection', (socket) => {
           }
         } catch (error) {
           console.error(`[Tracking] OSRM Error for ${deliveryID}:`, error.message);
+          const distMeters = getDistance(lat, lng, context.patientLat, context.patientLng);
+          if (distMeters > 50000) {
+            context.lastEta = "99+";
+          } else {
+            context.lastEta = Math.max(1, Math.ceil((distMeters / 11.1) / 60));
+          }
+          context.lastEtaTime = now;
         }
       }
     }

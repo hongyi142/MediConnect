@@ -3,6 +3,8 @@
 
 {% block extra_head %}
 <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 {% endblock %}
 
 {% block content %}
@@ -41,6 +43,18 @@
                             <div class="refund-banner__desc">Unfortunately, no available rider accepted your delivery within the time window. Your payment has been automatically refunded. Please allow 5&ndash;10 business days for the amount to reflect in your account.</div>
                         </div>
                     </div>
+                    <div id="success-banner" class="success-banner" style="display:none">
+                        <div class="success-banner__icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                        </div>
+                        <div class="success-banner__body">
+                            <div class="success-banner__title">Delivery Successful</div>
+                            <div class="success-banner__desc">Your medication has been delivered. Thank you for using MediConnect!</div>
+                        </div>
+                    </div>
                     <div id="qr-section" style="display:none" class="qr-section">
                         <h3>Delivery QR Code</h3>
                         <p class="qr-desc">Show this QR to your rider upon delivery.</p>
@@ -52,6 +66,10 @@
                 <div class="card">
                     <h2>Order Details</h2>
                     <div id="order-summary"><p class="text-muted">Loading...</p></div>
+                </div>
+                <div class="card" id="map-card" style="display:none; margin-top: 1.5rem; padding: 1.5rem;">
+                    <h2 style="font-size: var(--text-base); margin-bottom: 0.75rem;">Live Tracking</h2>
+                    <div id="tracking-map" style="height: 250px; width: 100%; border-radius: var(--radius-md); z-index: 1;"></div>
                 </div>
             </div>
         </div>
@@ -123,6 +141,23 @@
         line-height: 1.55;
     }
 
+    /* Success Banner */
+    .success-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        background: var(--success-bg);
+        border: 1px solid var(--success-light);
+        border-radius: var(--radius-md);
+        padding: 1rem 1.125rem;
+        margin-top: 1.25rem;
+        animation: refundFadeIn .4s ease-out;
+    }
+    .success-banner__icon { flex-shrink: 0; color: var(--success); margin-top: 1px; }
+    .success-banner__body { flex: 1; }
+    .success-banner__title { font-size: var(--text-sm); font-weight: 700; color: var(--success); margin-bottom: .25rem; }
+    .success-banner__desc { font-size: var(--text-xs); color: var(--success); opacity: .85; line-height: 1.55; }
+
     /* Refunded stepper state overrides */
     .step-row.refunded .step-indicator {
         border-color: var(--danger);
@@ -162,6 +197,26 @@
     var qrLoadedForDeliveryID = null;
     var trackingSocket = null;
     var trackingDeliveryID = null;
+    var leafletMap = null;
+    var riderMarker = null;
+    var patientMarker = null;
+
+    function initMap(lat, lng) {
+        if (!leafletMap && lat && lng) {
+            document.getElementById("map-card").style.display = "block";
+            leafletMap = L.map('tracking-map').setView([lat, lng], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(leafletMap);
+            
+            var redIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+            });
+            patientMarker = L.marker([lat, lng], {icon: redIcon}).addTo(leafletMap).bindPopup('Delivery Destination');
+        }
+    }
 
     function initTrackingSocket(deliveryID) {
         if (trackingSocket && trackingDeliveryID === deliveryID) return;
@@ -186,6 +241,16 @@
             var etaSpan = document.getElementById("rider-eta");
             if (etaSpan && data.eta) {
                 etaSpan.innerHTML = "Live ETA: <strong>" + data.eta + " mins</strong>";
+            }
+            if (leafletMap && data.lat && data.lng) {
+                var newPos = [data.lat, data.lng];
+                if (!riderMarker) {
+                    riderMarker = L.marker(newPos).addTo(leafletMap).bindPopup('Rider');
+                    var group = new L.featureGroup([patientMarker, riderMarker]);
+                    leafletMap.fitBounds(group.getBounds(), {padding: [30, 30]});
+                } else {
+                    riderMarker.setLatLng(newPos);
+                }
             }
         });
     }
@@ -350,21 +415,28 @@
                         setAssignedStepCopy((dStatus === "pending" || dStatus === "ready" || dStatus === "awaiting_rider" || dStatus === "searching_rider") && !(d.riderID || d.riderName));
                         var deliveryStep = mapDeliveryStatusToStep(d.status, !!(d.riderID || d.riderName));
                         if (targetStep !== "refunded" && stepRank(deliveryStep) > stepRank(targetStep)) targetStep = deliveryStep;
-                        if (d.riderID || d.riderName) {
+
+                        var isCompleted = (dStatus === "completed" || dStatus === "delivered");
+                        if ((d.riderID || d.riderName) && !isCompleted) {
                             riderShown = true;
                             setAssignedStepCopy(false);
                             document.getElementById("rider-card").style.display = "flex";
                             if (d.riderName) document.getElementById("rider-name").textContent = d.riderName + " is on the way!";
                             if (d.deliveryID) initTrackingSocket(d.deliveryID);
                         }
-                        if (d.qrCode) {
+                        if (d.qrCode && !isCompleted) {
                             document.getElementById("qr-section").style.display = "";
                             document.getElementById("qr-display").innerHTML = '<img src="' + resolveQrImageSrc(d.qrCode) + '" alt="Delivery QR Code">';
                             qrLoadedForDeliveryID = String(d.deliveryID || "");
+                        } else if (isCompleted) {
+                            document.getElementById("qr-section").style.display = "none";
                         }
                         if (d.deliveryID) {
                             sessionStorage.setItem("deliveryID", d.deliveryID);
-                            if (!d.qrCode) {
+                            if (d.patientLat && d.patientLng) {
+                                initMap(d.patientLat, d.patientLng);
+                            }
+                            if (!d.qrCode && !isCompleted) {
                                 await ensureQrCode(d.deliveryID);
                             }
                         }
@@ -382,7 +454,13 @@
                 document.getElementById("refund-banner").style.display = "none";
                 if (stepRank(targetStep) < stepRank("assigned")) setAssignedStepCopy(true);
                 if (!riderShown) document.getElementById("rider-card").style.display = "none";
-                if (targetStep === "delivered" && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                if (targetStep === "delivered") {
+                    document.getElementById("qr-section").style.display = "none";
+                    document.getElementById("success-banner").style.display = "flex";
+                    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                } else {
+                    document.getElementById("success-banner").style.display = "none";
+                }
             }
             updateStepper(targetStep);
             setLastUpdated();
@@ -453,8 +531,14 @@
             var ind = row.querySelector(".step-indicator");
             row.classList.remove("active");
             ind.classList.remove("done", "current");
-            if (i < activeIdx) { ind.classList.add("done"); }
-            else if (i === activeIdx) { ind.classList.add("current"); row.classList.add("active"); }
+            if (i < activeIdx) { 
+                ind.classList.add("done"); 
+            }
+            else if (i === activeIdx) { 
+                if (activeStep === "delivered") ind.classList.add("done");
+                else ind.classList.add("current"); 
+                row.classList.add("active"); 
+            }
         });
     }
 </script>
