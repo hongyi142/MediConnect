@@ -266,7 +266,8 @@
     });
 
     function initPage(user) {
-        var rawOrder = sessionStorage.getItem("completionData") || sessionStorage.getItem("orderData");
+        // Prefer the latest dashboard-selected order; fallback to completion flow data.
+        var rawOrder = sessionStorage.getItem("orderData") || sessionStorage.getItem("completionData");
         if (rawOrder) {
             try {
                 var data = JSON.parse(rawOrder);

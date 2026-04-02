@@ -463,6 +463,8 @@
                     };
                 })
             };
+            // Avoid stale completion flow data overriding the chosen order.
+            sessionStorage.removeItem("completionData");
             sessionStorage.setItem("orderData", JSON.stringify(orderData));
             window.location.href = "/patient/payment";
         } catch(e) {

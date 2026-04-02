@@ -268,7 +268,8 @@
         var sessionId = params.get("session_id");
         if (sessionId) { verifyPayment(sessionId); return; }
 
-        var raw = sessionStorage.getItem("completionData") || sessionStorage.getItem("orderData");
+        // Prefer order selected from dashboard "Pay Now"; fallback to completion flow data.
+        var raw = sessionStorage.getItem("orderData") || sessionStorage.getItem("completionData");
         if (!raw) { location.href = "/patient/dashboard"; return; }
 
         try { orderData = JSON.parse(raw); } catch (e) { location.href = "/patient/dashboard"; return; }
@@ -405,6 +406,8 @@
                 }
             } catch (_) {}
 
+            // Prevent stale completion flow order from overriding the paid order.
+            sessionStorage.removeItem("completionData");
             sessionStorage.removeItem("paymentSession");
             setTimeout(function () { location.href = "/patient/order-status"; }, 2500);
         } catch (e) {
