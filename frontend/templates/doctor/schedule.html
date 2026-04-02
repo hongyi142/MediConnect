@@ -63,7 +63,7 @@
 
         <div class="card">
             <div class="cal-header">
-                <button class="btn btn-secondary btn-sm" onclick="changeWeek(-1)">Previous</button>
+                <button class="btn btn-secondary btn-sm" id="prev-week-btn" onclick="changeWeek(-1)">Previous</button>
                 <h2 id="week-label">Week</h2>
                 <button class="btn btn-secondary btn-sm" onclick="changeWeek(1)">Next</button>
             </div>
@@ -167,7 +167,19 @@
         }
     }
 
-    function initPage() {
+    async function ensureSchedule() {
+        var cfg = document.getElementById("svc-config").dataset;
+        try {
+            var token = await fbAuth.currentUser.getIdToken();
+            await fetch(cfg.doctorUrl + "/doctor-schedule/ensure", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({ doctorID: window.currentUser.linkedID })
+            });
+        } catch (_) {}
+    }
+
+    async function initPage() {
         var now = new Date();
         var today = todayLocalStr();
         document.getElementById("event-date").value = today;
@@ -177,13 +189,14 @@
 
         currentWeekStart = new Date(now);
         currentWeekStart.setHours(0, 0, 0, 0);
-        currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay() + 1);
+        // Always start from today — no Mon-alignment
 
         document.querySelectorAll('input[name="shift"]').forEach(function (i) {
             i.addEventListener("change", syncShiftCards);
         });
 
         loadDoctorShift();
+        await ensureSchedule();
         loadWeekData();
     }
 
@@ -289,8 +302,20 @@
     }
 
     function changeWeek(step) {
+        if (step < 0) {
+            // Prevent navigating before today
+            var today = new Date(); today.setHours(0, 0, 0, 0);
+            var newStart = new Date(currentWeekStart);
+            newStart.setDate(newStart.getDate() - 7);
+            if (newStart < today) return;
+        }
         currentWeekStart.setDate(currentWeekStart.getDate() + step * 7);
-        loadWeekData();
+        if (step > 0) {
+            // Ensure future day docs exist in Firebase before rendering
+            ensureSchedule().then(loadWeekData);
+        } else {
+            loadWeekData();
+        }
     }
 
     async function loadWeekData() {
@@ -315,7 +340,7 @@
             });
             if (slotsRes.ok) {
                 var slotsData = await slotsRes.json();
-                weekSlots = slotsData.slots || [];
+                weekSlots = slotsData.days || [];
             }
         } catch (_) {}
 
@@ -373,6 +398,11 @@
     function renderWeek(from, to) {
         var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         document.getElementById("week-label").textContent = from.getDate() + " " + months[from.getMonth()] + " - " + to.getDate() + " " + months[to.getMonth()] + " " + to.getFullYear();
+        var prevBtn = document.getElementById("prev-week-btn");
+        if (prevBtn) {
+            var todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+            prevBtn.disabled = currentWeekStart.getTime() <= todayMidnight.getTime();
+        }
 
         var days = [];
         for (var i = 0; i < 7; i++) {
@@ -385,10 +415,9 @@
             var dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
             var dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999);
 
-            var slots = weekSlots.filter(function (s) {
-                var t = new Date(s.slotStart);
-                return t >= dayStart && t <= dayEnd;
-            }).sort(function (a, b) { return new Date(a.slotStart) - new Date(b.slotStart); });
+            var dateStr = localDateStr(day);
+            var dayEntry = weekSlots.find(function (s) { return s.date === dateStr; });
+            var slots = dayEntry ? [dayEntry] : [];
 
             var events = weekEvents.filter(function (e) {
                 var t = new Date(e.eventStart);
@@ -400,7 +429,6 @@
                 return t >= dayStart && t <= dayEnd;
             }).sort(function (a, b) { return new Date(a.slotStart || a.dateTime) - new Date(b.slotStart || b.dateTime); });
 
-            var dateStr = localDateStr(day);
             var todayStr = localDateStr(new Date());
             var isToday = dateStr === todayStr;
             var dayDisabled = (isToday && new Date().getHours() >= 19) ? 'disabled title="Day shift unavailable after 7 pm"' : '';
@@ -413,7 +441,10 @@
 
             var entries = [];
             slots.forEach(function (s) {
-                entries.push('<div class="entry"><span><span class="pill shift">Shift</span></span><span>' + fmtTime(s.slotStart) + ' - ' + fmtTime(s.slotEnd) + '</span></div>');
+                if (!s.shift || s.shift === "off") return;
+                var shiftWindows = { day: "07:00 - 19:00", night: "19:00 - 07:00" };
+                var label = shiftWindows[s.shift] || s.shift;
+                entries.push('<div class="entry"><span><span class="pill shift">Shift</span></span><span>' + label + '</span></div>');
             });
             appts.forEach(function (a) {
                 var st = a.slotStart || a.dateTime;

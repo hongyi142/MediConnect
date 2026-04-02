@@ -14,12 +14,24 @@ db = firestore.client()
 DEFAULT_STAFF_PASSWORD = "NewStaff123!"
 DOCTOR_COLLECTION = "Doctor"
 DOCTOR_SCHEDULE_COLLECTION = "DoctorSchedule"
-DOCTOR_BLOCK_COLLECTION = "DoctorCalendarEvent"
-DOCTOR_SHIFT_OVERRIDE_COLLECTION = "DoctorShiftOverride"
 SHIFT_WINDOWS = {
-    "day": {"start_hour": 7, "duration_hours": 12},
+    "day":   {"start_hour": 7,  "duration_hours": 12},
     "night": {"start_hour": 19, "duration_hours": 12},
-    "off": None,
+    "off":   None,
+}
+SLOTS_PER_SHIFT = 24   # 24 × 30 min = 12 hours
+DAYS_AHEAD = 7
+
+# Default shift pattern used when auto-populating a new doctor's schedule.
+# Keyed by Python weekday(): 0=Monday … 6=Sunday.
+WEEKLY_DEFAULT_SHIFTS = {
+    0: "day",    # Monday
+    1: "night",  # Tuesday
+    2: "day",    # Wednesday
+    3: "night",  # Thursday
+    4: "day",    # Friday
+    5: "night",  # Saturday
+    6: "day",    # Sunday
 }
 
 
@@ -48,15 +60,7 @@ def parse_datetime(value):
 
 def to_json(data):
     out = dict(data)
-    for key in [
-        "createdAt",
-        "updatedAt",
-        "slotStart",
-        "slotEnd",
-        "shiftUpdatedAt",
-        "eventStart",
-        "eventEnd",
-    ]:
+    for key in ["createdAt", "updatedAt", "shiftUpdatedAt"]:
         if out.get(key) and hasattr(out[key], "isoformat"):
             dt = out[key]
             if getattr(dt, "tzinfo", None) is not None:
@@ -76,21 +80,6 @@ def get_doctor_doc(doctor_id):
     return None
 
 
-def next_schedule_slot_id():
-    """
-    Generate a numeric string slotID compatible with environments where
-    firebase_admin.firestore does not expose transaction helpers.
-    """
-    max_id = 0
-    docs = db.collection(DOCTOR_SCHEDULE_COLLECTION).stream()
-    for doc in docs:
-        row = doc.to_dict() or {}
-        raw = str(row.get("slotID") or "").strip()
-        if raw.isdigit():
-            max_id = max(max_id, int(raw))
-    return str(max_id + 1)
-
-
 def normalise_shift(value):
     shift = str(value or "").strip().lower()
     if shift in SHIFT_WINDOWS:
@@ -107,72 +96,140 @@ def shift_bounds_for_date(shift, dt):
     return start, end
 
 
-def ensure_shift_schedule_slots(doctor_id, shift, days=7):
-    if shift not in ("day", "night"):
-        return 0
-
-    window_start = now_utc().replace(tzinfo=None)
-    window_end = window_start + timedelta(days=days + 1)
-
-    existing_keys = set()
-    query = (
+def get_day_ref(doctor_id, date_str):
+    return (
         db.collection(DOCTOR_SCHEDULE_COLLECTION)
-        .where("doctorID", "==", doctor_id)
-        .stream()
+        .document(doctor_id)
+        .collection("days")
+        .document(date_str)
     )
-    for doc in query:
-        row = doc.to_dict() or {}
-        start = parse_datetime(row.get("slotStart"))
-        end = parse_datetime(row.get("slotEnd"))
-        if not start or not end:
-            continue
-        if end < window_start or start > window_end:
-            continue
-        existing_keys.add(f"{start.isoformat()}|{end.isoformat()}")
+
+
+def make_schedule_array(shift, existing=None):
+    """Build a 24-element schedule array. Preserves 'booked' slots from existing."""
+    if shift == "off":
+        arr = ["unavailable"] * SLOTS_PER_SHIFT
+    else:
+        arr = ["available"] * SLOTS_PER_SHIFT
+    if existing:
+        for i, val in enumerate(existing[:SLOTS_PER_SHIFT]):
+            if val == "booked":
+                arr[i] = "booked"
+    return arr
+
+
+def slot_index_for_time(shift, target_dt):
+    """Returns 0-23 index for a datetime within a shift, or None if out of range."""
+    cfg = SHIFT_WINDOWS.get(shift)
+    if not cfg:
+        return None
+    shift_base = target_dt.replace(
+        hour=cfg["start_hour"], minute=0, second=0, microsecond=0
+    )
+    # Night shift: slots after midnight belong to the shift that started the previous evening
+    if shift == "night" and target_dt.hour < 12:
+        shift_base = shift_base - timedelta(days=1)
+    delta_minutes = (target_dt - shift_base).total_seconds() / 60
+    if delta_minutes < 0 or delta_minutes >= SLOTS_PER_SHIFT * 30:
+        return None
+    return int(delta_minutes // 30)
+
+
+def slot_datetime_for_index(shift, date_str, index):
+    """Returns (slot_start, slot_end) for a slot index on the shift's reference date."""
+    cfg = SHIFT_WINDOWS.get(shift)
+    if not cfg:
+        return None, None
+    date = datetime.strptime(date_str, "%Y-%m-%d")
+    shift_start = date.replace(hour=cfg["start_hour"], minute=0, second=0, microsecond=0)
+    slot_start = shift_start + timedelta(minutes=index * 30)
+    slot_end = slot_start + timedelta(minutes=30)
+    return slot_start, slot_end
+
+
+def ensure_missing_day_documents(doctor_id, days=DAYS_AHEAD * 2):
+    """Create day documents for any of the next `days` days that don't already exist.
+    Existing documents are never modified — this preserves any shift the doctor has set.
+    New documents default to shift='day'.
+    """
+    today = now_utc().replace(tzinfo=None).replace(hour=0, minute=0, second=0, microsecond=0)
+    parent_ref = db.collection(DOCTOR_SCHEDULE_COLLECTION).document(doctor_id)
+    if not parent_ref.get().exists:
+        parent_ref.set({"doctorID": doctor_id, "createdAt": now_utc(), "updatedAt": now_utc()})
 
     created = 0
-    cursor = window_start.replace(hour=0, minute=0, second=0, microsecond=0)
-    total_days = days
-    if shift == "night":
-        cursor = cursor - timedelta(days=1)
-        total_days = days + 1
-
-    for day_offset in range(total_days):
-        current_day = cursor + timedelta(days=day_offset)
-        slot_start, slot_end = shift_bounds_for_date(shift, current_day)
-        if not slot_start or not slot_end:
-            continue
-        key = f"{slot_start.isoformat()}|{slot_end.isoformat()}"
-        if key in existing_keys:
-            continue
-
-        ref = db.collection(DOCTOR_SCHEDULE_COLLECTION).document()
-        payload = {
-            "slotID": next_schedule_slot_id(),
-            "doctorID": doctor_id,
-            "slotStart": slot_start,
-            "slotEnd": slot_end,
-            "createdAt": now_utc(),
-            "updatedAt": now_utc(),
-            "source": "shift",
-            "shiftType": shift,
-        }
-        ref.set(payload)
-        created += 1
-        existing_keys.add(key)
+    for i in range(days):
+        date_str = (today + timedelta(days=i)).strftime("%Y-%m-%d")
+        day_ref = get_day_ref(doctor_id, date_str)
+        if not day_ref.get().exists:
+            day_ref.set({
+                "date": date_str,
+                "shift": "day",
+                "schedule": make_schedule_array("day"),
+                "createdAt": now_utc(),
+                "updatedAt": now_utc(),
+            })
+            created += 1
     return created
 
 
-def has_blocking_event(doctor_id, req_start, req_end):
-    docs = db.collection(DOCTOR_BLOCK_COLLECTION).where("doctorID", "==", doctor_id).stream()
-    for doc in docs:
-        row = doc.to_dict() or {}
-        event_start = parse_datetime(row.get("eventStart"))
-        event_end = parse_datetime(row.get("eventEnd"))
-        if not event_start or not event_end:
-            continue
-        if ranges_overlap(req_start, req_end, event_start, event_end):
-            return True
+def ensure_day_documents(doctor_id, shift=None, days=DAYS_AHEAD):
+    """Create or update day documents for the next `days` days.
+
+    If *shift* is None, each day gets its shift from WEEKLY_DEFAULT_SHIFTS
+    (a mix of day/night based on weekday). If a specific shift is supplied,
+    that shift is applied uniformly to all days.
+    """
+    today = now_utc().replace(tzinfo=None).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    parent_ref = db.collection(DOCTOR_SCHEDULE_COLLECTION).document(doctor_id)
+    if not parent_ref.get().exists:
+        parent_ref.set({"doctorID": doctor_id, "createdAt": now_utc(), "updatedAt": now_utc()})
+    else:
+        parent_ref.update({"updatedAt": now_utc()})
+
+    for i in range(days):
+        date = today + timedelta(days=i)
+        date_str = date.strftime("%Y-%m-%d")
+        day_shift = shift if shift is not None else WEEKLY_DEFAULT_SHIFTS[date.weekday()]
+        day_ref = get_day_ref(doctor_id, date_str)
+        snap = day_ref.get()
+        if snap.exists:
+            existing = snap.to_dict() or {}
+            if existing.get("shift") == day_shift:
+                continue
+            new_schedule = make_schedule_array(day_shift, existing.get("schedule", []))
+            day_ref.update({"shift": day_shift, "schedule": new_schedule, "updatedAt": now_utc()})
+        else:
+            day_ref.set({
+                "date": date_str,
+                "shift": day_shift,
+                "schedule": make_schedule_array(day_shift),
+                "createdAt": now_utc(),
+                "updatedAt": now_utc(),
+            })
+    return days
+
+
+def has_unavailable_slot(doctor_id, req_start, req_end):
+    """Return True if any 30-min slot in [req_start, req_end) is 'unavailable'."""
+    date_str = req_start.strftime("%Y-%m-%d")
+    snap = get_day_ref(doctor_id, date_str).get()
+    if not snap.exists:
+        return False
+    data = snap.to_dict() or {}
+    shift = data.get("shift")
+    schedule = data.get("schedule", [])
+    if not shift or shift == "off":
+        return True
+    cursor = req_start
+    while cursor < req_end:
+        idx = slot_index_for_time(shift, cursor)
+        if idx is not None and 0 <= idx < len(schedule):
+            if schedule[idx] == "unavailable":
+                return True
+        cursor += timedelta(minutes=30)
     return False
 
 
@@ -236,7 +293,6 @@ def create_doctor():
     auth_created = False
     try:
         firebase_uid, auth_created = maybe_create_auth_user(body, body["name"], body["email"])
-
         ref = db.collection(DOCTOR_COLLECTION).document()
         payload = {
             "doctorID": ref.id,
@@ -252,9 +308,7 @@ def create_doctor():
             "updatedAt": now_utc(),
         }
         ref.set(payload)
-        if shift in ("day", "night"):
-            ensure_shift_schedule_slots(payload["doctorID"], shift)
-
+        ensure_day_documents(payload["doctorID"])  # auto-assign mixed day/night shifts
         response = to_json(payload)
         if auth_created:
             response["defaultPassword"] = DEFAULT_STAFF_PASSWORD
@@ -272,7 +326,6 @@ def create_doctor():
 def get_doctor(doctor_id):
     if not db:
         return jsonify({"error": "Firestore is not initialised"}), 503
-
     doc = get_doctor_doc(doctor_id)
     if not doc:
         return jsonify({"error": "Doctor not found"}), 404
@@ -283,20 +336,13 @@ def get_doctor(doctor_id):
 def update_doctor(doctor_id):
     if not db:
         return jsonify({"error": "Firestore is not initialised"}), 503
-
     body = request.get_json(silent=True) or {}
     doc = get_doctor_doc(doctor_id)
     if not doc:
         return jsonify({"error": "Doctor not found"}), 404
-
-    updates = {
-        key: body[key]
-        for key in ["name", "email", "phone"]
-        if key in body
-    }
+    updates = {key: body[key] for key in ["name", "email", "phone"] if key in body}
     if not updates:
         return jsonify({"error": "No updatable fields provided"}), 400
-
     updates["updatedAt"] = now_utc()
     doc.reference.update(updates)
     return jsonify(to_json(doc.reference.get().to_dict()))
@@ -306,59 +352,43 @@ def update_doctor(doctor_id):
 def update_doctor_status(doctor_id):
     if not db:
         return jsonify({"error": "Firestore is not initialised"}), 503
-
     body = request.get_json(silent=True) or {}
     status = body.get("status")
     if status not in ["available", "busy"]:
         return jsonify({"error": "status must be 'available' or 'busy'"}), 400
-
     doc = get_doctor_doc(doctor_id)
     if not doc:
         return jsonify({"error": "Doctor not found"}), 404
-
     doc.reference.update({"status": status, "updatedAt": now_utc()})
-    updated = doc.reference.get().to_dict()
-    return jsonify(to_json(updated))
+    return jsonify(to_json(doc.reference.get().to_dict()))
 
 
 @app.route("/doctor/<doctor_id>/shift", methods=["PUT"])
 def update_doctor_shift(doctor_id):
     if not db:
         return jsonify({"error": "Firestore is not initialised"}), 503
-
     body = request.get_json(silent=True) or {}
     shift = normalise_shift(body.get("shift"))
     if not shift:
         return jsonify({"error": "shift must be one of: day, night, off"}), 400
-
     doc = get_doctor_doc(doctor_id)
     if not doc:
         return jsonify({"error": "Doctor not found"}), 404
-
     current = doc.to_dict() or {}
-    updates = {
-        "shift": shift,
-        "shiftUpdatedAt": now_utc(),
-        "updatedAt": now_utc(),
-    }
+    updates = {"shift": shift, "shiftUpdatedAt": now_utc(), "updatedAt": now_utc()}
     if shift == "off":
         updates["status"] = "busy"
     elif current.get("status") == "busy" and str(current.get("shift") or "").lower() == "off":
         updates["status"] = "available"
-
     doc.reference.update(updates)
-    generated = ensure_shift_schedule_slots(doctor_id, shift, days=7)
-    updated = doc.reference.get().to_dict() or {}
-    response = to_json(updated)
-    response["generatedShiftSlots"] = generated
-    return jsonify(response)
+    ensure_day_documents(doctor_id, shift)
+    return jsonify(to_json(doc.reference.get().to_dict()))
 
 
 @app.route("/doctor/list")
 def list_doctors():
     if not db:
         return jsonify({"error": "Firestore is not initialised"}), 503
-
     specialization = request.args.get("specialisation")
     status = request.args.get("status")
     shift = normalise_shift(request.args.get("shift"))
@@ -369,183 +399,78 @@ def list_doctors():
         query = query.where("status", "==", status)
     if shift:
         query = query.where("shift", "==", shift)
-
-    doctors = [to_json(doc.to_dict()) for doc in query.stream()]
-    return jsonify({"doctors": doctors})
+    return jsonify({"doctors": [to_json(doc.to_dict()) for doc in query.stream()]})
 
 
 @app.route("/doctor/available")
 def get_available_doctors():
     if not db:
         return jsonify({"error": "Firestore is not initialised"}), 503
-
     specialization = request.args.get("specialisation")
     query = db.collection(DOCTOR_COLLECTION).where("status", "==", "available")
     if specialization:
         query = query.where("specialisation", "==", specialization)
-
     doctors = [to_json(doc.to_dict()) for doc in query.stream()]
     doctors = [d for d in doctors if str(d.get("shift") or "").lower() != "off"]
     return jsonify({"doctors": doctors})
 
 
-@app.route("/doctor-schedule", methods=["POST"])
-def create_doctor_schedule():
+@app.route("/doctor-schedule/ensure", methods=["POST"])
+def ensure_schedule():
+    """Called by the frontend on login to guarantee the next 7 days exist.
+    Only creates missing day documents (shift defaults to 'day').
+    Never overwrites documents that already have a doctor-set shift.
+    """
+    if not db:
+        return jsonify({"error": "Firestore is not initialised"}), 503
     body = request.get_json(silent=True) or {}
     doctor_id = body.get("doctorID")
-    slot_start = parse_datetime(body.get("slotStart"))
-    slot_end = parse_datetime(body.get("slotEnd"))
-
-    if not doctor_id or not slot_start or not slot_end:
-        return jsonify({"error": "doctorID, slotStart, slotEnd are required in ISO format"}), 400
-    if slot_end <= slot_start:
-        return jsonify({"error": "slotEnd must be after slotStart"}), 400
-
-    doctor_doc = get_doctor_doc(doctor_id)
-    if not doctor_doc:
+    if not doctor_id:
+        return jsonify({"error": "doctorID is required"}), 400
+    doc = get_doctor_doc(doctor_id)
+    if not doc:
         return jsonify({"error": "Doctor not found"}), 404
-
-    existing = db.collection(DOCTOR_SCHEDULE_COLLECTION).where("doctorID", "==", doctor_id).stream()
-    for item in existing:
-        row = item.to_dict() or {}
-        existing_start = parse_datetime(row.get("slotStart"))
-        existing_end = parse_datetime(row.get("slotEnd"))
-        if existing_start and existing_end and ranges_overlap(slot_start, slot_end, existing_start, existing_end):
-            return jsonify({"error": "Schedule overlaps with an existing slot", "slotID": row.get("slotID")}), 409
-
-    slot_id = next_schedule_slot_id()
-    ref = db.collection(DOCTOR_SCHEDULE_COLLECTION).document()
-    payload = {
-        "slotID": slot_id,
-        "doctorID": doctor_id,
-        "slotStart": slot_start,
-        "slotEnd": slot_end,
-        "createdAt": now_utc(),
-        "updatedAt": now_utc(),
-    }
-    ref.set(payload)
-    return jsonify(to_json(payload)), 201
+    created = ensure_missing_day_documents(doctor_id)
+    return jsonify({"doctorID": doctor_id, "daysCreated": created})
 
 
 @app.route("/doctor-schedule")
 def list_doctor_schedule():
-    doctor_id = request.args.get("doctorID")
-    from_dt = parse_datetime(request.args.get("from"))
-    to_dt = parse_datetime(request.args.get("to"))
-    req_start = parse_datetime(request.args.get("slotStart"))
-    req_end = parse_datetime(request.args.get("slotEnd"))
-    contains = str(request.args.get("contains", "false")).lower() == "true"
-    include_doctor = str(request.args.get("includeDoctor", "false")).lower() == "true"
-
-    query = db.collection(DOCTOR_SCHEDULE_COLLECTION)
-    if doctor_id:
-        query = query.where("doctorID", "==", doctor_id)
-
-    slots = []
-    for doc in query.stream():
-        slot = doc.to_dict() or {}
-        slot_start = parse_datetime(slot.get("slotStart"))
-        slot_end = parse_datetime(slot.get("slotEnd"))
-        if not slot_start or not slot_end:
-            continue
-
-        if from_dt and slot_end < from_dt:
-            continue
-        if to_dt and slot_start > to_dt:
-            continue
-        if req_start and req_end:
-            if contains and not (slot_start <= req_start and slot_end >= req_end):
-                continue
-            if not contains and not ranges_overlap(slot_start, slot_end, req_start, req_end):
-                continue
-
-        row = to_json(slot)
-        if include_doctor:
-            doctor_doc = get_doctor_doc(slot.get("doctorID"))
-            if doctor_doc:
-                row["doctor"] = to_json(doctor_doc.to_dict())
-        slots.append(row)
-
-    slots.sort(key=lambda x: x.get("slotStart", ""))
-    return jsonify({"slots": slots})
-
-
-@app.route("/doctor-schedule/<slot_id>")
-def get_doctor_schedule_slot(slot_id):
-    docs = db.collection(DOCTOR_SCHEDULE_COLLECTION).where("slotID", "==", slot_id).limit(1).stream()
-    for doc in docs:
-        return jsonify(to_json(doc.to_dict()))
-    return jsonify({"error": "Schedule slot not found"}), 404
-
-
-@app.route("/doctor-calendar-event", methods=["POST"])
-def create_doctor_calendar_event():
-    body = request.get_json(silent=True) or {}
-    doctor_id = body.get("doctorID")
-    event_start = parse_datetime(body.get("eventStart"))
-    event_end = parse_datetime(body.get("eventEnd"))
-    reason = (body.get("reason") or "").strip()
-
-    if not doctor_id or not event_start or not event_end:
-        return jsonify({"error": "doctorID, eventStart, eventEnd are required in ISO format"}), 400
-    if event_end <= event_start:
-        return jsonify({"error": "eventEnd must be after eventStart"}), 400
-
-    doctor_doc = get_doctor_doc(doctor_id)
-    if not doctor_doc:
-        return jsonify({"error": "Doctor not found"}), 404
-
-    query = db.collection(DOCTOR_BLOCK_COLLECTION).where("doctorID", "==", doctor_id).stream()
-    for doc in query:
-        row = doc.to_dict() or {}
-        old_start = parse_datetime(row.get("eventStart"))
-        old_end = parse_datetime(row.get("eventEnd"))
-        if old_start and old_end and ranges_overlap(event_start, event_end, old_start, old_end):
-            return jsonify({"error": "Calendar event overlaps with an existing event"}), 409
-
-    ref = db.collection(DOCTOR_BLOCK_COLLECTION).document()
-    payload = {
-        "eventID": ref.id,
-        "doctorID": doctor_id,
-        "eventStart": event_start,
-        "eventEnd": event_end,
-        "reason": reason or "Unavailable",
-        "createdAt": now_utc(),
-        "updatedAt": now_utc(),
-    }
-    ref.set(payload)
-    return jsonify(to_json(payload)), 201
-
-
-@app.route("/doctor-calendar-event")
-def list_doctor_calendar_events():
+    """Return day documents for a doctor.
+    Response: { doctorID, days: [{date, shift, schedule: [24 values]}] }"""
     doctor_id = request.args.get("doctorID")
     if not doctor_id:
         return jsonify({"error": "doctorID is required"}), 400
 
-    from_dt = parse_datetime(request.args.get("from"))
-    to_dt = parse_datetime(request.args.get("to"))
-    query = db.collection(DOCTOR_BLOCK_COLLECTION).where("doctorID", "==", doctor_id)
+    from_str = (request.args.get("from") or "")[:10]   # YYYY-MM-DD prefix
+    to_str = (request.args.get("to") or "")[:10]
 
-    events = []
-    for doc in query.stream():
-        row = doc.to_dict() or {}
-        event_start = parse_datetime(row.get("eventStart"))
-        event_end = parse_datetime(row.get("eventEnd"))
-        if not event_start or not event_end:
+    days_ref = (
+        db.collection(DOCTOR_SCHEDULE_COLLECTION)
+        .document(doctor_id)
+        .collection("days")
+    )
+    days = []
+    for doc in days_ref.stream():
+        data = doc.to_dict() or {}
+        date = data.get("date", doc.id)
+        if from_str and date < from_str:
             continue
-        if from_dt and event_end < from_dt:
+        if to_str and date > to_str:
             continue
-        if to_dt and event_start > to_dt:
-            continue
-        events.append(to_json(row))
+        days.append({
+            "date": date,
+            "shift": data.get("shift", "off"),
+            "schedule": data.get("schedule", []),
+        })
 
-    events.sort(key=lambda e: e.get("eventStart", ""))
-    return jsonify({"events": events})
+    days.sort(key=lambda x: x["date"])
+    return jsonify({"doctorID": doctor_id, "days": days})
 
 
 @app.route("/doctor-schedule/available")
 def get_schedule_available_doctors():
+    """Find doctors with an 'available' slot covering the requested 30-min window."""
     req_start = parse_datetime(request.args.get("slotStart"))
     req_end = parse_datetime(request.args.get("slotEnd"))
     if not req_start or not req_end:
@@ -563,6 +488,8 @@ def get_schedule_available_doctors():
     if specialization:
         query = query.where("specialisation", "==", specialization)
 
+    date_str = req_start.strftime("%Y-%m-%d")
+
     doctors = []
     for doc in query.stream():
         doctor = doc.to_dict() or {}
@@ -570,42 +497,52 @@ def get_schedule_available_doctors():
             continue
         if str(doctor.get("shift") or "").lower() == "off":
             continue
-        if has_blocking_event(doctor.get("doctorID"), req_start, req_end):
+
+        doctor_id = doctor.get("doctorID")
+        snap = get_day_ref(doctor_id, date_str).get()
+        if not snap.exists:
             continue
 
-        matches = []
-        schedules = db.collection(DOCTOR_SCHEDULE_COLLECTION).where("doctorID", "==", doctor.get("doctorID")).stream()
-        for schedule_doc in schedules:
-            slot = schedule_doc.to_dict() or {}
-            slot_start = parse_datetime(slot.get("slotStart"))
-            slot_end = parse_datetime(slot.get("slotEnd"))
-            if slot_start and slot_end and slot_start <= req_start and slot_end >= req_end:
-                matches.append(
-                    {
-                        "slotID": slot.get("slotID"),
-                        "slotStart": slot_start.isoformat(),
-                        "slotEnd": slot_end.isoformat(),
-                    }
-                )
+        data = snap.to_dict() or {}
+        shift = data.get("shift")
+        schedule = data.get("schedule", [])
+        if not shift or shift == "off":
+            continue
 
-        if matches:
+        # Verify every requested 30-min slot is "available"
+        matching_slots = []
+        cursor = req_start
+        all_available = True
+        while cursor < req_end:
+            idx = slot_index_for_time(shift, cursor)
+            if idx is None or idx >= len(schedule) or schedule[idx] != "available":
+                all_available = False
+                break
+            slot_start, slot_end = slot_datetime_for_index(shift, date_str, idx)
+            matching_slots.append({
+                "slotID": f"{date_str}_{idx}",
+                "slotStart": slot_start.isoformat(),
+                "slotEnd": slot_end.isoformat(),
+            })
+            cursor += timedelta(minutes=30)
+
+        if all_available and matching_slots:
             row = to_json(doctor)
-            row["matchingSlots"] = matches
+            row["matchingSlots"] = matching_slots
             doctors.append(row)
 
-    return jsonify(
-        {
-            "requestedSlot": {"slotStart": req_start.isoformat(), "slotEnd": req_end.isoformat()},
-            "doctors": doctors,
-            "count": len(doctors),
-        }
-    )
+    return jsonify({
+        "requestedSlot": {"slotStart": req_start.isoformat(), "slotEnd": req_end.isoformat()},
+        "doctors": doctors,
+        "count": len(doctors),
+    })
 
 
 @app.route("/doctor-schedule/doctor/<doctor_id>/alternatives")
 def doctor_schedule_alternatives(doctor_id):
+    """Return available 30-min slots for a doctor, sorted ascending by time."""
     limit = request.args.get("limit", default=5, type=int)
-    from_dt = parse_datetime(request.args.get("from")) or now_utc()
+    from_dt = parse_datetime(request.args.get("from")) or now_utc().replace(tzinfo=None)
     exclude_start = parse_datetime(request.args.get("excludeStart"))
     exclude_end = parse_datetime(request.args.get("excludeEnd"))
 
@@ -613,35 +550,187 @@ def doctor_schedule_alternatives(doctor_id):
     if not doc:
         return jsonify({"error": "Doctor not found"}), 404
 
+    days_ref = (
+        db.collection(DOCTOR_SCHEDULE_COLLECTION)
+        .document(doctor_id)
+        .collection("days")
+    )
     slots = []
-    schedules = db.collection(DOCTOR_SCHEDULE_COLLECTION).where("doctorID", "==", doctor_id).stream()
-    for schedule_doc in schedules:
-        row = schedule_doc.to_dict() or {}
-        slot_start = parse_datetime(row.get("slotStart"))
-        slot_end = parse_datetime(row.get("slotEnd"))
-        if not slot_start or not slot_end:
+    for day_doc in days_ref.stream():
+        data = day_doc.to_dict() or {}
+        date_str = data.get("date", day_doc.id)
+        shift = data.get("shift")
+        schedule = data.get("schedule", [])
+        if not shift or shift == "off":
             continue
-        if slot_end < from_dt:
-            continue
-        if exclude_start and exclude_end and ranges_overlap(slot_start, slot_end, exclude_start, exclude_end):
-            continue
-        slots.append(to_json(row))
+        for idx, status in enumerate(schedule):
+            if status != "available":
+                continue
+            slot_start, slot_end = slot_datetime_for_index(shift, date_str, idx)
+            if not slot_start or slot_end <= from_dt:
+                continue
+            if exclude_start and exclude_end and ranges_overlap(slot_start, slot_end, exclude_start, exclude_end):
+                continue
+            slots.append({
+                "slotID": f"{date_str}_{idx}",
+                "slotStart": slot_start.isoformat(),
+                "slotEnd": slot_end.isoformat(),
+            })
 
-    slots.sort(key=lambda x: x.get("slotStart", ""))
-    return jsonify({"doctorID": doctor_id, "slots": slots[: max(1, min(limit, 20))]})
+    slots.sort(key=lambda x: x["slotStart"])
+    return jsonify({"doctorID": doctor_id, "slots": slots[:max(1, min(limit, 20))]})
+
+
+@app.route("/doctor-schedule/slot", methods=["PUT"])
+def update_schedule_slot():
+    """Mark a specific 30-min slot as 'booked' or 'available'. Called by booking services."""
+    body = request.get_json(silent=True) or {}
+    doctor_id = body.get("doctorID")
+    slot_start = parse_datetime(body.get("slotStart"))
+    status = body.get("status")
+
+    if not doctor_id or not slot_start or status not in ("booked", "available"):
+        return jsonify({"error": "doctorID, slotStart, and status (booked/available) are required"}), 400
+
+    date_str = slot_start.strftime("%Y-%m-%d")
+    snap = get_day_ref(doctor_id, date_str).get()
+    if not snap.exists:
+        return jsonify({"error": "No schedule found for this day"}), 404
+
+    data = snap.to_dict() or {}
+    shift = data.get("shift")
+    schedule = list(data.get("schedule", []))
+
+    idx = slot_index_for_time(shift, slot_start)
+    if idx is None or idx >= len(schedule):
+        return jsonify({"error": "Slot not found in schedule"}), 404
+
+    schedule[idx] = status
+    get_day_ref(doctor_id, date_str).update({"schedule": schedule, "updatedAt": now_utc()})
+    return jsonify({"doctorID": doctor_id, "date": date_str, "slotIndex": idx, "status": status})
+
+
+@app.route("/doctor-calendar-event", methods=["POST"])
+def create_doctor_calendar_event():
+    """Block out a time range by setting affected slots to 'unavailable'."""
+    body = request.get_json(silent=True) or {}
+    doctor_id = body.get("doctorID")
+    event_start = parse_datetime(body.get("eventStart"))
+    event_end = parse_datetime(body.get("eventEnd"))
+    reason = (body.get("reason") or "Unavailable").strip()
+
+    if not doctor_id or not event_start or not event_end:
+        return jsonify({"error": "doctorID, eventStart, eventEnd are required in ISO format"}), 400
+    if event_end <= event_start:
+        return jsonify({"error": "eventEnd must be after eventStart"}), 400
+
+    doc = get_doctor_doc(doctor_id)
+    if not doc:
+        return jsonify({"error": "Doctor not found"}), 404
+
+    date_str = event_start.strftime("%Y-%m-%d")
+    snap = get_day_ref(doctor_id, date_str).get()
+    if not snap.exists:
+        return jsonify({"error": "No schedule found for this day. Set a shift first."}), 404
+
+    data = snap.to_dict() or {}
+    shift = data.get("shift")
+    schedule = list(data.get("schedule", []))
+
+    if not shift or shift == "off":
+        return jsonify({"error": "Doctor is off on this day"}), 400
+
+    # Check for booked slots in the range first
+    cursor = event_start
+    indices = []
+    while cursor < event_end:
+        idx = slot_index_for_time(shift, cursor)
+        if idx is not None and 0 <= idx < len(schedule):
+            if schedule[idx] == "booked":
+                return jsonify({"error": f"Slot at {cursor.strftime('%H:%M')} is already booked"}), 409
+            indices.append(idx)
+        cursor += timedelta(minutes=30)
+
+    if not indices:
+        return jsonify({"error": "No valid slots found in the specified time range"}), 400
+
+    for idx in indices:
+        schedule[idx] = "unavailable"
+    get_day_ref(doctor_id, date_str).update({"schedule": schedule, "updatedAt": now_utc()})
+
+    return jsonify({
+        "doctorID": doctor_id,
+        "date": date_str,
+        "eventStart": event_start.isoformat(),
+        "eventEnd": event_end.isoformat(),
+        "reason": reason,
+        "blockedSlots": len(indices),
+    }), 201
+
+
+@app.route("/doctor-calendar-event")
+def list_doctor_calendar_events():
+    """Return blocked time ranges derived from 'unavailable' slots in the schedule array."""
+    doctor_id = request.args.get("doctorID")
+    if not doctor_id:
+        return jsonify({"error": "doctorID is required"}), 400
+
+    from_str = (request.args.get("from") or "")[:10]
+    to_str = (request.args.get("to") or "")[:10]
+
+    days_ref = (
+        db.collection(DOCTOR_SCHEDULE_COLLECTION)
+        .document(doctor_id)
+        .collection("days")
+    )
+    events = []
+    for day_doc in days_ref.stream():
+        data = day_doc.to_dict() or {}
+        date_str = data.get("date", day_doc.id)
+        shift = data.get("shift")
+        schedule = data.get("schedule", [])
+
+        if not shift or shift == "off":
+            continue
+        if from_str and date_str < from_str:
+            continue
+        if to_str and date_str > to_str:
+            continue
+
+        # Merge contiguous "unavailable" slots into event ranges
+        i = 0
+        while i < len(schedule):
+            if schedule[i] == "unavailable":
+                start_idx = i
+                while i < len(schedule) and schedule[i] == "unavailable":
+                    i += 1
+                event_start, _ = slot_datetime_for_index(shift, date_str, start_idx)
+                _, event_end = slot_datetime_for_index(shift, date_str, i - 1)
+                if event_start and event_end:
+                    events.append({
+                        "doctorID": doctor_id,
+                        "eventStart": event_start.isoformat(),
+                        "eventEnd": event_end.isoformat(),
+                        "reason": "Unavailable",
+                    })
+            else:
+                i += 1
+
+    events.sort(key=lambda e: e["eventStart"])
+    return jsonify({"events": events})
 
 
 @app.route("/doctor/<doctor_id>/shift-override", methods=["PUT"])
 def set_shift_override(doctor_id):
+    """Change the shift for a single day. Updates the day document's shift and resets schedule."""
     body = request.get_json(silent=True) or {}
-    date_str = body.get("date")       # "YYYY-MM-DD"
+    date_str = body.get("date")
     shift = normalise_shift(body.get("shift"))
 
     if not date_str or shift is None:
         return jsonify({"error": "date (YYYY-MM-DD) and shift (day/night/off) are required"}), 400
-
     try:
-        override_date = datetime.strptime(date_str, "%Y-%m-%d")
+        datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
         return jsonify({"error": "Invalid date format, use YYYY-MM-DD"}), 400
 
@@ -649,77 +738,52 @@ def set_shift_override(doctor_id):
     if not doc:
         return jsonify({"error": "Doctor not found"}), 404
 
-    day_start = override_date.replace(hour=0, minute=0, second=0, microsecond=0)
-    day_end = override_date.replace(hour=23, minute=59, second=59, microsecond=0)
+    parent_ref = db.collection(DOCTOR_SCHEDULE_COLLECTION).document(doctor_id)
+    if not parent_ref.get().exists:
+        parent_ref.set({"doctorID": doctor_id, "createdAt": now_utc(), "updatedAt": now_utc()})
 
-    # Delete existing shift-generated slots for this day
-    for slot_doc in db.collection(DOCTOR_SCHEDULE_COLLECTION).where("doctorID", "==", doctor_id).stream():
-        row = slot_doc.to_dict() or {}
-        slot_start_dt = parse_datetime(row.get("slotStart"))
-        if slot_start_dt and day_start <= slot_start_dt <= day_end:
-            src = row.get("source", "")
-            if src in ("shift", "shift_override", ""):
-                slot_doc.reference.delete()
-
-    # Generate new slot for the override shift
-    generated = 0
-    if shift in ("day", "night"):
-        slot_start, slot_end = shift_bounds_for_date(shift, override_date)
-        if slot_start and slot_end:
-            ref = db.collection(DOCTOR_SCHEDULE_COLLECTION).document()
-            ref.set({
-                "slotID": next_schedule_slot_id(),
-                "doctorID": doctor_id,
-                "slotStart": slot_start,
-                "slotEnd": slot_end,
-                "createdAt": now_utc(),
-                "updatedAt": now_utc(),
-                "source": "shift_override",
-                "shiftType": shift,
-            })
-            generated = 1
-
-    # Upsert the override record
-    override_ref = None
-    for o in db.collection(DOCTOR_SHIFT_OVERRIDE_COLLECTION).where("doctorID", "==", doctor_id).where("date", "==", date_str).limit(1).stream():
-        override_ref = o.reference
-        break
-
-    override_payload = {"doctorID": doctor_id, "date": date_str, "shift": shift, "updatedAt": now_utc()}
-    if override_ref:
-        override_ref.update(override_payload)
+    day_ref = get_day_ref(doctor_id, date_str)
+    snap = day_ref.get()
+    if snap.exists:
+        existing = snap.to_dict() or {}
+        new_schedule = make_schedule_array(shift, existing.get("schedule", []))
+        day_ref.update({"shift": shift, "schedule": new_schedule, "updatedAt": now_utc()})
     else:
-        override_payload["createdAt"] = now_utc()
-        db.collection(DOCTOR_SHIFT_OVERRIDE_COLLECTION).document().set(override_payload)
+        day_ref.set({
+            "date": date_str,
+            "shift": shift,
+            "schedule": make_schedule_array(shift),
+            "createdAt": now_utc(),
+            "updatedAt": now_utc(),
+        })
 
-    return jsonify({"doctorID": doctor_id, "date": date_str, "shift": shift, "generatedSlots": generated})
+    return jsonify({"doctorID": doctor_id, "date": date_str, "shift": shift})
 
 
 @app.route("/doctor-shift-overrides")
 def list_shift_overrides():
+    """Return the shift for each day document. Used by schedule page to populate dropdowns."""
     doctor_id = request.args.get("doctorID")
     if not doctor_id:
         return jsonify({"error": "doctorID is required"}), 400
 
-    from_date = request.args.get("from")   # "YYYY-MM-DD"
-    to_date = request.args.get("to")       # "YYYY-MM-DD"
+    from_date = (request.args.get("from") or "")[:10]
+    to_date = (request.args.get("to") or "")[:10]
 
+    days_ref = (
+        db.collection(DOCTOR_SCHEDULE_COLLECTION)
+        .document(doctor_id)
+        .collection("days")
+    )
     overrides = []
-    for doc in db.collection(DOCTOR_SHIFT_OVERRIDE_COLLECTION).where("doctorID", "==", doctor_id).stream():
-        row = doc.to_dict() or {}
-        d = row.get("date", "")
-        if from_date and d < from_date:
+    for doc in days_ref.stream():
+        data = doc.to_dict() or {}
+        date = data.get("date", doc.id)
+        if from_date and date < from_date:
             continue
-        if to_date and d > to_date:
+        if to_date and date > to_date:
             continue
-        out = dict(row)
-        for k in ["createdAt", "updatedAt"]:
-            if out.get(k) and hasattr(out[k], "isoformat"):
-                dt = out[k]
-                if getattr(dt, "tzinfo", None) is not None:
-                    dt = dt.replace(tzinfo=None)
-                out[k] = dt.isoformat()
-        overrides.append(out)
+        overrides.append({"date": date, "shift": data.get("shift", "off")})
 
     return jsonify({"overrides": overrides})
 

@@ -85,10 +85,15 @@ services:
 
   - name: notification-wrapper
     url: http://notification-wrapper:5011
+    # Generous timeouts for the long-lived SSE stream connections
+    connect_timeout: 10000
+    write_timeout: 600000
+    read_timeout: 600000
     routes:
       - name: notification-routes
         paths:
           - /notify
+          - /sse
         strip_path: false
 
   - name: telegram-wrapper

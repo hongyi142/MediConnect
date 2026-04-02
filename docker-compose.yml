@@ -50,6 +50,14 @@ services:
     env_file: ./backend/notification_wrapper/.env
     environment:
       - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
+      - APPOINTMENT_SERVICE_URL=http://appointment-service:5032
+      - PATIENT_SERVICE_URL=http://patient-service:5030
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - rabbitmq
+      - appointment-service
+      - patient-service
+      - redis
 
   start-consultation:
     build: ./backend/start-consultation-composite
@@ -76,6 +84,17 @@ services:
       - "15673:15672"
     healthcheck:
       test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mediconnect-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -190,11 +209,14 @@ services:
       - APPOINTMENT_SERVICE_URL=http://appointment-service:5032
       - NOTIFICATION_WRAPPER_URL=http://notification-wrapper:5011
       - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
+      - REDIS_URL=redis://redis:6379/0
+      - SSE_SERVICE_URL=http://notification-wrapper:5011
     depends_on:
       - patient-service
       - doctor-service
       - appointment-service
       - notification-wrapper
+      - redis
 
   inventory-service:
     build: ./backend/inventory
@@ -256,6 +278,7 @@ services:
       - TWILIO_WRAPPER_URL=http://localhost:8000
       - OPENAI_WRAPPER_URL=http://localhost:8000
       - NOTIFICATION_WRAPPER_URL=http://localhost:8000
+      - SSE_SERVICE_URL=http://localhost:8000
       # Payment services use Kong path prefixes to resolve /payment/* conflicts
       - PAYMENT_SERVICE_URL=http://localhost:8000/payment-svc
       - PAYMENT_WRAPPER_URL=http://localhost:8000/payment-gateway

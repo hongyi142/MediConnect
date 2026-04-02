@@ -6,6 +6,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 import pika
+import redis as redis_lib
 import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -63,6 +64,17 @@ def get_service_urls():
     appointment_url = os.environ.get("APPOINTMENT_SERVICE_URL", "http://appointment-service:5032").rstrip("/")
     notification_url = os.environ.get("NOTIFICATION_WRAPPER_URL", "http://notification-wrapper:5011").rstrip("/")
     return patient_url, doctor_url, appointment_url, notification_url
+
+
+_redis_client = None
+
+
+def get_redis():
+    global _redis_client
+    if _redis_client is None:
+        redis_url = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+        _redis_client = redis_lib.from_url(redis_url, decode_responses=True)
+    return _redis_client
 
 
 def publish_rabbit_message(routing_key, payload):
@@ -380,23 +392,90 @@ def book_appointment():
         )
         return jsonify({"error": "No available doctor for this timeslot", "alternatives": alternatives}), 409
 
-    appointment_resp = req(
-        "POST",
-        f"{appointment_url}/appointment",
-        json={
-            "patientID": patient_id,
-            "doctorID": selected_doctor.get("doctorID"),
-            "dateTime": slot_start.isoformat(),
-            "slotStart": slot_start.isoformat(),
-            "slotEnd": slot_end.isoformat(),
-            "specialisation": specialisation,
-            "reason": reason,
-            "doctorPreference": doctor_preference,
-            "status": "pending",
-        },
-    )
-    appointment_resp.raise_for_status()
-    appointment = appointment_resp.json()
+    # Acquire a per-slot Redis lock to prevent two concurrent bookings for the same doctor+slot.
+    doctor_id_for_lock = selected_doctor.get("doctorID")
+    lock_key = f"slot_lock:{doctor_id_for_lock}:{slot_start.isoformat()}"
+    lock_acquired = False
+    try:
+        r = get_redis()
+        lock_acquired = bool(r.set(lock_key, "1", nx=True, ex=30))
+    except Exception:
+        lock_acquired = True  # Redis unavailable — allow the booking (degraded mode)
+
+    if not lock_acquired:
+        return jsonify({"error": "This slot is being booked by another user. Please try again in a moment."}), 409
+
+    try:
+        # Re-check conflict inside the lock to catch the race condition.
+        if has_conflict(appointment_url, doctor_id_for_lock, slot_start, slot_end):
+            return jsonify({"error": "Doctor is no longer available for this slot", "alternatives": []}), 409
+
+        appointment_resp = req(
+            "POST",
+            f"{appointment_url}/appointment",
+            json={
+                "patientID": patient_id,
+                "doctorID": doctor_id_for_lock,
+                "dateTime": slot_start.isoformat(),
+                "slotStart": slot_start.isoformat(),
+                "slotEnd": slot_end.isoformat(),
+                "specialisation": specialisation,
+                "reason": reason,
+                "doctorPreference": doctor_preference,
+                "status": "pending",
+            },
+        )
+        appointment_resp.raise_for_status()
+        appointment = appointment_resp.json()
+
+        try:
+            req(
+                "PUT",
+                f"{doctor_url}/doctor-schedule/slot",
+                json={
+                    "doctorID": doctor_id_for_lock,
+                    "slotStart": slot_start.isoformat(),
+                    "status": "booked",
+                },
+            )
+        except Exception:
+            pass  # Non-fatal: appointment is created, schedule update is best-effort
+
+        # Push real-time SSE notifications to the patient and doctor
+        sse_url = os.environ.get("SSE_SERVICE_URL", "http://sse-service:5060").rstrip("/")
+        slot_display = slot_start.strftime("%d %b %Y %H:%M")
+        try:
+            req("POST", f"{sse_url}/sse/notify", json={
+                "userID": patient_id,
+                "event": "appointment_booked",
+                "data": {
+                    "message": f"Your appointment has been requested for {slot_display} UTC.",
+                    "appointmentID": appointment.get("appointmentID"),
+                    "doctorID": doctor_id_for_lock,
+                    "slotStart": slot_start.isoformat(),
+                },
+            })
+        except Exception:
+            pass
+        try:
+            req("POST", f"{sse_url}/sse/notify", json={
+                "userID": doctor_id_for_lock,
+                "event": "appointment_requested",
+                "data": {
+                    "message": f"New appointment request for {slot_display} UTC.",
+                    "appointmentID": appointment.get("appointmentID"),
+                    "patientID": patient_id,
+                    "slotStart": slot_start.isoformat(),
+                },
+            })
+        except Exception:
+            pass
+    finally:
+        try:
+            if lock_acquired:
+                get_redis().delete(lock_key)
+        except Exception:
+            pass
 
     doctor_event = {
         "eventType": "appointment_requested",

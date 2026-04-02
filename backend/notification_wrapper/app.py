@@ -1,13 +1,17 @@
-import os
 import json
 import logging
+import os
+import queue as _queue_mod
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 
 import pika
+import redis as _redis_lib
 import requests
+from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request, stream_with_context
 from flask_cors import CORS
 
 load_dotenv()
@@ -20,6 +24,10 @@ RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://rabbitmq:5672/")
 _worker_started = False
 _worker_lock = threading.Lock()
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Email / SMS helpers (unchanged)
+# ══════════════════════════════════════════════════════════════════════════════
 
 def post_to_smu(api_url, payload):
     contact_key = os.environ.get("SMU_X_CONTACTS_KEY")
@@ -83,7 +91,6 @@ def _normalize_message(message):
     patient_name = _first_non_empty(normalized, ["patientName", "name"], "Customer")
     order_id = _first_non_empty(normalized, ["orderID", "orderId"], "Unknown")
 
-    # Event templates
     if event_type == "payment_successful":
         normalized["receiver"] = _first_non_empty(normalized, ["patientEmail", "email", "receiver"])
         normalized["subject"] = "MediConnect: Payment Successful"
@@ -115,7 +122,6 @@ def _normalize_message(message):
         normalized["content"] = f"Hi {patient_name}, order {order_id} has been delivered successfully."
         normalized["channel"] = "email"
 
-    # Legacy payload compatibility
     normalized["receiver"] = _first_non_empty(normalized, ["receiver", "email", "patientEmail"])
     normalized["mobile"] = _first_non_empty(normalized, ["mobile", "phone", "patientPhone"])
     if not normalized.get("content") and normalized.get("message"):
@@ -229,6 +235,201 @@ def start_worker_thread():
         logging.info("Notification worker thread started")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  SSE Push Notifications
+# ══════════════════════════════════════════════════════════════════════════════
+
+# In-memory registry: userID → list of queue.Queue (one per open browser tab)
+_sse_clients: dict = {}
+_sse_lock = threading.Lock()
+SSE_HEARTBEAT = 25  # seconds; keeps proxies / browsers from dropping the connection
+
+
+def _sse_register(user_id: str) -> _queue_mod.Queue:
+    q: _queue_mod.Queue = _queue_mod.Queue(maxsize=100)
+    with _sse_lock:
+        _sse_clients.setdefault(user_id, []).append(q)
+    return q
+
+
+def _sse_unregister(user_id: str, q: _queue_mod.Queue) -> None:
+    with _sse_lock:
+        bucket = _sse_clients.get(user_id)
+        if bucket:
+            try:
+                bucket.remove(q)
+            except ValueError:
+                pass
+            if not bucket:
+                del _sse_clients[user_id]
+
+
+def _sse_push(user_id: str, event: str, data: dict) -> int:
+    """Push event to all open connections for user_id. Returns number pushed."""
+    with _sse_lock:
+        queues = list(_sse_clients.get(user_id, []))
+    pushed = 0
+    for q in queues:
+        try:
+            q.put_nowait({"event": event, "data": data})
+            pushed += 1
+        except _queue_mod.Full:
+            pass
+    return pushed
+
+
+def run_sse_consumer():
+    """Background thread: consume from sse_exchange and route to SSE clients."""
+    while True:
+        try:
+            conn = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
+            ch = conn.channel()
+            ch.exchange_declare(exchange="sse_exchange", exchange_type="topic", durable=True)
+            result = ch.queue_declare(queue="", exclusive=True)
+            q_name = result.method.queue
+            ch.queue_bind(exchange="sse_exchange", queue=q_name, routing_key="notify.#")
+
+            def on_msg(_ch, _method, _props, body):
+                try:
+                    msg = json.loads(body)
+                    uid = msg.get("userID", "")
+                    evt = msg.get("event", "notification")
+                    dat = msg.get("data", {})
+                    if uid:
+                        _sse_push(uid, evt, dat)
+                except Exception:
+                    pass
+
+            ch.basic_consume(queue=q_name, on_message_callback=on_msg, auto_ack=True)
+            ch.start_consuming()
+        except Exception:
+            time.sleep(5)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Appointment Reminder Scheduler
+# ══════════════════════════════════════════════════════════════════════════════
+
+_reminder_redis = None
+_REMINDER_WINDOW = 5  # ± minutes around the 24h / 1h target
+
+
+def _get_redis():
+    global _reminder_redis
+    if _reminder_redis is None:
+        redis_url = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+        _reminder_redis = _redis_lib.from_url(redis_url, decode_responses=True)
+    return _reminder_redis
+
+
+def _already_sent(appt_id: str, key: str) -> bool:
+    try:
+        return bool(_get_redis().get(f"reminder:{appt_id}:{key}"))
+    except Exception:
+        return False
+
+
+def _mark_sent(appt_id: str, key: str) -> None:
+    try:
+        _get_redis().setex(f"reminder:{appt_id}:{key}", 172800, "1")  # 48 h TTL
+    except Exception:
+        pass
+
+
+def _fire_reminder(appt: dict, label: str, rkey: str) -> None:
+    appt_id = appt.get("appointmentID", "")
+    patient_id = appt.get("patientID", "")
+    slot_start = appt.get("slotStart") or appt.get("dateTime", "")
+
+    if not appt_id or not patient_id:
+        return
+    if _already_sent(appt_id, rkey):
+        return
+
+    slot_display = slot_start[:16].replace("T", " ") + " UTC" if slot_start else "your scheduled time"
+    message = f"Reminder: your appointment is in {label} (at {slot_display})."
+
+    # Real-time SSE push (instant if patient is online)
+    _sse_push(patient_id, "reminder", {
+        "message": message,
+        "appointmentID": appt_id,
+        "slotStart": slot_start,
+    })
+
+    # Email fallback (always attempted)
+    try:
+        email = fetch_patient_email(patient_id)
+        if email:
+            send_email(
+                email,
+                f"MediConnect – Appointment reminder ({label})",
+                f"{message}\n\nAppointment ID: {appt_id}\n\n"
+                "Please log in to MediConnect to view the full details.",
+            )
+    except Exception as exc:
+        logging.warning("Reminder email failed for %s: %s", appt_id, exc)
+
+    _mark_sent(appt_id, rkey)
+    logging.info("Sent %s reminder for appointment %s (patient %s)", rkey, appt_id, patient_id)
+
+
+def check_reminders() -> None:
+    appt_url = os.environ.get(
+        "APPOINTMENT_SERVICE_URL", "http://appointment-service:5032"
+    ).rstrip("/")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    reminders = [
+        {"key": "24h", "label": "24 hours", "hours": 24},
+        {"key": "1h",  "label": "1 hour",   "hours": 1},
+    ]
+    query_from = now + timedelta(minutes=55)
+    query_to = now + timedelta(hours=24, minutes=_REMINDER_WINDOW)
+
+    try:
+        resp = requests.get(
+            f"{appt_url}/appointment/upcoming",
+            params={
+                "status": "confirmed",
+                "from": query_from.isoformat(),
+                "to": query_to.isoformat(),
+            },
+            timeout=10,
+        )
+        if not resp.ok:
+            return
+        appointments = resp.json().get("appointments", [])
+    except Exception as exc:
+        logging.warning("Reminder check — could not fetch appointments: %s", exc)
+        return
+
+    for appt in appointments:
+        raw = appt.get("slotStart") or appt.get("dateTime")
+        if not raw:
+            continue
+        try:
+            slot_dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if slot_dt.tzinfo:
+                slot_dt = slot_dt.astimezone(timezone.utc).replace(tzinfo=None)
+        except (ValueError, AttributeError):
+            continue
+
+        for r in reminders:
+            target = slot_dt - timedelta(hours=r["hours"])
+            if abs((now - target).total_seconds()) <= _REMINDER_WINDOW * 60:
+                _fire_reminder(appt, r["label"], r["key"])
+
+
+def start_reminder_scheduler():
+    scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler.add_job(check_reminders, "interval", minutes=1, id="check_reminders")
+    scheduler.start()
+    logging.info("Appointment reminder scheduler started (every 1 minute)")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Flask routes
+# ══════════════════════════════════════════════════════════════════════════════
+
 @app.errorhandler(Exception)
 def handle_exception(err):
     code = getattr(err, "code", 500)
@@ -237,8 +438,67 @@ def handle_exception(err):
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "service": "notification-wrapper"})
+    with _sse_lock:
+        sse_users = len(_sse_clients)
+        sse_conns = sum(len(v) for v in _sse_clients.values())
+    return jsonify({
+        "status": "ok",
+        "service": "notification-wrapper",
+        "sse_connected_users": sse_users,
+        "sse_total_connections": sse_conns,
+    })
 
+
+# ── SSE endpoints ─────────────────────────────────────────────────────────
+
+@app.route("/sse/stream")
+def sse_stream():
+    """Browser connects here to receive real-time push events."""
+    user_id = request.args.get("userID", "").strip()
+    if not user_id:
+        return jsonify({"error": "userID is required"}), 400
+
+    q = _sse_register(user_id)
+
+    def generate():
+        try:
+            yield f"event: connected\ndata: {json.dumps({'userID': user_id})}\n\n"
+            while True:
+                try:
+                    msg = q.get(timeout=SSE_HEARTBEAT)
+                    yield f"event: {msg['event']}\ndata: {json.dumps(msg['data'])}\n\n"
+                except _queue_mod.Empty:
+                    yield ": heartbeat\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            _sse_unregister(user_id, q)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",   # disable nginx / Kong buffering
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.route("/sse/notify", methods=["POST"])
+def sse_notify():
+    """Internal: any service POSTs here to push an event to a specific user."""
+    body = request.get_json(silent=True) or {}
+    user_id = body.get("userID", "").strip()
+    event = body.get("event", "notification")
+    data = body.get("data", {})
+    if not user_id:
+        return jsonify({"error": "userID is required"}), 400
+    pushed = _sse_push(user_id, event, data)
+    return jsonify({"pushed": True, "connections": pushed})
+
+
+# ── Notification endpoints (unchanged) ───────────────────────────────────
 
 @app.route("/notify/email", methods=["POST"])
 def notify_email():
@@ -310,4 +570,6 @@ def notify_order_ready():
 
 if __name__ == "__main__":
     start_worker_thread()
-    app.run(host="0.0.0.0", port=5011)
+    threading.Thread(target=run_sse_consumer, daemon=True, name="sse-consumer").start()
+    start_reminder_scheduler()
+    app.run(host="0.0.0.0", port=5011, threaded=True)
