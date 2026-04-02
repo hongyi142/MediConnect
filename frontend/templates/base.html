@@ -47,6 +47,7 @@
     data-assign-delivery-url="{{ ASSIGN_DELIVERY_URL }}"
     data-complete-delivery-url="{{ COMPLETE_DELIVERY_URL }}"
     data-notification-url="{{ NOTIFICATION_WRAPPER_URL }}"
+    data-sse-url="{{ SSE_SERVICE_URL }}"
   ></div>
 
   <!-- Firebase initialisation -->
@@ -290,6 +291,57 @@
   <style>
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
+
+  <!-- SSE Push Notifications -->
+  <script>
+    (function () {
+      var _sseSource = null;
+
+      var SSE_EVENTS = {
+        appointment_booked:    "success",
+        appointment_requested: "success",
+        appointment_confirmed: "success",
+        appointment_cancelled: "error",
+        reminder:              "success",
+        notification:          "success",
+      };
+
+      function connectSSE(linkedID) {
+        if (_sseSource) { _sseSource.close(); _sseSource = null; }
+        var cfg = document.getElementById("svc-config");
+        if (!cfg) return;
+        var sseBase = cfg.dataset.sseUrl;
+        if (!sseBase) return;
+
+        var url = sseBase + "/sse/stream?userID=" + encodeURIComponent(linkedID);
+        _sseSource = new EventSource(url);
+
+        Object.keys(SSE_EVENTS).forEach(function (eventName) {
+          _sseSource.addEventListener(eventName, function (e) {
+            try {
+              var data = JSON.parse(e.data);
+              if (data.message) showToast(data.message, SSE_EVENTS[eventName]);
+            } catch (_) {}
+          });
+        });
+
+        // Auto-reconnect is handled natively by EventSource on error
+        _sseSource.onerror = function () {};
+      }
+
+      fbAuth.onAuthStateChanged(function (u) {
+        if (!u) {
+          if (_sseSource) { _sseSource.close(); _sseSource = null; }
+          return;
+        }
+        fbDb.collection("users").doc(u.uid).get().then(function (snap) {
+          if (!snap.exists) return;
+          var linkedID = snap.data().linkedID;
+          if (linkedID) connectSSE(linkedID);
+        }).catch(function () {});
+      });
+    })();
+  </script>
 
   {% block scripts %}{% endblock %}
 </body>

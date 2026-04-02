@@ -101,6 +101,39 @@ def health():
     return jsonify({"status": "ok", "service": "appointment-service"})
 
 
+@app.route("/appointment/upcoming")
+def get_upcoming_appointments():
+    """Return confirmed (or filtered) appointments within a datetime window.
+    Used by reminder-service to find appointments needing reminders.
+    Query params: status (default 'confirmed'), from (ISO datetime), to (ISO datetime).
+    """
+    if not db:
+        return jsonify({"error": "Firestore is not initialised"}), 503
+
+    status_filter = request.args.get("status", "confirmed")
+    from_dt = parse_datetime(request.args.get("from"))
+    to_dt = parse_datetime(request.args.get("to"))
+
+    query = db.collection("Appointment")
+    if status_filter:
+        query = query.where("status", "==", status_filter)
+
+    appointments = []
+    for doc in query.stream():
+        item = doc.to_dict() or {}
+        slot_start, _ = appointment_interval(item)
+        if not slot_start:
+            continue
+        if from_dt and slot_start < from_dt:
+            continue
+        if to_dt and slot_start > to_dt:
+            continue
+        appointments.append(to_json(item))
+
+    appointments.sort(key=lambda x: x.get("slotStart") or x.get("dateTime") or "")
+    return jsonify({"appointments": appointments})
+
+
 @app.route("/appointment", methods=["POST"])
 def create_appointment():
     if not db:

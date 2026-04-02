@@ -110,7 +110,6 @@
 
 <script>
     var allItems = [];
-    var activePhotoMedicationID = null;
 
     fbAuth.onAuthStateChanged(async function(u) {
         if (!u) { location.href = "/auth/login"; return; }
@@ -160,7 +159,7 @@
             var warn = qty < 5 && qty > 0 ? '<span class="warn-icon">!</span>' : qty === 0 ? '<span class="out-text"> OUT</span>' : '';
             var actions = '<div class="action-btns">';
             if (qty < 10) actions += '<button class="btn btn-amber btn-sm" onclick="openRestock(\'' + id + '\',' + qty + ',\'' + encodeURIComponent(name) + '\')">Restock</button>';
-            actions += '<button class="btn btn-secondary btn-sm" onclick="openChangePhoto(\'' + id + '\',\'' + encodeURIComponent(name) + '\')">Change Photo</button>';
+            actions += '<button class="btn btn-secondary btn-sm" onclick="openEditModal(\'' + id + '\')">Edit</button>';
             actions += '</div>';
             return '<tr class="' + cls + '"><td><div class="med-cell">' + imageHtml + '<div>' + escapeHtml(name) + '</div></div></td><td>' + escapeHtml(item.description || "") + '</td><td>' + qty + warn + '</td><td>$' + Number(item.price||0).toFixed(2) + '</td><td>' + actions + '</td></tr>';
         }).join("");
@@ -192,16 +191,22 @@
         document.getElementById("modal").style.display = "flex";
     }
 
-    function openChangePhoto(id, encodedName) {
-        var name = decodeURIComponent(encodedName || "");
-        activePhotoMedicationID = id;
-        document.getElementById("modal-title").textContent = "Change Photo: " + name;
+    function openEditModal(id) {
+        var item = allItems.find(function(i) { return (i.medicationID || i.id) === id; }) || {};
+        document.getElementById("modal-title").textContent = "Edit Medication";
+        var currentThumb = item.imageUrl
+            ? '<img src="' + escapeAttr(item.imageUrl) + '" style="width:56px;height:56px;object-fit:cover;border-radius:8px;margin-bottom:.5rem;display:block;">'
+            : '';
         document.getElementById("modal-body").innerHTML =
-            '<div class="form-group"><label>New Picture *</label><input type="file" id="m-photo" accept="image/png,image/jpeg,image/webp"></div>' +
-            '<p class="form-hint">Upload a new JPG, PNG or WEBP image for this medication.</p>';
+            '<div class="form-group"><label>Name *</label><input id="e-name" value="' + escapeAttr(item.name || "") + '"></div>' +
+            '<div class="form-group"><label>Description</label><input id="e-desc" value="' + escapeAttr(item.description || "") + '"></div>' +
+            '<div class="form-group"><label>Price ($)</label><input type="number" id="e-price" min="0" step="0.01" value="' + Number(item.price || 0).toFixed(2) + '"></div>' +
+            '<div class="form-group"><label>Photo</label>' + currentThumb +
+            '<input type="file" id="e-photo" accept="image/png,image/jpeg,image/webp">' +
+            '<p class="form-hint">Leave empty to keep the current photo. JPG, PNG or WEBP.</p></div>';
         document.getElementById("modal-error").style.display = "none";
-        document.getElementById("modal-submit").textContent = "Upload";
-        document.getElementById("modal-submit").onclick = submitPhotoChange;
+        document.getElementById("modal-submit").textContent = "Save";
+        document.getElementById("modal-submit").onclick = function() { submitEdit(id); };
         document.getElementById("modal").style.display = "flex";
     }
 
@@ -270,40 +275,33 @@
         } catch(e) { document.getElementById("modal-error").textContent = "Restock failed."; document.getElementById("modal-error").style.display = ""; }
     }
 
-    async function submitPhotoChange() {
-        var errDiv = document.getElementById("modal-error");
-        if (!activePhotoMedicationID) {
-            errDiv.textContent = "Medication not selected.";
-            errDiv.style.display = "";
-            return;
-        }
-        var photoInput = document.getElementById("m-photo");
-        var photoFile = (photoInput && photoInput.files && photoInput.files[0]) ? photoInput.files[0] : null;
-        if (!photoFile) {
-            errDiv.textContent = "Please select an image file.";
-            errDiv.style.display = "";
-            return;
-        }
-
+    async function submitEdit(id) {
         var cfg = document.getElementById("svc-config").dataset;
+        var errDiv = document.getElementById("modal-error");
+        var name = document.getElementById("e-name").value.trim();
+        if (!name) { errDiv.textContent = "Name is required."; errDiv.style.display = ""; return; }
         var formData = new FormData();
-        formData.append("image", photoFile);
+        formData.append("name", name);
+        formData.append("description", document.getElementById("e-desc").value.trim());
+        formData.append("price", String(parseFloat(document.getElementById("e-price").value) || 0));
+        var photoFile = document.getElementById("e-photo").files[0] || null;
+        if (photoFile) formData.append("image", photoFile);
         try {
             var token = await fbAuth.currentUser.getIdToken();
-            var res = await fetch(cfg.invUrl + "/inventory/" + activePhotoMedicationID + "/image", {
+            var res = await fetch(cfg.invUrl + "/inventory/" + id, {
                 method: "PUT",
                 headers: { "Authorization": "Bearer " + token },
                 body: formData
             });
             if (!res.ok) {
                 var err = await res.json().catch(function(){ return {}; });
-                throw new Error(err.message || "Upload failed.");
+                throw new Error(err.message || "Failed");
             }
             closeModal();
             await loadInventory();
-            if (typeof showToast === "function") showToast("Medication photo updated!");
-        } catch (e) {
-            errDiv.textContent = e.message || "Photo update failed.";
+            if (typeof showToast === "function") showToast("Medication updated!");
+        } catch(e) {
+            errDiv.textContent = e.message || "Update failed.";
             errDiv.style.display = "";
         }
     }

@@ -23,7 +23,7 @@ def to_json(data):
 def create_delivery():
     data = request.get_json()
     # Required fields: orderID, patientName, patientAddress, patientPhone, patientEmail
-    doc_ref = db.collection("deliveries").document()
+    doc_ref = db.collection("Delivery").document()
     delivery = {
         "deliveryID": doc_ref.id,
         "orderID": data["orderID"],
@@ -45,13 +45,13 @@ def create_delivery():
 
 @app.route("/delivery", methods=["GET"])
 def list_deliveries():
-    docs = db.collection("deliveries").stream()
+    docs = db.collection("Delivery").stream()
     deliveries = [to_json(doc.to_dict()) for doc in docs]
     return jsonify({"code": 200, "data": deliveries})
 
 @app.route("/delivery/<delivery_id>", methods=["GET"])
 def get_delivery(delivery_id):
-    doc = db.collection("deliveries").document(delivery_id).get()
+    doc = db.collection("Delivery").document(delivery_id).get()
     if not doc.exists:
         return jsonify({"code": 404, "message": "Not found"}), 404
     return jsonify({"code": 200, "data": to_json(doc.to_dict())})
@@ -59,7 +59,7 @@ def get_delivery(delivery_id):
 @app.route("/delivery/<delivery_id>", methods=["PUT"])
 def update_delivery(delivery_id):
     data = request.get_json(silent=True) or {}
-    ref = db.collection("deliveries").document(delivery_id)
+    ref = db.collection("Delivery").document(delivery_id)
     snap = ref.get()
     if not snap.exists:
         return jsonify({"code": 404, "message": "Not found"}), 404
@@ -87,7 +87,7 @@ def update_delivery(delivery_id):
 
 @app.route("/delivery/<delivery_id>/delivered", methods=["PUT"])
 def mark_delivered(delivery_id):
-    db.collection("deliveries").document(delivery_id).update({
+    db.collection("Delivery").document(delivery_id).update({
         "status": "completed",
         "completedAt": datetime.now(timezone.utc).isoformat()
     })
