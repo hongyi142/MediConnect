@@ -213,6 +213,42 @@ def health():
     return jsonify({"status": "ok", "service": "complete-consultation"})
 
 
+@app.route("/complete-consultation/summarise-notes", methods=["POST"])
+def summarise_notes():
+    """
+    Proxy endpoint so the frontend never calls openai-wrapper directly.
+    Accepts { notes, patientID? } and enriches the AI call with the
+    patient's allergies and past medical history fetched from patient-service.
+    """
+    body = request.get_json(silent=True) or {}
+    notes = body.get("notes")
+    patient_id = body.get("patientID")
+
+    if not notes:
+        return jsonify({"error": "notes is required"}), 400
+
+    openai_url = os.environ.get("OPENAI_WRAPPER_URL", "http://openai-wrapper:5021").rstrip("/")
+    patient_url = os.environ.get("PATIENT_SERVICE_URL", "http://patient-service:5030").rstrip("/")
+
+    allergies, past_history = [], []
+    if patient_id:
+        try:
+            p_resp = call("GET", f"{patient_url}/patient/{patient_id}")
+            if p_resp.ok:
+                p_data = p_resp.json()
+                allergies = p_data.get("allergies") or []
+                past_history = p_data.get("pastHistory") or []
+        except Exception:
+            pass
+
+    ai_resp = call(
+        "POST",
+        f"{openai_url}/openai/summarise-notes",
+        json={"notes": notes, "allergies": allergies, "pastHistory": past_history},
+    )
+    return (ai_resp.content, ai_resp.status_code, {"Content-Type": "application/json"})
+
+
 @app.route("/available-medications")
 def available_medications():
     inventory_url = os.environ.get("INVENTORY_SERVICE_URL", "http://inventory-service:5005").rstrip("/")
@@ -237,6 +273,7 @@ def complete_consultation():
     consultation_url = os.environ.get("CONSULTATION_SERVICE_URL", "http://consultation-service:5004").rstrip("/")
     openai_url = os.environ.get("OPENAI_WRAPPER_URL", "http://openai-wrapper:5021").rstrip("/")
     inventory_url = os.environ.get("INVENTORY_SERVICE_URL", "http://inventory-service:5005").rstrip("/")
+    patient_url = os.environ.get("PATIENT_SERVICE_URL", "http://patient-service:5030").rstrip("/")
     order_url = os.environ.get("ORDER_SERVICE_URL", "https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI").rstrip("/")
     mc_url = os.environ.get("MC_SERVICE_URL", "http://mc-service:5010").rstrip("/")
     notification_url = os.environ.get("NOTIFICATION_WRAPPER_URL", "http://notification-wrapper:5011").rstrip("/")
@@ -245,10 +282,21 @@ def complete_consultation():
     notes_resp = call("PUT", f"{consultation_url}/consultation/{appt_id}/notes", json={"notes": notes})
     notes_resp.raise_for_status()
 
-    # Step 2 (non-blocking)
+    # Step 2 (non-blocking) — include patient allergies and history for richer AI summary
     summary = ""
     try:
-        summary_resp = call("POST", f"{openai_url}/openai/summarise-notes", json={"notes": notes})
+        allergies, past_history = [], []
+        if patient_id:
+            patient_resp = call("GET", f"{patient_url}/patient/{patient_id}")
+            if patient_resp.ok:
+                patient_data = patient_resp.json()
+                allergies = patient_data.get("allergies") or []
+                past_history = patient_data.get("pastHistory") or []
+        summary_resp = call(
+            "POST",
+            f"{openai_url}/openai/summarise-notes",
+            json={"notes": notes, "allergies": allergies, "pastHistory": past_history},
+        )
         if summary_resp.ok:
             summary = summary_resp.json().get("summary", "")
     except Exception:
@@ -315,7 +363,14 @@ def complete_consultation():
     complete_resp = call(
         "PUT",
         f"{consultation_url}/consultation/{appt_id}/complete",
-        json={"summary": summary, "mcIssued": mc_issued, "mcKey": mc_key, "medications": meds_for_record},
+        json={
+            "summary": summary,
+            "mcIssued": mc_issued,
+            "mcKey": mc_key,
+            "medications": meds_for_record,
+            "patientID": patient_id,
+            "doctorID": doctor_id,
+        },
     )
     complete_resp.raise_for_status()
     consultation = complete_resp.json()

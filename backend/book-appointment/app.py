@@ -264,10 +264,13 @@ def build_alternatives(doctor_url, appointment_url, slot_start, slot_end, specia
 def notify_patient(notification_url, patient, appointment, status, cancellation_reason=None, alternatives=None):
     receiver = patient.get("email")
     mobile = patient.get("phone")
+    patient_id = patient.get("patientID") or appointment.get("patientID")
     doctor_id = appointment.get("doctorID")
+    appt_id = appointment.get("appointmentID")
     slot_start = appointment.get("slotStart") or appointment.get("dateTime")
 
     if status == "confirmed":
+        event_type = "appointment_confirmed"
         subject = "MediConnect Appointment Confirmed"
         content = (
             f"Your appointment on {slot_start} with doctor {doctor_id} has been confirmed. "
@@ -275,6 +278,7 @@ def notify_patient(notification_url, patient, appointment, status, cancellation_
         )
         sms = "Your MediConnect appointment has been confirmed."
     else:
+        event_type = "appointment_cancelled"
         subject = "MediConnect Appointment Update"
         content = "Your appointment was rejected by the doctor."
         if cancellation_reason:
@@ -286,6 +290,12 @@ def notify_patient(notification_url, patient, appointment, status, cancellation_
         sms = "Your appointment was rejected. Please review alternative doctors/timeslots."
 
     payload = {
+        "event_type": event_type,
+        "patientID": patient_id,
+        "patientName": patient.get("name"),
+        "appointmentID": appt_id,
+        "slotStart": slot_start,
+        "reason": cancellation_reason,
         "receiver": receiver,
         "subject": subject,
         "content": content,
@@ -440,6 +450,29 @@ def book_appointment():
             )
         except Exception:
             pass  # Non-fatal: appointment is created, schedule update is best-effort
+
+        # Send email + Telegram notification for appointment booking
+        _, _, _, notification_url = get_service_urls()
+        patient_resp = req("GET", f"{patient_url}/patient/{patient_id}")
+        patient_data = patient_resp.json() if patient_resp.ok else {}
+        try:
+            req("POST", f"{notification_url}/notify/send", json={
+                "event_type": "appointment_booked",
+                "patientID": patient_id,
+                "patientName": patient_data.get("name"),
+                "appointmentID": appointment.get("appointmentID"),
+                "slotStart": slot_start.isoformat(),
+                "receiver": patient_data.get("email"),
+                "subject": "MediConnect: Appointment Requested",
+                "content": (
+                    f"Hi {patient_data.get('name', 'there')}, your appointment has been requested for "
+                    f"{slot_start.strftime('%d %b %Y %H:%M')} UTC. Awaiting doctor confirmation."
+                ),
+                "mobile": patient_data.get("phone"),
+                "message": f"[MediConnect] Appointment requested for {slot_start.strftime('%d %b %Y %H:%M')} UTC.",
+            })
+        except Exception:
+            pass
 
         # Push real-time SSE notifications to the patient and doctor
         sse_url = os.environ.get("SSE_SERVICE_URL", "http://sse-service:5060").rstrip("/")
@@ -602,6 +635,42 @@ def respond_to_appointment():
             "patientNotified": patient_notification_sent,
         }
     )
+
+
+@app.route("/book-appointment/symptom-check", methods=["POST"])
+def symptom_check():
+    """
+    Proxy endpoint so the frontend never calls openai-wrapper directly.
+    Accepts { symptoms, patientID? } and enriches the AI call with
+    the patient's allergies and past medical history fetched from patient-service.
+    """
+    body = request.get_json(silent=True) or {}
+    symptoms = body.get("symptoms")
+    patient_id = body.get("patientID")
+
+    if not symptoms:
+        return jsonify({"error": "symptoms is required"}), 400
+
+    openai_url = os.environ.get("OPENAI_WRAPPER_URL", "http://openai-wrapper:5021").rstrip("/")
+    patient_url_base = os.environ.get("PATIENT_SERVICE_URL", "http://patient-service:5030").rstrip("/")
+
+    allergies, past_history = [], []
+    if patient_id:
+        try:
+            p_resp = req("GET", f"{patient_url_base}/patient/{patient_id}")
+            if p_resp.ok:
+                p_data = p_resp.json()
+                allergies = p_data.get("allergies") or []
+                past_history = p_data.get("pastHistory") or []
+        except Exception:
+            pass
+
+    ai_resp = req(
+        "POST",
+        f"{openai_url}/openai/symptom-check",
+        json={"symptoms": symptoms, "allergies": allergies, "pastHistory": past_history},
+    )
+    return (ai_resp.content, ai_resp.status_code, {"Content-Type": "application/json"})
 
 
 @app.route("/book-appointment/doctor-notifications/<doctor_id>", methods=["GET"])

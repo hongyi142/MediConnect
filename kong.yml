@@ -38,6 +38,12 @@ services:
         paths:
           - /consultation
         strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
 
   - name: inventory-service
     url: http://inventory-service:5005

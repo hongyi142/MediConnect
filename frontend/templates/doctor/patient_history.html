@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Patient Consultation History - MediConnect{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+    <div class="page-header">
+        <button class="back-btn" onclick="history.back()">&#8592; Back</button>
+        <div>
+            <h1 id="page-title">Patient Consultation History</h1>
+            <p id="page-subtitle" class="subtitle">Past consultation notes and summaries</p>
+        </div>
+    </div>
+
+    <div id="patient-card" class="info-card" style="display:none"></div>
+
+    <div id="history-list"></div>
+    <div id="empty-msg" style="display:none" class="empty-state">No past consultations found for this patient.</div>
+    <div id="error-msg" class="alert alert-error" style="display:none"></div>
+</div>
+
+<style>
+.page-wrap { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; padding-top: var(--navbar-height); }
+.page-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem; }
+.back-btn { background: none; border: 1px solid var(--border); border-radius: var(--radius-md); padding: .4rem .8rem; cursor: pointer; font-size: .875rem; }
+.back-btn:hover { background: var(--surface-alt, #f3f4f6); }
+h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+.subtitle { color: var(--text-muted, #6b7280); margin: .25rem 0 0; font-size: .9rem; }
+.info-card { background: rgba(255,255,255,.8); border: 1px solid rgba(255,255,255,.9); border-radius: var(--radius-xl); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); }
+.info-card .row { display: flex; gap: 1rem; justify-content: space-between; margin-bottom: .4rem; font-size: .9rem; }
+.info-card .label { color: var(--text-muted, #6b7280); }
+.allergy-badge { display: inline-block; background: #fee2e2; color: #991b1b; border-radius: 999px; padding: .15rem .6rem; font-size: .78rem; margin: .1rem; }
+.consult-card { background: rgba(255,255,255,.8); border: 1px solid rgba(255,255,255,.9); border-radius: var(--radius-xl); padding: 1.25rem 1.5rem; margin-bottom: 1rem; box-shadow: var(--shadow-md); }
+.consult-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+.consult-date { font-weight: 600; font-size: 1rem; }
+.status-badge { font-size: .75rem; padding: .2rem .6rem; border-radius: 999px; background: #dcfce7; color: #166534; }
+.section-label { font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted, #6b7280); margin: .75rem 0 .25rem; }
+.notes-box, .summary-box { background: var(--surface-alt, #f9fafb); border: 1px solid var(--border); border-radius: var(--radius-md); padding: .75rem 1rem; font-size: .875rem; white-space: pre-wrap; word-break: break-word; }
+.summary-box { background: #eff6ff; border-color: #bfdbfe; }
+.med-list { list-style: none; padding: 0; margin: 0; }
+.med-list li { font-size: .875rem; padding: .2rem 0; border-bottom: 1px solid var(--border); }
+.med-list li:last-child { border: none; }
+.mc-badge { display: inline-block; background: #fef9c3; color: #713f12; border-radius: 999px; padding: .15rem .6rem; font-size: .78rem; margin-left: .5rem; }
+.empty-state { text-align: center; color: var(--text-muted, #6b7280); padding: 3rem 0; font-size: .95rem; }
+.alert-error { background: #fee2e2; color: #991b1b; border-radius: var(--radius-md); padding: .75rem 1rem; font-size: .875rem; margin-bottom: 1rem; }
+</style>
+
+<script>
+(async function () {
+    var firebaseUser = await new Promise(function(res) { fbAuth.onAuthStateChanged(res); });
+    if (!firebaseUser) { window.location.href = "/auth/login"; return; }
+    var snap = await fbDb.collection("users").doc(firebaseUser.uid).get();
+    if (!snap.exists || snap.data().role !== "doctor") { window.location.href = "/auth/login"; return; }
+
+    var patientID = sessionStorage.getItem("viewPatientID");
+    if (!patientID) { document.getElementById("error-msg").textContent = "No patient selected."; document.getElementById("error-msg").style.display = ""; return; }
+
+    var cfg = document.getElementById("svc-config").dataset;
+    var token = await fbAuth.currentUser.getIdToken();
+
+    // Load patient info
+    try {
+        var pRes = await fetch(cfg.patientUrl + "/patient/" + patientID, { headers: { "Authorization": "Bearer " + token } });
+        if (pRes.ok) {
+            var p = await pRes.json();
+            document.getElementById("page-title").textContent = "History: " + (p.name || patientID);
+            document.getElementById("page-subtitle").textContent = (p.NRIC || "") + (p.email ? "  ·  " + p.email : "");
+            var allergies = (p.allergies || []).map(function(a) { return '<span class="allergy-badge">' + escHtml(a) + '</span>'; }).join(" ") || "None";
+            var history = (p.pastHistory || []).join(", ") || "None";
+            document.getElementById("patient-card").innerHTML =
+                '<div class="row"><span class="label">Allergies</span><span>' + allergies + '</span></div>' +
+                '<div class="row"><span class="label">Past Medical History</span><span>' + escHtml(history) + '</span></div>';
+            document.getElementById("patient-card").style.display = "";
+        }
+    } catch (_) {}
+
+    // Load consultation history
+    try {
+        var cRes = await fetch(cfg.consultationUrl + "/consultation/patient/" + patientID, { headers: { "Authorization": "Bearer " + token } });
+        if (!cRes.ok) throw new Error("Failed to load consultations");
+        var cData = await cRes.json();
+        var consultations = cData.consultations || [];
+
+        if (!consultations.length) {
+            document.getElementById("empty-msg").style.display = "";
+            return;
+        }
+
+        var html = "";
+        consultations.forEach(function(c) {
+            var dateStr = c.endTime ? new Date(c.endTime).toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" }) :
+                          c.startTime ? new Date(c.startTime).toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" }) : "Unknown date";
+
+            var medsHtml = "";
+            if (c.medications && c.medications.length) {
+                medsHtml = '<div class="section-label">Medications Prescribed</div><ul class="med-list">' +
+                    c.medications.map(function(m) {
+                        return '<li>' + escHtml(m.medicationName || m.medicationID) +
+                            (m.qty ? ' &times; ' + m.qty : '') +
+                            (m.instructions ? ' — <em>' + escHtml(m.instructions) + '</em>' : '') +
+                            '</li>';
+                    }).join("") + '</ul>';
+            }
+
+            var mcHtml = c.mcIssued ? '<span class="mc-badge">MC Issued</span>' : "";
+            var notesHtml = c.notes ? '<div class="section-label">Doctor\'s Notes</div><div class="notes-box">' + escHtml(c.notes) + '</div>' : "";
+            var summaryHtml = c.summary ? '<div class="section-label">AI Summary</div><div class="summary-box">' + escHtml(c.summary) + '</div>' : "";
+
+            html += '<div class="consult-card">' +
+                '<div class="consult-card-header">' +
+                '<span class="consult-date">' + dateStr + mcHtml + '</span>' +
+                '<span class="status-badge">' + escHtml(c.status || "completed") + '</span>' +
+                '</div>' +
+                (c.apptID ? '<div style="font-size:.8rem;color:var(--text-muted,#6b7280);margin-bottom:.5rem">Appt: ' + escHtml(c.apptID) + '</div>' : '') +
+                notesHtml + summaryHtml + medsHtml +
+                '</div>';
+        });
+        document.getElementById("history-list").innerHTML = html;
+    } catch (e) {
+        document.getElementById("error-msg").textContent = e.message || "Could not load history.";
+        document.getElementById("error-msg").style.display = "";
+    }
+})();
+
+function escHtml(str) {
+    return String(str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+</script>
+{% endblock %}

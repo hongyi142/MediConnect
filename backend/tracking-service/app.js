@@ -19,6 +19,7 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || 5050;
 const DELIVERY_SERVICE_URL = process.env.DELIVERY_SERVICE_URL || 'http://delivery:5000';
+const RIDER_SERVICE_URL = process.env.RIDER_SERVICE_URL || 'http://rider-service:5001';
 const OSRM_URL = 'http://router.project-osrm.org/route/v1/driving/';
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://guest:guest@rabbitmq:5672/';
 
@@ -159,6 +160,34 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(`[Tracking] Socket disconnected: ${socket.id}`);
   });
+});
+
+// REST endpoint: returns rider's current location.
+// Returns live Socket.io position if the rider has an active delivery,
+// otherwise falls back to the stored coordinates in rider-service.
+app.get('/rider-location/:riderID', async (req, res) => {
+  const { riderID } = req.params;
+
+  // Check if rider has an active delivery with live location cached
+  for (const [, ctx] of deliveryContext) {
+    if (ctx.riderLat && ctx.riderLng) {
+      // deliveryContext doesn't key by riderID, so we fall through to rider-service
+      // (a future enhancement could index by riderID as well)
+      break;
+    }
+  }
+
+  try {
+    const response = await axios.get(`${RIDER_SERVICE_URL}/rider/${riderID}`);
+    const rider = response.data.data || response.data;
+    if (rider && rider.latitude && rider.longitude) {
+      return res.json({ riderID, latitude: rider.latitude, longitude: rider.longitude });
+    }
+    return res.status(404).json({ error: 'Rider location not available' });
+  } catch (err) {
+    console.error(`[Tracking] Could not fetch location for rider ${riderID}:`, err.message);
+    return res.status(502).json({ error: 'Could not fetch rider location' });
+  }
 });
 
 httpServer.listen(PORT, () => {

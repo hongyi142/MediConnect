@@ -10,19 +10,33 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-DELIVERY_URL     = os.environ.get("DELIVERY_URL", "http://delivery-service:5000")
-RIDER_URL        = os.environ.get("RIDER_URL",    "http://rider-service:5001")
-RABBITMQ_URL     = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
+DELIVERY_URL     = os.environ.get("DELIVERY_URL",  "http://delivery-service:5000")
+RIDER_URL        = os.environ.get("RIDER_URL",     "http://rider-service:5001")
+TRACKING_URL     = os.environ.get("TRACKING_URL",  "http://tracking-service:5050")
+RABBITMQ_URL     = os.environ.get("RABBITMQ_URL",  "amqp://guest:guest@rabbitmq:5672/")
 GOOGLE_MAPS_KEY  = os.environ.get("GOOGLE_MAPS_API_KEY")
 
 gmaps = googlemaps.Client(key=GOOGLE_MAPS_KEY) if GOOGLE_MAPS_KEY else None
 
 # Geolocation helpers
 
+def get_rider_location(rider_id):
+    """Fetch a rider's current location from the tracking-service (single source of truth)."""
+    try:
+        resp = requests.get(f"{TRACKING_URL}/rider-location/{rider_id}", timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("latitude"), data.get("longitude")
+    except Exception as exc:
+        print(f"[Assign Delivery] Could not fetch location for rider {rider_id} from tracking-service: {exc}")
+    return None, None
+
+
 def find_nearest_rider(patient_address, available_riders, radius_km=1):
     """
     Given a patient address and list of available riders (each with lat/lng),
     returns the single nearest rider within radius_km, or None if none found.
+    Rider location is expected to have been pre-populated via tracking-service.
     """
     # Filter riders that have location set
     riders_with_location = [
@@ -189,7 +203,13 @@ def on_order_paid(ch, method, properties, body):
     riders_resp      = requests.get(f"{RIDER_URL}/rider/free")
     available_riders = riders_resp.json().get("data", [])
 
-    # 3. Find nearest rider within 1km
+    # 3. Enrich riders with location from tracking-service (single source of truth)
+    for rider in available_riders:
+        lat, lng = get_rider_location(rider["riderID"])
+        rider["latitude"] = lat
+        rider["longitude"] = lng
+
+    # 4. Find nearest rider within 1km
     nearest = find_nearest_rider(order["patientAddress"], available_riders, radius_km=1)
 
     if nearest:
@@ -289,6 +309,11 @@ def nearest_rider():
 
     riders_resp      = requests.get(f"{RIDER_URL}/rider/free")
     available_riders = riders_resp.json().get("data", [])
+
+    for rider in available_riders:
+        lat, lng = get_rider_location(rider["riderID"])
+        rider["latitude"] = lat
+        rider["longitude"] = lng
 
     nearest = find_nearest_rider(address, available_riders, radius_km=1)
 

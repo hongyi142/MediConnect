@@ -93,6 +93,56 @@ def _build_telegram_text(message):
             f"📦 <b>Order Delivered</b>\n"
             f"Hi {patient_name}, order <b>{order_id}</b> has been delivered successfully."
         )
+    elif event_type == "rider_near_destination":
+        return (
+            f"🔔 <b>Rider Almost There</b>\n"
+            f"Hi {patient_name}, your rider is less than 500m away! "
+            f"Please get ready to receive order <b>{order_id}</b>."
+        )
+    elif event_type == "appointment_booked":
+        appt_id = _first_non_empty(message, ["appointmentID", "apptID"], "Unknown")
+        slot = _first_non_empty(message, ["slotStart", "dateTime"], "")
+        slot_display = slot[:16].replace("T", " ") + " UTC" if slot else "your scheduled time"
+        return (
+            f"📅 <b>Appointment Requested</b>\n"
+            f"Hi {patient_name}, your appointment (<b>{appt_id}</b>) has been requested for "
+            f"<b>{slot_display}</b>. Awaiting doctor confirmation."
+        )
+    elif event_type == "appointment_confirmed":
+        appt_id = _first_non_empty(message, ["appointmentID", "apptID"], "Unknown")
+        slot = _first_non_empty(message, ["slotStart", "dateTime"], "")
+        slot_display = slot[:16].replace("T", " ") + " UTC" if slot else "your scheduled time"
+        return (
+            f"✅ <b>Appointment Confirmed</b>\n"
+            f"Hi {patient_name}, your appointment (<b>{appt_id}</b>) on <b>{slot_display}</b> "
+            "has been confirmed. Please log in at your scheduled time to join."
+        )
+    elif event_type == "appointment_cancelled":
+        appt_id = _first_non_empty(message, ["appointmentID", "apptID"], "Unknown")
+        reason = _first_non_empty(message, ["reason", "cancellationReason"], "")
+        text = (
+            f"❌ <b>Appointment Cancelled</b>\n"
+            f"Hi {patient_name}, appointment <b>{appt_id}</b> has been cancelled."
+        )
+        if reason:
+            text += f" Reason: {reason}."
+        return text
+    elif event_type == "order_pending_payment":
+        total = float(_first_non_empty(message, ["totalAmount", "amount"], 0) or 0)
+        return (
+            f"💊 <b>Order Pending Payment</b>\n"
+            f"Hi {patient_name}, your consultation is complete. Order <b>{order_id}</b> "
+            f"totalling <b>${total:.2f}</b> is pending payment."
+        )
+    elif event_type == "appointment_reminder":
+        label = _first_non_empty(message, ["label"], "soon")
+        slot = _first_non_empty(message, ["slotStart", "dateTime"], "")
+        slot_display = slot[:16].replace("T", " ") + " UTC" if slot else "your scheduled time"
+        return (
+            f"⏰ <b>Appointment Reminder</b>\n"
+            f"Hi {patient_name}, your appointment is in <b>{label}</b> (at {slot_display}). "
+            "Log in to MediConnect to join."
+        )
     else:
         # Fallback: use subject/content or body from legacy payloads
         subject = message.get("subject", "MediConnect Notification")

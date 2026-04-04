@@ -132,9 +132,36 @@ def complete_consultation(appt_id):
         "endTime": datetime.utcnow(),
         "status": "completed",
     }
+    if body.get("patientID"):
+        updates["patientID"] = body["patientID"]
+    if body.get("doctorID"):
+        updates["doctorID"] = body["doctorID"]
     doc.reference.update(updates)
     updated = doc.reference.get().to_dict()
     return jsonify(to_json(updated))
+
+
+@app.route("/consultation/patient/<patient_id>")
+def get_consultations_by_patient(patient_id):
+    """Return all completed consultations for a patient, newest first."""
+    if not db:
+        return jsonify({"error": "Firestore is not initialised"}), 503
+
+    # We join via the appointment-service by matching apptIDs that belong to this patient.
+    # Instead, store patientID on the consultation at creation time (added below).
+    # For existing records we fall back to filtering by apptID prefix is not viable,
+    # so we accept patientID as a denormalised field written at complete time.
+    docs = (
+        db.collection("Consultation")
+        .where("patientID", "==", patient_id)
+        .stream()
+    )
+    results = sorted(
+        [to_json(d.to_dict()) for d in docs],
+        key=lambda c: c.get("endTime") or c.get("startTime") or "",
+        reverse=True,
+    )
+    return jsonify({"consultations": results})
 
 
 if __name__ == "__main__":

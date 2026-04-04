@@ -137,6 +137,11 @@ def doctor_inventory():
     return render_template("doctor/inventory.html")
 
 
+@app.route("/doctor/patient-history")
+def doctor_patient_history():
+    return render_template("doctor/patient_history.html")
+
+
 # ── Shared ──
 @app.route("/account/settings")
 def account_settings():

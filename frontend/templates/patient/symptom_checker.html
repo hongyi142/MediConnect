@@ -487,10 +487,12 @@
         var cfg = document.getElementById("svc-config").dataset;
         try {
             var token = await fbAuth.currentUser.getIdToken();
-            var res = await fetch(cfg.openaiUrl + "/openai/symptom-check", {
+            var patientID = window.currentUser && window.currentUser.linkedID;
+
+            var res = await fetch(cfg.bookAppointmentUrl + "/book-appointment/symptom-check", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-                body: JSON.stringify({ symptoms: parts.join(". ") })
+                body: JSON.stringify({ symptoms: parts.join(". "), patientID: patientID || null })
             });
             var data = await res.json();
             if (!res.ok) throw new Error(data.error || "Analysis failed");

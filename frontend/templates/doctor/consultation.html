@@ -33,6 +33,7 @@
         <div class="panel-card">
             <h3>Patient Info</h3>
             <div id="patient-info"></div>
+            <button class="btn-panel btn-history" onclick="viewPatientHistory()" style="margin-top:.75rem;width:100%">View Past Consultation Notes</button>
         </div>
         <button class="btn-prescribe" onclick="goToPrescription()">Submit &amp; Prescribe</button>
     </div>
@@ -151,6 +152,8 @@
     .btn-save:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(13, 148, 136, 0.4); }
     .btn-ai { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
     .btn-ai:hover { background: rgba(255,255,255,0.2); }
+    .btn-history { background: rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15); font-size: .8rem; }
+    .btn-history:hover { background: rgba(255,255,255,0.15); color: #fff; }
 
     .note-hint { color: var(--slate-400); font-size: .6875rem; display: block; margin-top: .375rem; }
 
@@ -241,6 +244,7 @@
             var token = await fbAuth.currentUser.getIdToken();
             var apptRes = await fetch(cfg.apptUrl + "/appointment/" + consultData.apptID, { headers: { "Authorization": "Bearer " + token } });
             var appt = await apptRes.json();
+            consultData.patientID = appt.patientID; // store for viewPatientHistory()
             var pRes = await fetch(cfg.patientUrl + "/patient/" + appt.patientID, { headers: { "Authorization": "Bearer " + token } });
             var p = await pRes.json();
             var allergies = (p.allergies||[]).map(function(a) { return '<span class="allergy-badge">' + a + '</span>'; }).join(" ") || "None";
@@ -294,9 +298,9 @@
         var cfg = document.getElementById("svc-config").dataset;
         try {
             var token = await fbAuth.currentUser.getIdToken();
-            var res = await fetch(cfg.openaiUrl + "/openai/summarise-notes", {
+            var res = await fetch(cfg.completeConsultationUrl + "/complete-consultation/summarise-notes", {
                 method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-                body: JSON.stringify({ notes: notes })
+                body: JSON.stringify({ notes: notes, patientID: consultData.patientID || null })
             });
             var data = await res.json();
             aiSummary = data.summary || "No summary generated.";
@@ -314,6 +318,21 @@
         if (room) room.disconnect();
         localTracks.forEach(function(t) { t.stop(); });
         location.href = "/doctor/prescription";
+    }
+
+    function viewPatientHistory() {
+        var patientID = consultData && consultData.patientID;
+        if (!patientID) {
+            // Try to get it from the loaded appointment data
+            var apptID = consultData && consultData.apptID;
+            if (!apptID) { alert("Patient information not yet loaded."); return; }
+        }
+        if (patientID) {
+            sessionStorage.setItem("viewPatientID", patientID);
+            window.open("/doctor/patient-history", "_blank");
+        } else {
+            alert("Patient ID not available yet. Please wait for patient info to load.");
+        }
     }
 </script>
 {% endblock %}

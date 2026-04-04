@@ -89,6 +89,26 @@ def fetch_patient_info(patient_id):
     return {}
 
 
+def _publish_to_telegram_queue(payload: dict) -> None:
+    """Best-effort: forward a notification payload to the Telegram worker queue."""
+    try:
+        params = pika.URLParameters(RABBITMQ_URL)
+        conn = pika.BlockingConnection(params)
+        ch = conn.channel()
+        ch.exchange_declare(exchange="service_exchange", exchange_type="direct", durable=True)
+        ch.queue_declare(queue="telegram_queue", durable=True)
+        ch.queue_bind(exchange="service_exchange", queue="telegram_queue", routing_key="notification")
+        ch.basic_publish(
+            exchange="service_exchange",
+            routing_key="notification",
+            body=json.dumps(payload),
+            properties=pika.BasicProperties(delivery_mode=2),
+        )
+        conn.close()
+    except Exception as exc:
+        logging.warning("Could not forward notification to Telegram queue: %s", exc)
+
+
 def _first_non_empty(message, keys, default=None):
     for key in keys:
         val = message.get(key)
@@ -136,6 +156,48 @@ def _normalize_message(message):
         normalized["subject"] = "MediConnect: Order Delivered"
         normalized["content"] = f"Hi {patient_name}, order {order_id} has been delivered successfully."
         normalized["message"] = f"[MediConnect] Order {order_id} has been delivered. Thank you for using MediConnect!"
+        normalized["channel"] = "both"
+    elif event_type == "rider_near_destination":
+        normalized["receiver"] = _first_non_empty(normalized, ["patientEmail", "email", "receiver"])
+        normalized["subject"] = "MediConnect: Rider Almost There"
+        normalized["content"] = f"Hi {patient_name}, your rider is less than 500m away for order {order_id}! Please get ready."
+        normalized["message"] = f"[MediConnect] Your rider is almost at your door for order {order_id}."
+        normalized["channel"] = "both"
+    elif event_type == "appointment_booked":
+        appt_id = _first_non_empty(normalized, ["appointmentID", "apptID"], "Unknown")
+        slot = _first_non_empty(normalized, ["slotStart", "dateTime"], "")
+        slot_display = slot[:16].replace("T", " ") + " UTC" if slot else "your scheduled time"
+        normalized["receiver"] = _first_non_empty(normalized, ["patientEmail", "email", "receiver"])
+        normalized["subject"] = "MediConnect: Appointment Requested"
+        normalized["content"] = f"Hi {patient_name}, your appointment ({appt_id}) has been requested for {slot_display}. Awaiting doctor confirmation."
+        normalized["message"] = f"[MediConnect] Appointment {appt_id} requested for {slot_display}. Awaiting confirmation."
+        normalized["channel"] = "both"
+    elif event_type == "appointment_confirmed":
+        appt_id = _first_non_empty(normalized, ["appointmentID", "apptID"], "Unknown")
+        slot = _first_non_empty(normalized, ["slotStart", "dateTime"], "")
+        slot_display = slot[:16].replace("T", " ") + " UTC" if slot else "your scheduled time"
+        normalized["receiver"] = _first_non_empty(normalized, ["patientEmail", "email", "receiver"])
+        normalized["subject"] = "MediConnect: Appointment Confirmed"
+        normalized["content"] = f"Hi {patient_name}, your appointment ({appt_id}) on {slot_display} has been confirmed."
+        normalized["message"] = f"[MediConnect] Appointment {appt_id} confirmed for {slot_display}."
+        normalized["channel"] = "both"
+    elif event_type == "appointment_cancelled":
+        appt_id = _first_non_empty(normalized, ["appointmentID", "apptID"], "Unknown")
+        reason = _first_non_empty(normalized, ["reason", "cancellationReason"], "")
+        content = f"Hi {patient_name}, appointment {appt_id} has been cancelled."
+        if reason:
+            content += f" Reason: {reason}."
+        normalized["receiver"] = _first_non_empty(normalized, ["patientEmail", "email", "receiver"])
+        normalized["subject"] = "MediConnect: Appointment Cancelled"
+        normalized["content"] = content
+        normalized["message"] = f"[MediConnect] Appointment {appt_id} was cancelled."
+        normalized["channel"] = "both"
+    elif event_type == "order_pending_payment":
+        total = float(_first_non_empty(normalized, ["totalAmount", "amount"], 0) or 0)
+        normalized["receiver"] = _first_non_empty(normalized, ["patientEmail", "email", "receiver"])
+        normalized["subject"] = f"MediConnect: Order {order_id} Pending Payment"
+        normalized["content"] = f"Hi {patient_name}, your consultation is complete. Order {order_id} totalling ${total:.2f} is pending payment."
+        normalized["message"] = f"[MediConnect] Order {order_id} is pending payment (${total:.2f})."
         normalized["channel"] = "both"
 
     normalized["receiver"] = _first_non_empty(normalized, ["receiver", "email", "patientEmail"])
@@ -393,6 +455,15 @@ def _fire_reminder(appt: dict, label: str, rkey: str) -> None:
             )
     except Exception as exc:
         logging.warning("Reminder email failed for %s: %s", appt_id, exc)
+
+    # Telegram reminder
+    _publish_to_telegram_queue({
+        "event_type": "appointment_reminder",
+        "patientID": patient_id,
+        "appointmentID": appt_id,
+        "slotStart": slot_start,
+        "label": label,
+    })
 
     _mark_sent(appt_id, rkey)
     logging.info("Sent %s reminder for appointment %s (patient %s)", rkey, appt_id, patient_id)
@@ -677,6 +748,11 @@ def notify_send():
 
     if not email_sent and not sms_sent:
         return jsonify({"error": "No valid email or SMS payload provided."}), 400
+
+    # Forward to Telegram if patient is identifiable
+    if body.get("patientID") or body.get("event_type"):
+        _publish_to_telegram_queue(body)
+
     return jsonify({"emailSent": email_sent, "smsSent": sms_sent})
 
 
@@ -696,6 +772,15 @@ def notify_order_ready():
     subject = f"Order Ready - {order_id}"
     content = f"Your order {order_id} is ready. Total amount: ${float(total or 0):.2f}."
     send_email(receiver, subject, content)
+
+    # Forward to Telegram
+    _publish_to_telegram_queue({
+        "event_type": "order_pending_payment",
+        "patientID": patient_id,
+        "orderID": order_id,
+        "totalAmount": total,
+    })
+
     return jsonify({"message": "Order-ready notification sent", "receiver": receiver})
 
 

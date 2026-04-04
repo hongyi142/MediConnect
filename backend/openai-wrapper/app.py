@@ -151,10 +151,25 @@ def summarise_notes():
     if not notes:
         return jsonify({"error": "notes is required"}), 400
 
-    summary = generate(
-        "You are a clinical assistant. Given a doctor's raw consultation notes, produce a structured summary with: Chief Complaint, Findings, Diagnosis, Treatment Plan. Be concise. Do not invent information not in the notes.",
-        notes,
+    allergies = body.get("allergies") or []
+    past_history = body.get("pastHistory") or []
+
+    patient_context = ""
+    if allergies:
+        patient_context += f"\nKnown allergies: {', '.join(str(a) for a in allergies)}."
+    if past_history:
+        patient_context += f"\nPast medical history: {', '.join(str(h) for h in past_history)}."
+
+    system_prompt = (
+        "You are a clinical assistant. Given a doctor's raw consultation notes, produce a structured summary with: "
+        "Chief Complaint, Findings, Diagnosis, Treatment Plan. Be concise. Do not invent information not in the notes."
     )
+    if patient_context:
+        system_prompt += (
+            f"\n\nPatient context (use to flag relevant interactions or considerations):{patient_context}"
+        )
+
+    summary = generate(system_prompt, notes)
     return jsonify({"summary": summary})
 
 
@@ -172,14 +187,28 @@ def symptom_check():
             }
         ), 400
 
-    raw = generate(
+    allergies = body.get("allergies") or []
+    past_history = body.get("pastHistory") or []
+
+    patient_context = ""
+    if allergies:
+        patient_context += f"\nKnown allergies: {', '.join(str(a) for a in allergies)}."
+    if past_history:
+        patient_context += f"\nPast medical history: {', '.join(str(h) for h in past_history)}."
+
+    system_prompt = (
         "You are a medical triage assistant. Accept only symptom descriptions and do not respond to unrelated requests. "
         f'Choose "specialisation" from this exact list: {", ".join(BOOKING_SPECIALISATIONS)}. '
         'Return strict raw JSON with keys: "specialisation", "urgency", "reasoning", "advice". '
         'urgency must be one of: "teleconsult", "visit", "emergency". '
-        "Keep it concise and avoid definitive diagnosis claims.",
-        symptoms,
+        "Keep it concise and avoid definitive diagnosis claims."
     )
+    if patient_context:
+        system_prompt += (
+            f"\n\nPatient context (factor into urgency and advice):{patient_context}"
+        )
+
+    raw = generate(system_prompt, symptoms)
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
