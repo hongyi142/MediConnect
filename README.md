@@ -1,9 +1,9 @@
-<div align="center">
+<div align="center" display="inline">
   <img src="logo.svg" width="72" height="72" alt="MediConnect logo"/>
   <h1>MediConnect</h1>
 </div>
 
-MediConnect is an online teleconsultation platform that connects patients with doctors across multiple medical specialisations. Patients can book appointments, attend video consultations, receive prescriptions, and have their medications delivered to their doorstep — all through a single web application. The platform supports real-time notifications, automated appointment reminders, and an integrated payment and delivery workflow.
+MediConnect is an online teleconsultation platform that connects patients with doctors across multiple medical specialisations. Patients can book appointments, attend video consultations, receive prescriptions, and have their medications delivered to their doorstep - all through a single web application.
 
 ## User Roles
 

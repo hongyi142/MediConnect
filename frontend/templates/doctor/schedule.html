@@ -195,9 +195,9 @@
             i.addEventListener("change", syncShiftCards);
         });
 
-        loadDoctorShift();
         await ensureSchedule();
-        loadWeekData();
+        await loadWeekData();  // loads weekOverrides first
+        loadDoctorShift();     // reads today's shift from weekOverrides
     }
 
     function syncShiftCards() {
@@ -207,46 +207,26 @@
         });
     }
 
-    async function loadDoctorShift() {
-        var cfg = document.getElementById("svc-config").dataset;
-        try {
-            var token = await fbAuth.currentUser.getIdToken();
-            var res = await fetch(cfg.doctorUrl + "/doctor/" + encodeURIComponent(window.currentUser.linkedID), {
-                headers: { "Authorization": "Bearer " + token }
-            });
-            if (!res.ok) return;
-            var doc = await res.json();
-            var shift = String(doc.shift || "day").toLowerCase();
-            globalShift = shift;
-            var opt = document.querySelector('input[name="shift"][value="' + shift + '"]') || document.querySelector('input[name="shift"][value="day"]');
-            if (opt) opt.checked = true;
-            syncShiftCards();
-            document.getElementById("shift-note").textContent = "Current shift: " + shift;
-        } catch (_) {}
+    function loadDoctorShift() {
+        // Read today's shift from weekOverrides (loaded by loadWeekData) so the
+        // card matches the per-day dropdown exactly.
+        var todayStr = todayLocalStr();
+        var shift = weekOverrides[todayStr] !== undefined ? weekOverrides[todayStr] : (globalShift || "day");
+        var opt = document.querySelector('input[name="shift"][value="' + shift + '"]');
+        if (!opt) opt = document.querySelector('input[name="shift"][value="day"]');
+        if (opt) opt.checked = true;
+        syncShiftCards();
+        document.getElementById("shift-note").textContent = "Today\u2019s shift: " + shift;
     }
 
     async function saveShift() {
-        var selected = document.querySelector('input[name="shift"]:checked');
-        if (!selected) return;
-
+        var sel = document.querySelector('input[name="shift"]:checked');
+        if (!sel) return;
         var btn = document.getElementById("save-shift-btn");
         setLoading(btn, true);
-        var cfg = document.getElementById("svc-config").dataset;
-        try {
-            var token = await fbAuth.currentUser.getIdToken();
-            var res = await fetch(cfg.doctorUrl + "/doctor/" + encodeURIComponent(window.currentUser.linkedID) + "/shift", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-                body: JSON.stringify({ shift: selected.value })
-            });
-            var data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Unable to update shift");
-            document.getElementById("shift-note").textContent = "Current shift: " + selected.value;
-            showToast("Shift updated.");
-            loadWeekData();
-        } catch (e) {
-            showToast(e.message || "Unable to update shift.", "error");
-        }
+        // Save today's shift via shift-override — same endpoint as the per-day dropdown
+        await window.setShiftOverride(todayLocalStr(), sel.value);
+        document.getElementById("shift-note").textContent = "Today\u2019s shift: " + sel.value;
         setLoading(btn, false);
     }
 
@@ -318,7 +298,7 @@
         }
     }
 
-    async function loadWeekData() {
+    async function loadWeekData() {  // always async so callers can await it
         var cfg = document.getElementById("svc-config").dataset;
         var token = await fbAuth.currentUser.getIdToken();
 
@@ -488,8 +468,9 @@
             var data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed");
             weekOverrides[date] = shift;
-            showToast("Shift for " + fmtDate(date) + " set to " + shift + ".");
-            loadWeekData();
+            showToast("Shift for " + date + " set to " + shift + ".");
+            await loadWeekData();
+            loadDoctorShift(); // re-sync card if today was changed
         } catch (e) {
             showToast(e.message || "Failed to update shift.", "error");
             loadWeekData();

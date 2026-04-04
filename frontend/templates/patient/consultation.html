@@ -102,7 +102,13 @@
             room.on("participantConnected", handleParticipant);
             room.on("participantDisconnected", function() {
                 document.getElementById("remote-video").innerHTML = "";
-                document.getElementById("video-status").textContent = "Doctor disconnected";
+                document.getElementById("video-status").textContent = "Consultation ended — redirecting...";
+                // Doctor has ended the session; clean up and redirect patient
+                setTimeout(function() {
+                    if (room) room.disconnect();
+                    localTracks.forEach(function(t) { t.stop(); });
+                    location.href = "/patient/dashboard";
+                }, 3000);
             });
         } catch(e) {
             document.getElementById("video-status").textContent = "Connection failed";

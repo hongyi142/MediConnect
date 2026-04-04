@@ -128,6 +128,7 @@ def complete_consultation(appt_id):
         "summary": body.get("summary", ""),
         "mcIssued": bool(body.get("mcIssued", False)),
         "mcKey": body.get("mcKey"),
+        "medications": body.get("medications", []),
         "endTime": datetime.utcnow(),
         "status": "completed",
     }

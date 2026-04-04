@@ -171,6 +171,7 @@ def push_order_item(order_url, order_id, med):
         "qty": qty,
         "unitPrice": unit_price,
         "subtotal": qty * unit_price,
+        "instructions": med.get("instructions", ""),
     }
     candidates = [
         ("POST", add_item_url, item_payload_outsystems),
@@ -300,11 +301,21 @@ def complete_consultation():
         mc_key = mc_data.get("mcKey")
         mc_download = mc_data.get("downloadUrl")
 
-    # Step 6
+    # Step 6 — store summary, MC details AND the prescribed medications (with instructions)
+    meds_for_record = [
+        {
+            "medicationID": m.get("medicationID"),
+            "medicationName": m.get("medicationName"),
+            "qty": m.get("qty"),
+            "unitPrice": m.get("unitPrice"),
+            "instructions": m.get("instructions", ""),
+        }
+        for m in medications
+    ]
     complete_resp = call(
         "PUT",
         f"{consultation_url}/consultation/{appt_id}/complete",
-        json={"summary": summary, "mcIssued": mc_issued, "mcKey": mc_key},
+        json={"summary": summary, "mcIssued": mc_issued, "mcKey": mc_key, "medications": meds_for_record},
     )
     complete_resp.raise_for_status()
     consultation = complete_resp.json()

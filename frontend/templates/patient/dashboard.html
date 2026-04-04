@@ -111,8 +111,8 @@
             </div>
         </div>
 
-        <!-- Pending Orders -->
-        <div class="card" style="margin-top: 1.5rem">
+        <!-- Pending Orders — hidden when there are no pending orders -->
+        <div class="card" id="orders-card" style="margin-top:1.5rem;display:none">
             <div class="card-header">
                 <h2>Pending Payments</h2>
                 <a href="/patient/order-status" class="view-all">View all</a>
@@ -404,18 +404,20 @@
             var pending = (orders || []).filter(function(o) { return (o.Status || "").toLowerCase() === "pending"; });
             var sp = document.getElementById("stat-payments"); if (sp) sp.textContent = pending.length;
 
-            var list = document.getElementById("order-list");
+            var card = document.getElementById("orders-card");
             if (pending.length === 0) {
-                document.getElementById("order-empty").style.display = "";
+                if (card) card.style.display = "none";
                 return;
             }
+            if (card) card.style.display = "";
+            var list = document.getElementById("order-list");
             list.innerHTML = pending.map(function(o) {
                 return '<div class="appt-card"><div class="appt-info"><div class="date">Order #' + o.Id + '</div><div class="detail">Total: $' + Number(o.TotalAmount || 0).toFixed(2) + '</div></div>' +
                        '<button class="btn btn-primary btn-sm" id="pay-btn-' + o.Id + '" onclick="payOrder(\'' + o.Id + '\', ' + o.TotalAmount + ')">Pay Now</button></div>';
             }).join("");
         } catch(e) {
-            document.getElementById("order-empty").style.display = "";
             var sp = document.getElementById("stat-payments"); if (sp) sp.textContent = "0";
+            // Keep card hidden on error
         }
     }
 

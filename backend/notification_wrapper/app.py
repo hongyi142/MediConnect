@@ -77,6 +77,18 @@ def fetch_patient_email(patient_id):
     return resp.json().get("email")
 
 
+def fetch_patient_info(patient_id):
+    """Return full patient dict (email, phone, name, …) or empty dict on failure."""
+    try:
+        base = os.environ.get("PATIENT_SERVICE_URL", "http://patient-service:5030").rstrip("/")
+        resp = requests.get(f"{base}/patient/{patient_id}", timeout=10)
+        if resp.ok:
+            return resp.json()
+    except Exception:
+        pass
+    return {}
+
+
 def _first_non_empty(message, keys, default=None):
     for key in keys:
         val = message.get(key)
@@ -98,7 +110,8 @@ def _normalize_message(message):
             f"Hi {patient_name}, your payment for order {order_id} was successful. "
             "We are preparing your medication for delivery."
         )
-        normalized["channel"] = "email"
+        normalized["message"] = f"[MediConnect] Payment for order {order_id} confirmed. Your medication is being prepared."
+        normalized["channel"] = "both"
     elif event_type == "payment_refunded":
         amount = float(_first_non_empty(normalized, ["amount"], 0) or 0)
         normalized["receiver"] = _first_non_empty(normalized, ["patientEmail", "email", "receiver"])
@@ -107,7 +120,8 @@ def _normalize_message(message):
             f"Hi {patient_name}, unfortunately we could not find an available rider for order {order_id}. "
             f"Your payment of ${amount / 100:.2f} has been fully refunded."
         )
-        normalized["channel"] = "email"
+        normalized["message"] = f"[MediConnect] Order {order_id} refunded. ${amount / 100:.2f} has been returned to you."
+        normalized["channel"] = "both"
     elif event_type == "rider_assigned":
         rider_name = _first_non_empty(normalized, ["riderName"], "our rider")
         normalized["receiver"] = _first_non_empty(normalized, ["patientEmail", "email", "receiver"])
@@ -115,12 +129,14 @@ def _normalize_message(message):
         normalized["content"] = (
             f"Hi {patient_name}, {rider_name} has been assigned to order {order_id} and is on the way."
         )
-        normalized["channel"] = "email"
+        normalized["message"] = f"[MediConnect] {rider_name} is delivering order {order_id} to you now."
+        normalized["channel"] = "both"
     elif event_type == "order_delivered":
         normalized["receiver"] = _first_non_empty(normalized, ["patientEmail", "email", "receiver"])
         normalized["subject"] = "MediConnect: Order Delivered"
         normalized["content"] = f"Hi {patient_name}, order {order_id} has been delivered successfully."
-        normalized["channel"] = "email"
+        normalized["message"] = f"[MediConnect] Order {order_id} has been delivered. Thank you for using MediConnect!"
+        normalized["channel"] = "both"
 
     normalized["receiver"] = _first_non_empty(normalized, ["receiver", "email", "patientEmail"])
     normalized["mobile"] = _first_non_empty(normalized, ["mobile", "phone", "patientPhone"])
@@ -142,6 +158,15 @@ def _process_queue_message(ch, method, body):
 
     message = _normalize_message(raw)
     channel = message.get("channel", "email")
+
+    # If SMS is required but phone is missing, try fetching from patient service
+    if channel in ("sms", "both") and not message.get("mobile"):
+        patient_id = raw.get("patientID") or raw.get("PatientId")
+        if patient_id:
+            info = fetch_patient_info(patient_id)
+            mobile = info.get("phone") or info.get("mobile") or info.get("phoneNumber")
+            if mobile:
+                message["mobile"] = mobile
 
     try:
         email_ok = True
@@ -379,10 +404,12 @@ def check_reminders() -> None:
     ).rstrip("/")
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     reminders = [
-        {"key": "24h", "label": "24 hours", "hours": 24},
-        {"key": "1h",  "label": "1 hour",   "hours": 1},
+        {"key": "24h", "label": "24 hours",   "minutes": 24 * 60},
+        {"key": "1h",  "label": "1 hour",     "minutes": 60},
+        {"key": "10m", "label": "10 minutes", "minutes": 10},
     ]
-    query_from = now + timedelta(minutes=55)
+    # Query window must cover the earliest checkpoint (10 min) minus the tolerance
+    query_from = now + timedelta(minutes=10 - _REMINDER_WINDOW)
     query_to = now + timedelta(hours=24, minutes=_REMINDER_WINDOW)
 
     try:
@@ -414,16 +441,120 @@ def check_reminders() -> None:
             continue
 
         for r in reminders:
-            target = slot_dt - timedelta(hours=r["hours"])
+            target = slot_dt - timedelta(minutes=r["minutes"])
             if abs((now - target).total_seconds()) <= _REMINDER_WINDOW * 60:
                 _fire_reminder(appt, r["label"], r["key"])
+
+
+_TTL_MINUTES = 10  # Auto-cancel pending appointments after this many minutes
+
+
+def check_pending_ttl() -> None:
+    """Cancel pending appointments that have not been accepted within TTL_MINUTES."""
+    appt_url = os.environ.get(
+        "APPOINTMENT_SERVICE_URL", "http://appointment-service:5032"
+    ).rstrip("/")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    cutoff = now - timedelta(minutes=_TTL_MINUTES)
+
+    try:
+        resp = requests.get(
+            f"{appt_url}/appointment/upcoming",
+            params={"status": "pending"},
+            timeout=10,
+        )
+        if not resp.ok:
+            return
+        appointments = resp.json().get("appointments", [])
+    except Exception as exc:
+        logging.warning("TTL check — could not fetch pending appointments: %s", exc)
+        return
+
+    for appt in appointments:
+        appt_id = appt.get("appointmentID", "")
+        patient_id = appt.get("patientID", "")
+        created_raw = appt.get("createdAt")
+        if not appt_id or not created_raw:
+            continue
+
+        # Skip if already processed
+        try:
+            if _get_redis().get(f"ttl_cancelled:{appt_id}"):
+                continue
+        except Exception:
+            pass
+
+        try:
+            created_dt = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
+            if created_dt.tzinfo:
+                created_dt = created_dt.astimezone(timezone.utc).replace(tzinfo=None)
+        except (ValueError, AttributeError):
+            continue
+
+        if created_dt > cutoff:
+            continue  # Not yet expired
+
+        # Cancel the appointment
+        try:
+            cancel_resp = requests.put(
+                f"{appt_url}/appointment/{appt_id}",
+                json={
+                    "status": "cancelled",
+                    "cancellationReason": "Doctor did not respond within 10 minutes. Please book again.",
+                },
+                timeout=10,
+            )
+            if not cancel_resp.ok:
+                logging.warning("TTL cancel failed for %s: %s", appt_id, cancel_resp.text)
+                continue
+        except Exception as exc:
+            logging.warning("TTL cancel request error for %s: %s", appt_id, exc)
+            continue
+
+        # Mark as processed
+        try:
+            _get_redis().setex(f"ttl_cancelled:{appt_id}", 86400, "1")
+        except Exception:
+            pass
+
+        # Notify patient via SSE
+        slot_start = appt.get("slotStart") or appt.get("dateTime", "")
+        slot_display = slot_start[:16].replace("T", " ") + " UTC" if slot_start else "your slot"
+        message = (
+            f"Your appointment for {slot_display} was automatically cancelled because "
+            "the doctor did not respond within 10 minutes. Please book a new appointment."
+        )
+        _sse_push(patient_id, "appointment_cancelled", {
+            "message": message,
+            "appointmentID": appt_id,
+        })
+
+        # Notify patient via email + SMS
+        try:
+            info = fetch_patient_info(patient_id)
+            email = info.get("email")
+            phone = info.get("phone") or info.get("mobile") or info.get("phoneNumber")
+            patient_name = info.get("name", "Patient")
+            if email:
+                send_email(
+                    email,
+                    "MediConnect – Appointment Auto-Cancelled",
+                    f"Hi {patient_name},\n\n{message}\n\nAppointment ID: {appt_id}",
+                )
+            if phone:
+                send_sms(phone_number=phone, sms_message=f"[MediConnect] {message}")
+        except Exception as exc:
+            logging.warning("TTL notification failed for %s: %s", appt_id, exc)
+
+        logging.info("Auto-cancelled expired pending appointment %s (patient %s)", appt_id, patient_id)
 
 
 def start_reminder_scheduler():
     scheduler = BackgroundScheduler(timezone="UTC")
     scheduler.add_job(check_reminders, "interval", minutes=1, id="check_reminders")
+    scheduler.add_job(check_pending_ttl, "interval", minutes=1, id="check_pending_ttl")
     scheduler.start()
-    logging.info("Appointment reminder scheduler started (every 1 minute)")
+    logging.info("Reminder + TTL scheduler started (every 1 minute)")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
