@@ -100,7 +100,7 @@
 
     /* Header */
     .history-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem; }
-    .history-header h1 { margin: 0; font-size: clamp(2rem, 3vw, 2.5rem); font-weight: 800; color: var(--slate-900); letter-spacing: -0.02em; }
+    .history-header h1 { margin: 0; font-size: clamp(2rem, 3vw, 2.5rem); font-weight: 800; color: var(--slate-900); letter-spacing: -0.02em; font-family: var(--font-heading); }
     .history-header .subtitle { color: var(--text-muted); font-size: var(--text-sm); margin-top: .25rem; }
 
     /* Stat grid — reuse main.css pattern */
@@ -269,29 +269,9 @@
             return !!orderIds[o] || (patientEmail && e === patientEmail) || (pid && pid === String(user.linkedID));
         });
 
-        var mcMap = {};
-        var pastAppts = appts.filter(function (a) {
-            var dt = new Date(a.slotStart || a.dateTime || 0);
-            return !isNaN(dt.getTime()) && (dt < new Date() || a.status === "cancelled");
-        });
-        await Promise.all(pastAppts.map(async function (a) {
-            var apptId = a.appointmentID || a.id;
-            if (!apptId) return;
-            try {
-                var cRes = await fetch(cfg.consultationUrl + "/consultation/" + encodeURIComponent(apptId), { headers: { "Authorization": "Bearer " + token } });
-                if (!cRes.ok) return;
-                var consult = await cRes.json();
-                if (!consult || !consult.mcIssued || !consult.mcKey) return;
-                var mcRes = await fetch(cfg.mcUrl + "/mc/" + encodeURIComponent(consult.mcKey), { headers: { "Authorization": "Bearer " + token } });
-                if (!mcRes.ok) return;
-                var mcData = await mcRes.json();
-                if (mcData.downloadUrl) mcMap[String(apptId)] = mcData.downloadUrl;
-            } catch (_) {}
-        }));
-
         renderStats(appts, orders, deliveries);
         renderTracker(orders);
-        renderAppointments(appts, mcMap);
+        renderAppointments(appts);
         renderOrders(orders);
         renderDeliveries(deliveries);
     }
@@ -337,7 +317,7 @@
         }).join("");
     }
 
-    function renderAppointments(appts, mcMap) {
+    function renderAppointments(appts) {
         var host = document.getElementById("appt-history");
         if (!appts.length) {
             host.innerHTML = '<p class="text-muted">No appointments yet.</p>';
@@ -348,12 +328,10 @@
         host.innerHTML = appts.slice(0, 12).map(function (a) {
             var id = a.appointmentID || a.id || "-";
             var status = String(a.status || "pending").toLowerCase();
-            var mcUrl = mcMap[String(id)] || "";
-            var link = mcUrl ? '<a class="btn-mini" target="_blank" rel="noopener" href="' + mcUrl + '">Download MC</a>' : '';
             return '<div class="row-item">' +
                 '<div class="row-main"><div class="row-title">Appointment #' + id + '</div>' +
                 '<div class="row-sub">' + fmtDate(a.slotStart || a.dateTime) + (a.specialisation ? ' &middot; ' + a.specialisation : '') + '</div></div>' +
-                '<div class="row-actions"><span class="badge ' + status + '">' + status + '</span>' + link + '</div></div>';
+                '<div class="row-actions"><span class="badge ' + status + '">' + status + '</span></div></div>';
         }).join("");
     }
 

@@ -344,41 +344,101 @@
         location.href = "/patient/join";
     }
 
+    function toOrderPatientId(raw) {
+        var text = String(raw || "").trim();
+        if (/^\d+$/.test(text)) return text;
+        var crc = 0 ^ (-1);
+        for (var i = 0; i < text.length; i++) {
+            var c = text.charCodeAt(i);
+            crc = crc ^ c;
+            for (var j = 0; j < 8; j++) {
+                var mask = -(crc & 1);
+                crc = (crc >>> 1) ^ (0xEDB88320 & mask);
+            }
+        }
+        var val = ((crc ^ (-1)) >>> 0) % 900000000 + 100000000;
+        return String(val);
+    }
+
+    async function fetchOrderItems(cfg, patientId, apptId) {
+        if (!patientId || !cfg.orderUrl) return [];
+        var candidates = [String(patientId)];
+        var hashed = toOrderPatientId(patientId);
+        if (hashed !== String(patientId)) candidates.push(hashed);
+        for (var i = 0; i < candidates.length; i++) {
+            try {
+                var ordersRes = await fetch(cfg.orderUrl + "/GetOrdersByPatient?PatientId=" + encodeURIComponent(candidates[i]));
+                if (!ordersRes.ok) continue;
+                var orders = await ordersRes.json();
+                if (!Array.isArray(orders)) continue;
+                var matched = orders.find(function(o) { return String(o.ApptId || "") === String(apptId); });
+                if (!matched) continue;
+                var itemsRes = await fetch(cfg.orderUrl + "/GetItemsByOrder?OrderId=" + encodeURIComponent(matched.Id));
+                if (!itemsRes.ok) continue;
+                var items = await itemsRes.json();
+                if (Array.isArray(items) && items.length) return items;
+            } catch (_) {}
+        }
+        return [];
+    }
+
     var _rxLoaded = {};
     async function togglePrescription(apptId) {
         var panel = document.getElementById("rx-" + apptId);
         if (!panel) return;
         panel.classList.toggle("open");
         if (!panel.classList.contains("open")) return;
-        if (_rxLoaded[apptId]) return; // already loaded
+        if (_rxLoaded[apptId]) return;
         _rxLoaded[apptId] = true;
+
+        var cfg = document.getElementById("svc-config").dataset;
+        var token = await fbAuth.currentUser.getIdToken();
+        var html = "";
+
+        // Step 1: Check consultation for MC download
         try {
-            var cfg = document.getElementById("svc-config").dataset;
-            var token = await fbAuth.currentUser.getIdToken();
-            var res = await fetch(cfg.consultationUrl + "/consultation/" + encodeURIComponent(apptId), {
+            var consultRes = await fetch(cfg.consultationUrl + "/consultation/" + encodeURIComponent(apptId), {
                 headers: { "Authorization": "Bearer " + token }
             });
-            if (!res.ok) { panel.innerHTML = '<p class="text-muted rx-instr">No prescription record found.</p>'; return; }
-            var data = await res.json();
-            var meds = data.medications || [];
-            if (!meds.length) {
-                panel.innerHTML = '<p class="text-muted rx-instr">No medications prescribed for this visit.</p>';
-                return;
-            }
-            var html = '<div class="rx-title">Prescribed Medications</div>';
-            meds.forEach(function(m) {
-                html += '<div class="rx-item">' +
-                    '<span><strong>' + (m.medicationName || m.medicationID || "—") + '</strong> &times;' + (m.qty || 1) + '</span>' +
-                    '<span>$' + (Number(m.unitPrice || 0) * Number(m.qty || 1)).toFixed(2) + '</span>' +
-                    '</div>';
-                if (m.instructions) {
-                    html += '<div class="rx-instr" style="padding:.125rem 0 .375rem">' + m.instructions + '</div>';
+            if (consultRes.ok) {
+                var cData = await consultRes.json();
+                var consult = cData.consultation || cData;
+                if (consult.mcIssued && consult.mcKey) {
+                    try {
+                        var mcRes = await fetch(cfg.mcUrl + "/mc/" + encodeURIComponent(consult.mcKey), {
+                            headers: { "Authorization": "Bearer " + token }
+                        });
+                        if (mcRes.ok) {
+                            var mcJson = await mcRes.json();
+                            if (mcJson.downloadUrl) {
+                                html += '<div style="margin-bottom:.625rem"><a class="btn-rx" href="' + mcJson.downloadUrl + '" target="_blank" rel="noopener">' +
+                                    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px;vertical-align:-1px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>' +
+                                    'Download MC</a></div>';
+                            }
+                        }
+                    } catch (_) {}
                 }
+            }
+        } catch (_) {}
+
+        // Step 2: Pull prescribed items from the order service
+        var patientId = window.currentUser && window.currentUser.linkedID;
+        var items = await fetchOrderItems(cfg, patientId, apptId);
+
+        if (items.length) {
+            html += '<div class="rx-title">Prescribed Medications</div>';
+            items.forEach(function(item) {
+                var name = item.MedicationName || item.MedicationId || item.medicationName || item.medicationID || "—";
+                var qty = Number(item.Quantity || item.qty || 1);
+                var price = Number(item.UnitPrice || item.unitPrice || 0);
+                html += '<div class="rx-item"><span><strong>' + name + '</strong> &times;' + qty + '</span>' +
+                    '<span>$' + (qty * price).toFixed(2) + '</span></div>';
             });
-            panel.innerHTML = html;
-        } catch(e) {
-            panel.innerHTML = '<p class="text-muted rx-instr">Could not load prescription.</p>';
+        } else {
+            html += '<p class="text-muted rx-instr">No medications prescribed for this visit.</p>';
         }
+
+        panel.innerHTML = html;
     }
 </script>
 {% endblock %}

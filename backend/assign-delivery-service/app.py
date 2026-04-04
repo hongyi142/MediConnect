@@ -17,7 +17,7 @@ GOOGLE_MAPS_KEY  = os.environ.get("GOOGLE_MAPS_API_KEY")
 
 gmaps = googlemaps.Client(key=GOOGLE_MAPS_KEY) if GOOGLE_MAPS_KEY else None
 
-# â”€â”€ Geolocation helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Geolocation helpers
 
 def find_nearest_rider(patient_address, available_riders, radius_km=1):
     """
@@ -97,7 +97,7 @@ def geocode_address(address):
     except Exception:
         return None, None
 
-# â”€â”€ AMQP setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# AMQP setup
 
 def get_channel():
     params = pika.URLParameters(RABBITMQ_URL)
@@ -215,8 +215,8 @@ def on_order_paid(ch, method, properties, body):
                 "orderID":        delivery["orderID"],
             })
     else:
-        # Fallback â€” broadcast to all riders manually
-        print("[Assign Delivery] No nearby rider â€” broadcasting to all")
+        # Fallback broadcast to all riders manually
+        print("[Assign Delivery] No nearby rider broadcasting to all")
         broadcast_to_riders({
             "deliveryID":     delivery["deliveryID"],
             "patientAddress": delivery["patientAddress"],
@@ -244,10 +244,10 @@ def start_amqp_listener():
             print("[Assign Delivery] Listening on delivery_queue ...")
             ch.start_consuming()
         except Exception as e:
-            print(f"[Assign Delivery] AMQP error: {e} â€” retrying in 5s")
+            print(f"[Assign Delivery] AMQP error: {e} retrying in 5s")
             time.sleep(5)
 
-# â”€â”€ HTTP endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# HTTP endpoints 
 
 @app.route("/accept-delivery", methods=["POST"])
 def accept_delivery():
