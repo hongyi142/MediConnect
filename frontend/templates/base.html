@@ -13,13 +13,6 @@
   <!-- Main stylesheet -->
   <link rel="stylesheet" href="/static/css/main.css">
 
-  <!-- Firebase compat SDK 10.12.0 -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
-  <!-- Twilio Video SDK 2.27.0 -->
-  <script src="https://sdk.twilio.com/js/video/releases/2.27.0/twilio-video.min.js"></script>
 
   {% block extra_head %}{% endblock %}
 </head>
@@ -49,6 +42,11 @@
     data-notification-url="{{ NOTIFICATION_WRAPPER_URL }}"
     data-sse-url="{{ SSE_SERVICE_URL }}"
   ></div>
+
+  <!-- Firebase compat SDK 10.12.0 – loaded in <body> so they don't block <head> parsing -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <!-- Firebase initialisation -->
   <script>
@@ -165,6 +163,9 @@
       }).join("");
     }
 
+    // Shared promise so page scripts can await the same Firestore read instead of re-fetching.
+    window._userDocPromise = null;
+
     fbAuth.onAuthStateChanged(async function(firebaseUser) {
       var navName = document.getElementById("nav-name");
       var navRole = document.getElementById("nav-role");
@@ -175,6 +176,8 @@
       var navbar = document.getElementById("main-navbar");
 
       if (!firebaseUser) {
+        window.currentUser = null;
+        window._userDocPromise = null;
         if (navbar) navbar.style.display = "none";
         if (navBrand) navBrand.setAttribute("href", "/");
         if (navLinks) navLinks.innerHTML = "";
@@ -184,9 +187,14 @@
         navbar.style.display = "";
       }
 
-      var snap = await fbDb.collection("users").doc(firebaseUser.uid).get();
+      // Cache the Firestore read as a promise so page scripts can share it.
+      if (!window._userDocPromise) {
+        window._userDocPromise = fbDb.collection("users").doc(firebaseUser.uid).get();
+      }
+      var snap = await window._userDocPromise;
       if (!snap.exists) return;
       var user = snap.data();
+      window.currentUser = user;
 
       if (navName) navName.textContent = user.name;
       if (navAvatar) {
@@ -334,7 +342,9 @@
           if (_sseSource) { _sseSource.close(); _sseSource = null; }
           return;
         }
-        fbDb.collection("users").doc(u.uid).get().then(function (snap) {
+        // Reuse the shared Firestore read from the navbar handler.
+        var p = window._userDocPromise || fbDb.collection("users").doc(u.uid).get();
+        p.then(function (snap) {
           if (!snap.exists) return;
           var linkedID = snap.data().linkedID;
           if (linkedID) connectSSE(linkedID);

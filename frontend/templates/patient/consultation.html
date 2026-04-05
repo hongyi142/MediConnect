@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Consultation - MediConnect{% endblock %}
+{% block extra_head %}
+<script src="https://sdk.twilio.com/js/video/releases/2.27.0/twilio-video.min.js"></script>
+{% endblock %}
 {% block navbar %}{% endblock %}
 
 {% block content %}
@@ -62,7 +65,7 @@
 
     fbAuth.onAuthStateChanged(async function(u) {
         if (!u) { location.href = "/auth/login"; return; }
-        var snap = await fbDb.collection("users").doc(u.uid).get();
+        var snap = await (window._userDocPromise || fbDb.collection("users").doc(u.uid).get());
         if (!snap.exists) { location.href = "/auth/login"; return; }
         var user = snap.data();
         if (user.role !== "patient") { location.href = "/auth/login"; return; }

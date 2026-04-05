@@ -207,7 +207,7 @@
 
     fbAuth.onAuthStateChanged(async function(u) {
         if (!u) { location.href = "/auth/login"; return; }
-        var snap = await fbDb.collection("users").doc(u.uid).get();
+        var snap = await (window._userDocPromise || fbDb.collection("users").doc(u.uid).get());
         if (!snap.exists) { await fbAuth.signOut(); location.href = "/auth/login"; return; }
         var user = snap.data();
         if (user.role !== "patient") { location.href = "/auth/login"; return; }

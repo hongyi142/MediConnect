@@ -1,7 +1,6 @@
 import os, threading, json, requests
 from flask import Flask, request, jsonify
 import pika
-import googlemaps
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -13,15 +12,13 @@ CORS(app)
 DELIVERY_URL     = os.environ.get("DELIVERY_URL",  "http://delivery-service:5000")
 RIDER_URL        = os.environ.get("RIDER_URL",     "http://rider-service:5001")
 TRACKING_URL     = os.environ.get("TRACKING_URL",  "http://tracking-service:5050")
+DISTANCE_MATRIX_WRAPPER_URL = os.environ.get("DISTANCE_MATRIX_WRAPPER_URL", "http://distance-matrix-wrapper:5063")
 RABBITMQ_URL     = os.environ.get("RABBITMQ_URL",  "amqp://guest:guest@rabbitmq:5672/")
-GOOGLE_MAPS_KEY  = os.environ.get("GOOGLE_MAPS_API_KEY")
-
-gmaps = googlemaps.Client(key=GOOGLE_MAPS_KEY) if GOOGLE_MAPS_KEY else None
 
 # Geolocation helpers
 
 def get_rider_location(rider_id):
-    """Fetch a rider's current location from the tracking-service (single source of truth)."""
+    """Fetch a rider's current location from the tracking-service."""
     try:
         resp = requests.get(f"{TRACKING_URL}/rider-location/{rider_id}", timeout=5)
         if resp.status_code == 200:
@@ -49,28 +46,47 @@ def find_nearest_rider(patient_address, available_riders, radius_km=1):
         return None
 
     # Build origins list from rider coordinates
-    origins = [
-        (r["latitude"], r["longitude"])
-        for r in riders_with_location
-    ]
+    origins = []
+    for rider in riders_with_location:
+        origins.append(
+            {
+                "latitude": rider["latitude"],
+                "longitude": rider["longitude"],
+            }
+        )
 
-    if not gmaps:
-        print("[Assign Delivery] GOOGLE_MAPS_API_KEY missing, skipping nearest rider logic")
+    try:
+        dm_resp = requests.post(
+            f"{DISTANCE_MATRIX_WRAPPER_URL}/distance-matrix",
+            json={
+                "origins": origins,
+                "destination_address": patient_address,
+                "mode": "driving",
+                "units": "metric",
+            },
+            timeout=10,
+        )
+        if dm_resp.status_code >= 400:
+            print(
+                f"[Assign Delivery] distance-matrix-wrapper error "
+                f"({dm_resp.status_code}): {dm_resp.text}"
+            )
+            return None
+        result = dm_resp.json()
+    except Exception as exc:
+        print(f"[Assign Delivery] Failed to call distance-matrix-wrapper: {exc}")
         return None
-
-    # Call Google Maps Distance Matrix API
-    result = gmaps.distance_matrix(
-        origins=origins,
-        destinations=[patient_address],
-        mode="driving",
-        units="metric"
-    )
 
     nearest_rider  = None
     nearest_metres = float("inf")
 
-    for i, row in enumerate(result["rows"]):
-        element = row["elements"][0]
+    for i, row in enumerate(result.get("rows", [])):
+        if i >= len(riders_with_location):
+            break
+        elements = row.get("elements") or []
+        if not elements:
+            continue
+        element = elements[0]
 
         # Skip if no route found
         if element["status"] != "OK":
@@ -96,15 +112,19 @@ def find_nearest_rider(patient_address, available_riders, radius_km=1):
 
 
 def geocode_address(address):
-    if not gmaps or not address:
+    if not address:
         return None, None
     try:
-        results = gmaps.geocode(address)
-        if not results:
+        geo_resp = requests.post(
+            f"{DISTANCE_MATRIX_WRAPPER_URL}/geocode",
+            json={"address": address},
+            timeout=10,
+        )
+        if geo_resp.status_code >= 400:
             return None, None
-        loc = results[0].get("geometry", {}).get("location", {})
-        lat = loc.get("lat")
-        lng = loc.get("lng")
+        data = geo_resp.json()
+        lat = data.get("lat")
+        lng = data.get("lng")
         if lat is None or lng is None:
             return None, None
         return float(lat), float(lng)
@@ -119,7 +139,7 @@ def get_channel():
     return conn, conn.channel()
 
 def broadcast_to_riders(delivery_data):
-    """Fallback â€” broadcast to all riders if no nearby rider found."""
+    """Fallback broadcast to all riders if no nearby rider found."""
     conn, ch = get_channel()
     ch.exchange_declare(exchange="delivery.available", exchange_type="fanout", durable=True)
     ch.basic_publish(
@@ -301,7 +321,7 @@ def accept_delivery():
 @app.route("/nearest-rider", methods=["POST"])
 def nearest_rider():
     """
-    Test endpoint â€” given an address, returns nearest available rider.
+    Test endpoint given an address, returns nearest available rider.
     Body: { "address": "123 Orchard Road, Singapore" }
     """
     data    = request.get_json()

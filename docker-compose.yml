@@ -45,6 +45,12 @@ services:
     build: ./backend/openai-wrapper
     env_file: ./backend/openai-wrapper/.env
 
+  distance-matrix-wrapper:
+    build: ./backend/distance-matrix-wrapper
+    container_name: distance-matrix-wrapper
+    environment:
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+
   notification-wrapper:
     build: ./backend/notification_wrapper
     env_file: ./backend/notification_wrapper/.env
@@ -69,11 +75,14 @@ services:
   complete-consultation:
     build: ./backend/complete-consultation-composite
     env_file: ./backend/complete-consultation-composite/.env
+    environment:
+      - PATIENT_SERVICE_URL=http://patient-service:5030
     depends_on:
       - consultation-service
       - openai-wrapper
       - mc-service
       - notification-wrapper
+      - patient-service
 
   # ──── Message Queue ──────────────────────────────────────
   rabbitmq:
@@ -211,11 +220,13 @@ services:
       - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
       - REDIS_URL=redis://redis:6379/0
       - SSE_SERVICE_URL=http://notification-wrapper:5011
+      - OPENAI_WRAPPER_URL=http://openai-wrapper:5021
     depends_on:
       - patient-service
       - doctor-service
       - appointment-service
       - notification-wrapper
+      - openai-wrapper
       - redis
 
   inventory-service:
@@ -242,10 +253,14 @@ services:
     environment:
       - DELIVERY_URL=http://delivery-service:5000
       - RIDER_URL=http://rider-service:5001
+      - TRACKING_URL=http://tracking-service:5050
+      - DISTANCE_MATRIX_WRAPPER_URL=http://distance-matrix-wrapper:5063
       - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
     depends_on:
       - delivery-service
       - rider-service
+      - tracking-service
+      - distance-matrix-wrapper
 
   complete-delivery:
     build: ./backend/complete-delivery-service
@@ -263,11 +278,14 @@ services:
     container_name: tracking-service
     environment:
       - DELIVERY_SERVICE_URL=http://delivery-service:5000
+      - RIDER_SERVICE_URL=http://rider-service:5001
       - RABBITMQ_URL=${RABBITMQ_URL:-amqp://rabbitmq:5672/}
     depends_on:
       rabbitmq:
         condition: service_healthy
       delivery-service:
+        condition: service_started
+      rider-service:
         condition: service_started
 
   # ──── Frontend ───────────────────────────────────────────

@@ -48,7 +48,7 @@ h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
 (async function () {
     var firebaseUser = await new Promise(function(res) { fbAuth.onAuthStateChanged(res); });
     if (!firebaseUser) { window.location.href = "/auth/login"; return; }
-    var snap = await fbDb.collection("users").doc(firebaseUser.uid).get();
+    var snap = await (window._userDocPromise || fbDb.collection("users").doc(firebaseUser.uid).get());
     if (!snap.exists || snap.data().role !== "doctor") { window.location.href = "/auth/login"; return; }
 
     var patientID = sessionStorage.getItem("viewPatientID");

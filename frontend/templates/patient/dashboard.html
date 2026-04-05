@@ -315,7 +315,7 @@
 <script>
     fbAuth.onAuthStateChanged(async function(firebaseUser) {
         if (!firebaseUser) { window.location.href = "/auth/login"; return; }
-        var snap = await fbDb.collection("users").doc(firebaseUser.uid).get();
+        var snap = await (window._userDocPromise || fbDb.collection("users").doc(firebaseUser.uid).get());
         if (!snap.exists) { await fbAuth.signOut(); window.location.href = "/auth/login"; return; }
         var user = snap.data();
         if (user.role !== "patient") { window.location.href = "/auth/login"; return; }
@@ -384,13 +384,15 @@
             var candidates = [String(user.linkedID || "")];
             var hashed = toOrderPatientId(user.linkedID);
             if (hashed && candidates.indexOf(hashed) < 0) candidates.push(hashed);
-            var orders = [];
-            for (var i = 0; i < candidates.length; i++) {
-                var res = await fetch(cfg.orderUrl + "/GetOrdersByPatient?PatientId=" + encodeURIComponent(candidates[i]));
-                if (!res.ok) continue;
-                var payload = await res.json();
-                if (Array.isArray(payload) && payload.length > orders.length) orders = payload;
-            }
+            var results = await Promise.all(candidates.map(async function(id) {
+                try {
+                    var res = await fetch(cfg.orderUrl + "/GetOrdersByPatient?PatientId=" + encodeURIComponent(id));
+                    if (!res.ok) return [];
+                    var payload = await res.json();
+                    return Array.isArray(payload) ? payload : [];
+                } catch(_) { return []; }
+            }));
+            var orders = results.reduce(function(best, r) { return r.length > best.length ? r : best; }, []);
             var pending = (orders || []).filter(function(o) { return (o.Status || "").toLowerCase() === "pending"; });
             var sp = document.getElementById("stat-payments"); if (sp) sp.textContent = pending.length;
 

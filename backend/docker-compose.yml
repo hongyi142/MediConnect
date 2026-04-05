@@ -19,6 +19,13 @@ services:
     ports:
       - "5001:5001"
 
+  distance_matrix_wrapper:
+    build: ./distance-matrix-wrapper
+    environment:
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    ports:
+      - "5063:5063"
+
   assign_delivery:
     build: ./assign-delivery-service
     ports:
@@ -28,6 +35,7 @@ services:
     environment:
       DELIVERY_URL: http://delivery:5000
       RIDER_URL: http://rider:5001
+      DISTANCE_MATRIX_WRAPPER_URL: http://distance_matrix_wrapper:5063
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
     depends_on:
       rabbitmq:
@@ -35,6 +43,8 @@ services:
       delivery:
         condition: service_started
       rider:
+        condition: service_started
+      distance_matrix_wrapper:
         condition: service_started
 
   complete_delivery:

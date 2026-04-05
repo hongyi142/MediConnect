@@ -89,6 +89,15 @@ services:
           - /openai
         strip_path: false
 
+  - name: distance-matrix-wrapper
+    url: http://distance-matrix-wrapper:5063
+    routes:
+      - name: distance-matrix-routes
+        paths:
+          - /distance-matrix
+          - /geocode
+        strip_path: false
+
   - name: notification-wrapper
     url: http://notification-wrapper:5011
     # Generous timeouts for the long-lived SSE stream connections
@@ -218,6 +227,7 @@ services:
       - name: tracking-routes
         paths:
           - /socket.io
+          - /rider-location
         strip_path: false
 
 # ──────────────────────────────────────────────

@@ -34,7 +34,7 @@ MediConnect is an online teleconsultation platform that connects patients with d
 
 | Service | Port | Description |
 |---------|------|-------------|
-| Assign Delivery | 5002 | Finds the nearest available rider and assigns a delivery |
+| Assign Delivery | 5002 | Finds the nearest available rider (via distance-matrix-wrapper) and assigns a delivery |
 | Book Appointment | 5033 | Orchestrates appointment booking across patient, doctor and appointment services |
 | Complete Consultation | 5014 | Finalises consultation: deducts inventory, creates order, issues MC, sends notifications |
 | Complete Delivery | 5004 | Marks delivery as complete and publishes payment/notification events |
@@ -46,6 +46,7 @@ MediConnect is an online teleconsultation platform that connects patients with d
 | Service | Port | Description |
 |---------|------|-------------|
 | Amazon S3 | 5022 | Uploads and retrieves files from AWS S3 |
+| Distance Matrix | 5063 | Wraps Google Maps Geocoding + Distance Matrix APIs for rider-distance calculations |
 | OpenAI | 5021 | Generates AI-powered consultation summaries |
 | Telegram | 5012 | Sends Telegram bot notifications |
 | Twilio | 5020 | Creates and manages Twilio Video rooms |
