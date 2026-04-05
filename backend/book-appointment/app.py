@@ -456,6 +456,7 @@ def book_appointment():
         patient_resp = req("GET", f"{patient_url}/patient/{patient_id}")
         patient_data = patient_resp.json() if patient_resp.ok else {}
         try:
+            slot_display = slot_start.strftime("%d %b %Y %I:%M %p").lower()
             req("POST", f"{notification_url}/notify/send", json={
                 "event_type": "appointment_booked",
                 "patientID": patient_id,
@@ -466,23 +467,23 @@ def book_appointment():
                 "subject": "MediConnect: Appointment Requested",
                 "content": (
                     f"Hi {patient_data.get('name', 'there')}, your appointment has been requested for "
-                    f"{slot_start.strftime('%d %b %Y %H:%M')} UTC. Awaiting doctor confirmation."
+                    f"{slot_display}. Awaiting doctor confirmation."
                 ),
                 "mobile": patient_data.get("phone"),
-                "message": f"[MediConnect] Appointment requested for {slot_start.strftime('%d %b %Y %H:%M')} UTC.",
+                "message": f"[MediConnect] Appointment requested for {slot_display}.",
             })
         except Exception:
             pass
 
         # Push real-time SSE notifications to the patient and doctor
         sse_url = os.environ.get("SSE_SERVICE_URL", "http://sse-service:5060").rstrip("/")
-        slot_display = slot_start.strftime("%d %b %Y %H:%M")
+        slot_display = slot_start.strftime("%d %b %Y %I:%M %p").lower()
         try:
             req("POST", f"{sse_url}/sse/notify", json={
                 "userID": patient_id,
                 "event": "appointment_booked",
                 "data": {
-                    "message": f"Your appointment has been requested for {slot_display} UTC.",
+                    "message": f"Your appointment has been requested for {slot_display}.",
                     "appointmentID": appointment.get("appointmentID"),
                     "doctorID": doctor_id_for_lock,
                     "slotStart": slot_start.isoformat(),
@@ -495,7 +496,7 @@ def book_appointment():
                 "userID": doctor_id_for_lock,
                 "event": "appointment_requested",
                 "data": {
-                    "message": f"New appointment request for {slot_display} UTC.",
+                    "message": f"New appointment request for {slot_display}.",
                     "appointmentID": appointment.get("appointmentID"),
                     "patientID": patient_id,
                     "slotStart": slot_start.isoformat(),

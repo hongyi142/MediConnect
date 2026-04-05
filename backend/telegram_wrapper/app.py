@@ -3,6 +3,7 @@ import json
 import logging
 import threading
 import time
+from datetime import datetime, timezone
 
 import pika
 import requests
@@ -63,6 +64,30 @@ def _first_non_empty(message, keys, default=None):
     return default
 
 
+def _parse_iso_datetime(value):
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    except ValueError:
+        return None
+
+
+def _format_slot_display(value, fallback="your scheduled time"):
+    dt = _parse_iso_datetime(value)
+    if not dt:
+        return fallback
+    return dt.strftime("%d %b %Y %I:%M %p").lower()
+
+
 def _build_telegram_text(message):
     """Compose a Telegram-friendly HTML message from the notification payload."""
     event_type = message.get("event_type")
@@ -102,7 +127,7 @@ def _build_telegram_text(message):
     elif event_type == "appointment_booked":
         appt_id = _first_non_empty(message, ["appointmentID", "apptID"], "Unknown")
         slot = _first_non_empty(message, ["slotStart", "dateTime"], "")
-        slot_display = slot[:16].replace("T", " ") + " UTC" if slot else "your scheduled time"
+        slot_display = _format_slot_display(slot)
         return (
             f"📅 <b>Appointment Requested</b>\n"
             f"Hi {patient_name}, your appointment (<b>{appt_id}</b>) has been requested for "
@@ -111,7 +136,7 @@ def _build_telegram_text(message):
     elif event_type == "appointment_confirmed":
         appt_id = _first_non_empty(message, ["appointmentID", "apptID"], "Unknown")
         slot = _first_non_empty(message, ["slotStart", "dateTime"], "")
-        slot_display = slot[:16].replace("T", " ") + " UTC" if slot else "your scheduled time"
+        slot_display = _format_slot_display(slot)
         return (
             f"✅ <b>Appointment Confirmed</b>\n"
             f"Hi {patient_name}, your appointment (<b>{appt_id}</b>) on <b>{slot_display}</b> "
@@ -137,7 +162,7 @@ def _build_telegram_text(message):
     elif event_type == "appointment_reminder":
         label = _first_non_empty(message, ["label"], "soon")
         slot = _first_non_empty(message, ["slotStart", "dateTime"], "")
-        slot_display = slot[:16].replace("T", " ") + " UTC" if slot else "your scheduled time"
+        slot_display = _format_slot_display(slot)
         return (
             f"⏰ <b>Appointment Reminder</b>\n"
             f"Hi {patient_name}, your appointment is in <b>{label}</b> (at {slot_display}). "

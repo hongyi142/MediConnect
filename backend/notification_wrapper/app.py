@@ -52,11 +52,18 @@ def send_email(receiver, subject, content):
     return True, "email sent"
 
 
-def send_sms(phone_number=None, sms_message=None, sms_payload=None):
+def _resolve_sms_api_url():
     sms_url = os.environ.get("SMU_SMS_API_URL")
-    if not sms_url:
-        email_url = os.environ.get("SMU_API_URL", "")
-        sms_url = email_url.replace("SendEmail", "SendSMS") if "SendEmail" in email_url else None
+    if sms_url:
+        return sms_url
+    email_url = os.environ.get("SMU_API_URL", "")
+    if "SendEmail" in email_url:
+        return email_url.replace("SendEmail", "SendSMS")
+    return None
+
+
+def send_sms(phone_number=None, sms_message=None, sms_payload=None):
+    sms_url = _resolve_sms_api_url()
     if sms_payload and isinstance(sms_payload, dict):
         payload = sms_payload
     else:
@@ -68,6 +75,45 @@ def send_sms(phone_number=None, sms_message=None, sms_payload=None):
         }
     post_to_smu(sms_url, payload)
     return True, "sms sent"
+
+
+def send_sms_with_fallback(phone_number=None, sms_message=None, sms_payload=None):
+    """Attempt SMS with resilient payload-key fallbacks for differing gateway schemas."""
+    if sms_payload and isinstance(sms_payload, dict):
+        try:
+            send_sms(sms_payload=sms_payload)
+            return True, None
+        except Exception as exc:
+            return False, str(exc)
+
+    if not phone_number or not sms_message:
+        return False, "mobile/phone and message are required for SMS"
+
+    try:
+        send_sms(phone_number=phone_number, sms_message=sms_message)
+        return True, None
+    except Exception as first_exc:
+        sms_url = _resolve_sms_api_url()
+        if not sms_url:
+            return False, str(first_exc)
+
+        fallback_payloads = [
+            {"phone": phone_number, "message": sms_message},
+            {"phoneNumber": phone_number, "message": sms_message},
+            {"recipient": phone_number, "message": sms_message},
+            {"to": phone_number, "message": sms_message},
+            {"mobileNumber": phone_number, "message": sms_message},
+            {"phone": phone_number, "text": sms_message},
+            {"phoneNumber": phone_number, "smsMessage": sms_message},
+        ]
+        for payload in fallback_payloads:
+            try:
+                post_to_smu(sms_url, payload)
+                logging.info("SMS sent using fallback payload keys: %s", ",".join(payload.keys()))
+                return True, None
+            except Exception:
+                continue
+        return False, str(first_exc)
 
 
 def fetch_patient_email(patient_id):
@@ -115,6 +161,30 @@ def _first_non_empty(message, keys, default=None):
         if val is not None and str(val).strip() != "":
             return val
     return default
+
+
+def _parse_iso_datetime(value):
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    except ValueError:
+        return None
+
+
+def _format_slot_display(value, fallback="your scheduled time"):
+    dt = _parse_iso_datetime(value)
+    if not dt:
+        return fallback
+    return dt.strftime("%d %b %Y %I:%M %p").lower()
 
 
 def _normalize_message(message):
@@ -166,7 +236,7 @@ def _normalize_message(message):
     elif event_type == "appointment_booked":
         appt_id = _first_non_empty(normalized, ["appointmentID", "apptID"], "Unknown")
         slot = _first_non_empty(normalized, ["slotStart", "dateTime"], "")
-        slot_display = slot[:16].replace("T", " ") + " UTC" if slot else "your scheduled time"
+        slot_display = _format_slot_display(slot)
         normalized["receiver"] = _first_non_empty(normalized, ["patientEmail", "email", "receiver"])
         normalized["subject"] = "MediConnect: Appointment Requested"
         normalized["content"] = f"Hi {patient_name}, your appointment ({appt_id}) has been requested for {slot_display}. Awaiting doctor confirmation."
@@ -175,7 +245,7 @@ def _normalize_message(message):
     elif event_type == "appointment_confirmed":
         appt_id = _first_non_empty(normalized, ["appointmentID", "apptID"], "Unknown")
         slot = _first_non_empty(normalized, ["slotStart", "dateTime"], "")
-        slot_display = slot[:16].replace("T", " ") + " UTC" if slot else "your scheduled time"
+        slot_display = _format_slot_display(slot)
         normalized["receiver"] = _first_non_empty(normalized, ["patientEmail", "email", "receiver"])
         normalized["subject"] = "MediConnect: Appointment Confirmed"
         normalized["content"] = f"Hi {patient_name}, your appointment ({appt_id}) on {slot_display} has been confirmed."
@@ -248,11 +318,13 @@ def _process_queue_message(ch, method, body):
 
         if channel in ("sms", "both"):
             has_delivery = True
-            sms_ok, _ = send_sms(
+            sms_ok, sms_err = send_sms_with_fallback(
                 phone_number=message.get("mobile"),
                 sms_message=message.get("message"),
                 sms_payload=message.get("smsPayload"),
             )
+            if not sms_ok and sms_err:
+                logging.warning("SMS delivery failed in worker: %s", sms_err)
 
         if not has_delivery:
             logging.warning("Notification skipped (no valid channel payload): %s", raw)
@@ -433,7 +505,7 @@ def _fire_reminder(appt: dict, label: str, rkey: str) -> None:
     if _already_sent(appt_id, rkey):
         return
 
-    slot_display = slot_start[:16].replace("T", " ") + " UTC" if slot_start else "your scheduled time"
+    slot_display = _format_slot_display(slot_start)
     message = f"Reminder: your appointment is in {label} (at {slot_display})."
 
     # Real-time SSE push (instant if patient is online)
@@ -590,7 +662,7 @@ def check_pending_ttl() -> None:
 
         # Notify patient via SSE
         slot_start = appt.get("slotStart") or appt.get("dateTime", "")
-        slot_display = slot_start[:16].replace("T", " ") + " UTC" if slot_start else "your slot"
+        slot_display = _format_slot_display(slot_start, fallback="your slot")
         message = (
             f"Your appointment for {slot_display} was automatically cancelled because "
             "the doctor did not respond within 10 minutes. Please book a new appointment."
@@ -613,7 +685,18 @@ def check_pending_ttl() -> None:
                     f"Hi {patient_name},\n\n{message}\n\nAppointment ID: {appt_id}",
                 )
             if phone:
-                send_sms(phone_number=phone, sms_message=f"[MediConnect] {message}")
+                sms_ok, sms_err = send_sms_with_fallback(phone_number=phone, sms_message=f"[MediConnect] {message}")
+                if not sms_ok and sms_err:
+                    logging.warning("TTL SMS delivery failed for %s: %s", appt_id, sms_err)
+
+            _publish_to_telegram_queue({
+                "event_type": "appointment_cancelled",
+                "patientID": patient_id,
+                "patientName": patient_name,
+                "appointmentID": appt_id,
+                "slotStart": slot_start,
+                "reason": "Doctor did not respond within 10 minutes",
+            })
         except Exception as exc:
             logging.warning("TTL notification failed for %s: %s", appt_id, exc)
 
@@ -722,36 +805,55 @@ def notify_sms():
     sms_message = body.get("message")
     if not sms_payload and (not phone_number or not sms_message):
         return jsonify({"error": "Provide smsPayload or mobile + message."}), 400
-    send_sms(phone_number=phone_number, sms_message=sms_message, sms_payload=sms_payload)
+    sms_ok, sms_err = send_sms_with_fallback(
+        phone_number=phone_number,
+        sms_message=sms_message,
+        sms_payload=sms_payload,
+    )
+    if not sms_ok:
+        return jsonify({"error": f"SMS send failed: {sms_err}"}), 502
     return jsonify({"message": "SMS sent", "phoneNumber": phone_number})
 
 
 @app.route("/notify/send", methods=["POST"])
 def notify_send():
     body = request.get_json(silent=True) or {}
+    message = _normalize_message(body)
     email_sent = False
     sms_sent = False
 
-    receiver = body.get("receiver")
-    subject = body.get("subject")
-    content = body.get("content")
+    receiver = message.get("receiver")
+    subject = message.get("subject")
+    content = message.get("content")
     if receiver and subject and content:
         send_email(receiver, subject, content)
         email_sent = True
 
-    phone_number = body.get("mobile")
-    sms_message = body.get("message")
-    sms_payload = body.get("smsPayload")
+    phone_number = message.get("mobile")
+    sms_message = message.get("message")
+    sms_payload = message.get("smsPayload")
+    if not phone_number:
+        patient_id = message.get("patientID") or message.get("patientId") or message.get("PatientId")
+        if patient_id:
+            info = fetch_patient_info(patient_id)
+            phone_number = info.get("phone") or info.get("mobile") or info.get("phoneNumber")
+            if phone_number:
+                message["mobile"] = phone_number
     if sms_payload or (phone_number and sms_message):
-        send_sms(phone_number=phone_number, sms_message=sms_message, sms_payload=sms_payload)
-        sms_sent = True
+        sms_sent, sms_err = send_sms_with_fallback(
+            phone_number=phone_number,
+            sms_message=sms_message,
+            sms_payload=sms_payload,
+        )
+        if not sms_sent and sms_err:
+            logging.warning("SMS delivery failed in /notify/send: %s", sms_err)
 
     if not email_sent and not sms_sent:
         return jsonify({"error": "No valid email or SMS payload provided."}), 400
 
     # Forward to Telegram if patient is identifiable
-    if body.get("patientID") or body.get("event_type"):
-        _publish_to_telegram_queue(body)
+    if message.get("patientID") or message.get("event_type"):
+        _publish_to_telegram_queue(message)
 
     return jsonify({"emailSent": email_sent, "smsSent": sms_sent})
 
