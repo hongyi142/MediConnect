@@ -48,8 +48,8 @@ services:
   distance-matrix-wrapper:
     build: ./backend/distance-matrix-wrapper
     container_name: distance-matrix-wrapper
-    environment:
-      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+    env_file:
+      - ./backend/distance-matrix-wrapper/.env
 
   notification-wrapper:
     build: ./backend/notification_wrapper

@@ -21,8 +21,8 @@ services:
 
   distance_matrix_wrapper:
     build: ./distance-matrix-wrapper
-    environment:
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    env_file:
+      - ./distance-matrix-wrapper/.env
     ports:
       - "5063:5063"
 
@@ -30,8 +30,6 @@ services:
     build: ./assign-delivery-service
     ports:
       - "5002:5002"
-    env_file:
-      - ./assign-delivery-service/.env
     environment:
       DELIVERY_URL: http://delivery:5000
       RIDER_URL: http://rider:5001
