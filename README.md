@@ -3,15 +3,15 @@
 </div>
 <br/>
 
-MediConnect is an online teleconsultation platform that connects patients with doctors across multiple medical specialisations. Patients can book appointments, attend video consultations, receive prescriptions, and have their medications delivered to their doorstep - all through a single web application.
+MediConnect is an online teleconsultation platform that connects patients with doctors across multiple medical specialisations. Patients can book appointments, attend video consultations, receive prescriptions and have their medications delivered to their doorstep - all through a single web application.
 
 ## User Roles
 
 | Role | Description |
 |------|-------------|
-| **Patient** | Book appointments, attend video consultations, view prescriptions, track deliveries, make payments |
-| **Doctor** | Manage schedule and availability, conduct video consultations, issue prescriptions and MCs |
-| **Delivery Rider** | Accept delivery assignments, scan QR codes to confirm delivery completion |
+| **Patient** | Book appointments, attend video consultations, view prescriptions, make payments, track deliveries |
+| **Doctor** | Conduct video consultations, issue prescriptions and MCs, manage staff and inventory |
+| **Delivery Rider** | Accept and deliver delivery assignments |
 
 ## Services
 
@@ -54,7 +54,7 @@ MediConnect is an online teleconsultation platform that connects patients with d
 
 ## Environment Setup
 
-Most services require environment variables and/or Firebase credentials. **Never commit real `.env` files or service account keys** — they are git-ignored.
+Most services require environment variables and/or Firebase credentials.
 
 ### `.env` files
 
