@@ -52,6 +52,64 @@ MediConnect is an online teleconsultation platform that connects patients with d
 | Twilio | 5020 | Creates and manages Twilio Video rooms |
 | Notification | 5011 | Routes notifications (email/SMS) via RabbitMQ and pushes SSE events |
 
+## Environment Setup
+
+Most services require environment variables and/or Firebase credentials. **Never commit real `.env` files or service account keys** — they are git-ignored.
+
+### `.env` files
+
+Each service that needs configuration ships with a `.env.example` template. Copy it and fill in your own credentials before starting:
+
+```bash
+cp backend/<service-name>/.env.example backend/<service-name>/.env
+```
+
+The following services each have a `.env.example`:
+
+| Service | Credentials required |
+|---------|----------------------|
+| `amazon-s3-wrapper` | AWS access key, secret, region, bucket name |
+| `openai-wrapper` | OpenAI API key |
+| `twilio-wrapper` | Twilio Account SID, Auth Token, API Key SID & Secret |
+| `payment_wrapper` | Stripe secret key, webhook secret |
+| `payment_atomic` | Stripe secret key, frontend URL |
+| `notification_wrapper` | SMU Lab Notification API URL & key, RabbitMQ URL |
+| `telegram_wrapper` | Telegram Bot token, RabbitMQ URL |
+| `distance-matrix-wrapper` | Google Maps API key |
+| `process_payment_composite` | Internal service URLs, OutSystems base URL, RabbitMQ URL |
+| `complete-consultation-composite` | Internal service URLs, OutSystems base URL |
+| `start-consultation-composite` | Internal service URLs |
+| `book-appointment` | Internal service URLs, RabbitMQ URL, Redis URL |
+| `consultation-service` | Firebase credential paths |
+| `inventory` | S3 wrapper URL, folder/subfolder paths |
+| `mc-service` | S3 wrapper URL, folder/subfolder paths |
+
+### Firebase service account keys
+
+Several atomic services connect directly to Firebase Firestore. Place the appropriate JSON key file in the service directory before running:
+
+| Service | Key file expected |
+|---------|-------------------|
+| `appointment-service` | `serviceAccountKey.json` |
+| `doctor-service` | `serviceAccountKey.json` |
+| `patient-service` | `serviceAccountKey.json` |
+| `rider-service` | `serviceAccountKey.json` |
+| `delivery-service` | `serviceAccountKey.json` |
+| `consultation-service` | `serviceAccountKey.json` **and** `firebase_credentials.json` |
+
+Download these from the [Firebase Console](https://console.firebase.google.com/) under **Project Settings → Service Accounts → Generate new private key** and rename the downloaded file accordingly.
+
+### Where to obtain external credentials
+
+| Credential | Where to get it |
+|------------|----------------|
+| OpenAI API key | [platform.openai.com](https://platform.openai.com/) → API keys |
+| Stripe secret key | [dashboard.stripe.com](https://dashboard.stripe.com/) → Developers → API keys |
+| Twilio SID / Auth Token | [console.twilio.com](https://console.twilio.com/) → Account Info |
+| Telegram Bot token | Talk to [@BotFather](https://t.me/BotFather) on Telegram |
+| Google Maps API key | [console.cloud.google.com](https://console.cloud.google.com/) → APIs & Services → Credentials |
+| SMU Lab Utilities Amazon S3 & Notification API | [smuedu-dev.outsystemsenterprise.com/SMULabUtilities](https://smuedu-dev.outsystemsenterprise.com/SMULabUtilities/) → API Keys |
+
 ## Usage
 
 ### Prerequisites
