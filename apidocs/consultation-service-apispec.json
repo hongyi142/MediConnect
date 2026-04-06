@@ -1,0 +1,220 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Consultation Service",
+    "description": "Atomic service for managing video consultation records in Firestore.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5004", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Consultations" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Consultations"],
+        "summary": "Health check",
+        "responses": { "200": { "description": "Service is healthy" } }
+      }
+    },
+    "/consultation": {
+      "post": {
+        "tags": ["Consultations"],
+        "summary": "Create a consultation record",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["apptID", "roomName"],
+                "properties": {
+                  "apptID": { "type": "string" },
+                  "roomName": { "type": "string", "example": "consult-appt-abc123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Consultation record created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consultationID": { "type": "string" },
+                    "apptID": { "type": "string" },
+                    "roomName": { "type": "string" },
+                    "startTime": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "apptID and roomName are required" }
+        }
+      }
+    },
+    "/consultation/{apptID}": {
+      "get": {
+        "tags": ["Consultations"],
+        "summary": "Get consultation by appointment ID",
+        "parameters": [
+          { "name": "apptID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consultation record",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Consultation" }
+              }
+            }
+          },
+          "404": { "description": "Consultation not found" }
+        }
+      }
+    },
+    "/consultation/{apptID}/notes": {
+      "put": {
+        "tags": ["Consultations"],
+        "summary": "Update consultation notes",
+        "parameters": [
+          { "name": "apptID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["notes"],
+                "properties": {
+                  "notes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notes updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Notes updated" },
+                    "apptID": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "notes is required" },
+          "404": { "description": "Consultation not found" }
+        }
+      }
+    },
+    "/consultation/{apptID}/complete": {
+      "put": {
+        "tags": ["Consultations"],
+        "summary": "Mark consultation as complete",
+        "parameters": [
+          { "name": "apptID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "mcIssued": { "type": "boolean" },
+                  "mcKey": { "type": "string", "nullable": true },
+                  "medications": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "medicationID": { "type": "string" },
+                        "medicationName": { "type": "string" },
+                        "qty": { "type": "integer" },
+                        "unitPrice": { "type": "number" },
+                        "instructions": { "type": "string" }
+                      }
+                    }
+                  },
+                  "patientID": { "type": "string" },
+                  "doctorID": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Consultation marked complete",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Consultation" }
+              }
+            }
+          },
+          "404": { "description": "Consultation not found" }
+        }
+      }
+    },
+    "/consultation/patient/{patientID}": {
+      "get": {
+        "tags": ["Consultations"],
+        "summary": "Get all consultations for a patient",
+        "parameters": [
+          { "name": "patientID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of consultations (newest first)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consultations": { "type": "array", "items": { "$ref": "#/components/schemas/Consultation" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Consultation": {
+        "type": "object",
+        "properties": {
+          "consultationID": { "type": "string" },
+          "apptID": { "type": "string" },
+          "roomName": { "type": "string" },
+          "notes": { "type": "string" },
+          "summary": { "type": "string" },
+          "mcIssued": { "type": "boolean" },
+          "mcKey": { "type": "string", "nullable": true },
+          "medications": { "type": "array", "items": { "type": "object" } },
+          "patientID": { "type": "string" },
+          "doctorID": { "type": "string" },
+          "startTime": { "type": "string", "format": "date-time" },
+          "endTime": { "type": "string", "format": "date-time", "nullable": true },
+          "status": { "type": "string", "enum": ["active", "completed"] }
+        }
+      }
+    }
+  }
+}

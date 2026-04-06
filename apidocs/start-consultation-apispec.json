@@ -1,0 +1,95 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Start Consultation Service",
+    "description": "Composite service that initiates a Twilio video consultation room, generates patient and doctor access tokens, and creates an active consultation record.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5013", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Consultation" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Consultation"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "service": { "type": "string", "example": "start-consultation" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/start-consultation": {
+      "post": {
+        "tags": ["Consultation"],
+        "summary": "Start a video consultation",
+        "description": "Validates that the appointment is confirmed, creates a Twilio video room named 'consult-{apptID}', generates patient and doctor access tokens, and creates an active consultation record in Firestore.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["apptID", "patientID", "doctorID"],
+                "properties": {
+                  "apptID": { "type": "string", "example": "appt-abc123" },
+                  "patientID": { "type": "string", "example": "patient-xyz456" },
+                  "doctorID": { "type": "string", "example": "doctor-def789" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Consultation started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consultationID": { "type": "string" },
+                    "apptID": { "type": "string" },
+                    "roomName": { "type": "string", "example": "consult-appt-abc123" },
+                    "patientToken": { "type": "string", "description": "Twilio access token for patient" },
+                    "doctorToken": { "type": "string", "description": "Twilio access token for doctor" },
+                    "twilioRoomSid": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing required fields or appointment is not confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "Appointment is not confirmed" }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "description": "Failed to create Twilio video room" }
+        }
+      }
+    }
+  }
+}

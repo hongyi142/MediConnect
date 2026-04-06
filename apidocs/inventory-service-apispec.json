@@ -1,0 +1,201 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Inventory Service",
+    "description": "Atomic service for managing medication inventory in Firestore, with image storage via the Amazon S3 wrapper.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5005", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Inventory" }
+  ],
+  "paths": {
+    "/inventory": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "Get all medications",
+        "parameters": [
+          {
+            "name": "includeImageUrl",
+            "in": "query",
+            "schema": { "type": "boolean", "default": true },
+            "description": "Whether to resolve and include S3 image URLs"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Full medication list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer", "example": 200 },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Medication" } },
+                    "medications": { "type": "array", "items": { "$ref": "#/components/schemas/Medication" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Add a new medication",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "quantity", "price"],
+                "properties": {
+                  "name": { "type": "string", "example": "Paracetamol 500mg" },
+                  "description": { "type": "string" },
+                  "quantity": { "type": "integer", "example": 100 },
+                  "price": { "type": "number", "example": 5.50 },
+                  "image": { "type": "string", "format": "binary", "description": "Optional medication image (JPG/PNG/WEBP)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Medication added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer", "example": 201 },
+                    "message": { "type": "string" },
+                    "medicationID": { "type": "string" },
+                    "fileKey": { "type": "string", "nullable": true },
+                    "imageUrl": { "type": "string", "nullable": true }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Missing required fields or unsupported image type" }
+        }
+      }
+    },
+    "/inventory/{medicationID}": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "Get a single medication",
+        "parameters": [
+          { "name": "medicationID", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "includeImageUrl", "in": "query", "schema": { "type": "boolean", "default": true } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Medication details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer" },
+                    "data": { "$ref": "#/components/schemas/Medication" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Medication not found" }
+        }
+      },
+      "put": {
+        "tags": ["Inventory"],
+        "summary": "Update a medication",
+        "description": "The quantity field is treated as a delta (positive to add stock, negative to remove).",
+        "parameters": [
+          { "name": "medicationID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "quantity": { "type": "integer", "description": "Delta value added to current quantity" },
+                  "price": { "type": "number" },
+                  "image": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated medication including image URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer" },
+                    "data": { "$ref": "#/components/schemas/Medication" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Medication not found" }
+        }
+      }
+    },
+    "/inventory/{medicationID}/deduct": {
+      "put": {
+        "tags": ["Inventory"],
+        "summary": "Deduct stock for a prescribed medication",
+        "parameters": [
+          { "name": "medicationID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["qty"],
+                "properties": {
+                  "qty": { "type": "integer", "example": 2, "description": "Quantity to deduct (use negative to reverse)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Stock deducted successfully" },
+          "400": { "description": "Insufficient stock" },
+          "404": { "description": "Medication not found" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Medication": {
+        "type": "object",
+        "properties": {
+          "medicationID": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "quantity": { "type": "integer" },
+          "price": { "type": "number" },
+          "fileKey": { "type": "string", "nullable": true },
+          "imageUrl": { "type": "string", "nullable": true }
+        }
+      }
+    }
+  }
+}

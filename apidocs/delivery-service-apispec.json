@@ -1,0 +1,181 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Delivery Service",
+    "description": "Atomic service for managing medication delivery records in Firestore. Status lifecycle: pending → assigned → completed.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5000", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Deliveries" }
+  ],
+  "paths": {
+    "/delivery": {
+      "get": {
+        "tags": ["Deliveries"],
+        "summary": "List all deliveries",
+        "responses": {
+          "200": {
+            "description": "All delivery records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer", "example": 200 },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Delivery" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Deliveries"],
+        "summary": "Create a delivery record",
+        "description": "Called by the assign-delivery-service after payment is verified. Creates a delivery with status 'pending'.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["orderID", "patientName", "patientAddress", "patientPhone", "patientEmail"],
+                "properties": {
+                  "orderID": { "type": "string", "example": "42" },
+                  "patientName": { "type": "string", "example": "Alice Tan" },
+                  "patientID": { "type": "string" },
+                  "patientAddress": { "type": "string", "example": "123 Orchard Road, Singapore 238858" },
+                  "patientPhone": { "type": "string", "example": "+6591234567" },
+                  "patientEmail": { "type": "string", "example": "alice@email.com" },
+                  "patientLat": { "type": "number", "example": 1.3043 },
+                  "patientLng": { "type": "number", "example": 103.8320 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Delivery record created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer", "example": 201 },
+                    "data": { "$ref": "#/components/schemas/Delivery" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/delivery/{deliveryID}": {
+      "get": {
+        "tags": ["Deliveries"],
+        "summary": "Get a delivery by ID",
+        "parameters": [
+          { "name": "deliveryID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delivery record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer" },
+                    "data": { "$ref": "#/components/schemas/Delivery" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Delivery not found" }
+        }
+      },
+      "put": {
+        "tags": ["Deliveries"],
+        "summary": "Update a delivery record",
+        "description": "Used to assign a rider (status: assigned) or update status. Guards against reassignment to a different rider and mutation of completed deliveries.",
+        "parameters": [
+          { "name": "deliveryID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "riderID": { "type": "string" },
+                  "riderName": { "type": "string" },
+                  "status": { "type": "string", "enum": ["pending", "assigned", "completed"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated" },
+          "404": { "description": "Delivery not found" },
+          "409": { "description": "Delivery completed or rider conflict" }
+        }
+      }
+    },
+    "/delivery/{deliveryID}/delivered": {
+      "put": {
+        "tags": ["Deliveries"],
+        "summary": "Mark delivery as completed",
+        "parameters": [
+          { "name": "deliveryID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Marked as delivered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer", "example": 200 },
+                    "message": { "type": "string", "example": "Marked as delivered" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Delivery": {
+        "type": "object",
+        "properties": {
+          "deliveryID": { "type": "string" },
+          "orderID": { "type": "string" },
+          "riderID": { "type": "string", "nullable": true },
+          "riderName": { "type": "string", "nullable": true },
+          "patientName": { "type": "string" },
+          "patientID": { "type": "string" },
+          "patientAddress": { "type": "string" },
+          "patientPhone": { "type": "string" },
+          "patientEmail": { "type": "string" },
+          "patientLat": { "type": "number", "nullable": true },
+          "patientLng": { "type": "number", "nullable": true },
+          "status": { "type": "string", "enum": ["pending", "assigned", "completed"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Patient Service",
+    "description": "Atomic service for managing patient profiles in Firestore.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5030", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Patients" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Patients"],
+        "summary": "Health check",
+        "responses": { "200": { "description": "Service is healthy" } }
+      }
+    },
+    "/patient": {
+      "post": {
+        "tags": ["Patients"],
+        "summary": "Create a patient",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "phone", "NRIC"],
+                "properties": {
+                  "name": { "type": "string", "example": "Alice Tan" },
+                  "email": { "type": "string", "example": "alice@email.com" },
+                  "phone": { "type": "string", "example": "+6591234567" },
+                  "NRIC": { "type": "string", "example": "S9012345A" },
+                  "address": { "type": "string" },
+                  "postalCode": { "type": "string" },
+                  "birthDate": { "type": "string", "format": "date" },
+                  "allergies": { "type": "array", "items": { "type": "string" } },
+                  "pastHistory": { "type": "array", "items": { "type": "string" } },
+                  "telegramChatID": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Patient created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Patient" }
+              }
+            }
+          },
+          "400": { "description": "Missing required fields" }
+        }
+      }
+    },
+    "/patient/{patientID}": {
+      "get": {
+        "tags": ["Patients"],
+        "summary": "Get patient by ID",
+        "parameters": [
+          { "name": "patientID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Patient" }
+              }
+            }
+          },
+          "404": { "description": "Patient not found" }
+        }
+      },
+      "put": {
+        "tags": ["Patients"],
+        "summary": "Update a patient",
+        "parameters": [
+          { "name": "patientID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "NRIC": { "type": "string" },
+                  "address": { "type": "string" },
+                  "postalCode": { "type": "string" },
+                  "birthDate": { "type": "string", "format": "date" },
+                  "allergies": { "type": "array", "items": { "type": "string" } },
+                  "pastHistory": { "type": "array", "items": { "type": "string" } },
+                  "telegramChatID": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated patient",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Patient" }
+              }
+            }
+          },
+          "404": { "description": "Patient not found" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Patient": {
+        "type": "object",
+        "properties": {
+          "patientID": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "phone": { "type": "string" },
+          "NRIC": { "type": "string" },
+          "address": { "type": "string" },
+          "postalCode": { "type": "string" },
+          "birthDate": { "type": "string", "format": "date" },
+          "allergies": { "type": "array", "items": { "type": "string" } },
+          "pastHistory": { "type": "array", "items": { "type": "string" } },
+          "telegramChatID": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

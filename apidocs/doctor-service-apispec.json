@@ -1,0 +1,588 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Doctor Service",
+    "description": "Atomic service for managing doctor profiles, availability status, shifts, and 30-minute schedule slots stored in Firestore.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5031", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Doctors" },
+    { "name": "Doctor Schedule" },
+    { "name": "Calendar Events" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Doctors"],
+        "summary": "Health check",
+        "responses": { "200": { "description": "Service is healthy" } }
+      }
+    },
+    "/doctor": {
+      "post": {
+        "tags": ["Doctors"],
+        "summary": "Create a doctor",
+        "description": "Creates a doctor profile, optionally creates a Firebase Auth account, and auto-populates 7 days of schedule with the default day/night weekly pattern.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "phone", "specialisation"],
+                "properties": {
+                  "name": { "type": "string", "example": "Dr. James Lim" },
+                  "email": { "type": "string", "example": "james@mediconnect.com" },
+                  "phone": { "type": "string", "example": "+6591234567" },
+                  "specialisation": { "type": "string", "example": "Neurology" },
+                  "shift": { "type": "string", "enum": ["day", "night", "off"], "default": "day" },
+                  "status": { "type": "string", "enum": ["available", "busy"] },
+                  "createAuth": { "type": "boolean", "default": true, "description": "Create a Firebase Auth account with default password" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Doctor created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Doctor" }
+              }
+            }
+          },
+          "400": { "description": "Missing required fields" }
+        }
+      }
+    },
+    "/doctor/list": {
+      "get": {
+        "tags": ["Doctors"],
+        "summary": "List doctors with optional filters",
+        "parameters": [
+          { "name": "specialisation", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["available", "busy"] } },
+          { "name": "shift", "in": "query", "schema": { "type": "string", "enum": ["day", "night", "off"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of doctors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "doctors": { "type": "array", "items": { "$ref": "#/components/schemas/Doctor" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/available": {
+      "get": {
+        "tags": ["Doctors"],
+        "summary": "Get currently available doctors",
+        "description": "Returns doctors with status='available' and shift not 'off'.",
+        "parameters": [
+          { "name": "specialisation", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available doctors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "doctors": { "type": "array", "items": { "$ref": "#/components/schemas/Doctor" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/{doctorID}": {
+      "get": {
+        "tags": ["Doctors"],
+        "summary": "Get doctor by ID",
+        "parameters": [
+          { "name": "doctorID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Doctor profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Doctor" }
+              }
+            }
+          },
+          "404": { "description": "Doctor not found" }
+        }
+      },
+      "put": {
+        "tags": ["Doctors"],
+        "summary": "Update doctor contact details",
+        "parameters": [
+          { "name": "doctorID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string" },
+                  "phone": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated doctor" },
+          "400": { "description": "No updatable fields provided" },
+          "404": { "description": "Doctor not found" }
+        }
+      }
+    },
+    "/doctor/{doctorID}/status": {
+      "put": {
+        "tags": ["Doctors"],
+        "summary": "Update doctor status",
+        "parameters": [
+          { "name": "doctorID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["available", "busy"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated doctor" },
+          "400": { "description": "Invalid status" },
+          "404": { "description": "Doctor not found" }
+        }
+      }
+    },
+    "/doctor/{doctorID}/shift": {
+      "put": {
+        "tags": ["Doctors"],
+        "summary": "Update doctor recurring shift and rebuild schedule",
+        "parameters": [
+          { "name": "doctorID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["shift"],
+                "properties": {
+                  "shift": { "type": "string", "enum": ["day", "night", "off"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated doctor with rebuilt schedule" },
+          "404": { "description": "Doctor not found" }
+        }
+      }
+    },
+    "/doctor/{doctorID}/shift-override": {
+      "put": {
+        "tags": ["Doctor Schedule"],
+        "summary": "Override shift for a single day",
+        "parameters": [
+          { "name": "doctorID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["date", "shift"],
+                "properties": {
+                  "date": { "type": "string", "example": "2025-04-10", "description": "YYYY-MM-DD" },
+                  "shift": { "type": "string", "enum": ["day", "night", "off"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shift override applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "doctorID": { "type": "string" },
+                    "date": { "type": "string" },
+                    "shift": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Doctor not found" }
+        }
+      }
+    },
+    "/doctor-schedule/ensure": {
+      "post": {
+        "tags": ["Doctor Schedule"],
+        "summary": "Ensure next 7 days of schedule exist",
+        "description": "Creates any missing day documents for the next 14 days. Never overwrites existing schedules.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["doctorID"],
+                "properties": {
+                  "doctorID": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Days ensured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "doctorID": { "type": "string" },
+                    "daysCreated": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Doctor not found" }
+        }
+      }
+    },
+    "/doctor-schedule": {
+      "get": {
+        "tags": ["Doctor Schedule"],
+        "summary": "Get doctor schedule (day documents with 24-slot arrays)",
+        "parameters": [
+          { "name": "doctorID", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "description": "YYYY-MM-DD" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "description": "YYYY-MM-DD" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule days",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "doctorID": { "type": "string" },
+                    "days": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "date": { "type": "string" },
+                          "shift": { "type": "string", "enum": ["day", "night", "off"] },
+                          "schedule": {
+                            "type": "array",
+                            "items": { "type": "string", "enum": ["available", "booked", "unavailable"] },
+                            "description": "24 elements, each representing a 30-min slot"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor-schedule/available": {
+      "get": {
+        "tags": ["Doctor Schedule"],
+        "summary": "Find doctors with available slots for a requested time window",
+        "parameters": [
+          { "name": "slotStart", "in": "query", "required": true, "schema": { "type": "string", "format": "date-time" } },
+          { "name": "slotEnd", "in": "query", "required": true, "schema": { "type": "string", "format": "date-time" } },
+          { "name": "specialisation", "in": "query", "schema": { "type": "string" } },
+          { "name": "doctorID", "in": "query", "schema": { "type": "string", "description": "Filter to a specific doctor" } },
+          { "name": "includeBusy", "in": "query", "schema": { "type": "boolean", "default": false } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Doctors with available slots for the window",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "requestedSlot": {
+                      "type": "object",
+                      "properties": {
+                        "slotStart": { "type": "string", "format": "date-time" },
+                        "slotEnd": { "type": "string", "format": "date-time" }
+                      }
+                    },
+                    "doctors": { "type": "array", "items": { "$ref": "#/components/schemas/Doctor" } },
+                    "count": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor-schedule/slot": {
+      "put": {
+        "tags": ["Doctor Schedule"],
+        "summary": "Mark a slot as booked or available",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["doctorID", "slotStart", "status"],
+                "properties": {
+                  "doctorID": { "type": "string" },
+                  "slotStart": { "type": "string", "format": "date-time" },
+                  "status": { "type": "string", "enum": ["booked", "available"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Slot updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "doctorID": { "type": "string" },
+                    "date": { "type": "string" },
+                    "slotIndex": { "type": "integer" },
+                    "status": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Slot or schedule not found" }
+        }
+      }
+    },
+    "/doctor-schedule/doctor/{doctorID}/alternatives": {
+      "get": {
+        "tags": ["Doctor Schedule"],
+        "summary": "Get alternative available slots for a doctor",
+        "parameters": [
+          { "name": "doctorID", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 5, "maximum": 20 } },
+          { "name": "excludeStart", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "excludeEnd", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available slots",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "doctorID": { "type": "string" },
+                    "slots": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slotID": { "type": "string" },
+                          "slotStart": { "type": "string", "format": "date-time" },
+                          "slotEnd": { "type": "string", "format": "date-time" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Doctor not found" }
+        }
+      }
+    },
+    "/doctor-calendar-event": {
+      "get": {
+        "tags": ["Calendar Events"],
+        "summary": "List blocked time ranges for a doctor",
+        "parameters": [
+          { "name": "doctorID", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "description": "YYYY-MM-DD" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "description": "YYYY-MM-DD" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Calendar events derived from unavailable slots",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "doctorID": { "type": "string" },
+                          "eventStart": { "type": "string", "format": "date-time" },
+                          "eventEnd": { "type": "string", "format": "date-time" },
+                          "reason": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Calendar Events"],
+        "summary": "Block out a time range (mark slots as unavailable)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["doctorID", "eventStart", "eventEnd"],
+                "properties": {
+                  "doctorID": { "type": "string" },
+                  "eventStart": { "type": "string", "format": "date-time" },
+                  "eventEnd": { "type": "string", "format": "date-time" },
+                  "reason": { "type": "string", "default": "Unavailable" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Time range blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "doctorID": { "type": "string" },
+                    "date": { "type": "string" },
+                    "eventStart": { "type": "string", "format": "date-time" },
+                    "eventEnd": { "type": "string", "format": "date-time" },
+                    "reason": { "type": "string" },
+                    "blockedSlots": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "409": { "description": "One or more slots in range are already booked" },
+          "400": { "description": "Doctor is off on this day or missing fields" }
+        }
+      }
+    },
+    "/doctor-shift-overrides": {
+      "get": {
+        "tags": ["Doctor Schedule"],
+        "summary": "List shift per day for a doctor",
+        "parameters": [
+          { "name": "doctorID", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "description": "YYYY-MM-DD" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "description": "YYYY-MM-DD" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shift per day",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "overrides": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "date": { "type": "string" },
+                          "shift": { "type": "string", "enum": ["day", "night", "off"] }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Doctor": {
+        "type": "object",
+        "properties": {
+          "doctorID": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "phone": { "type": "string" },
+          "specialisation": { "type": "string" },
+          "status": { "type": "string", "enum": ["available", "busy"] },
+          "shift": { "type": "string", "enum": ["day", "night", "off"] },
+          "firebaseUID": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "shiftUpdatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

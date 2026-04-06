@@ -1,0 +1,199 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Complete Consultation Service",
+    "description": "Composite service that finalises a consultation: saves notes, generates an AI summary, deducts inventory, creates an order in OutSystems, optionally generates a Medical Certificate, and sends an order-ready notification.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5014", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Consultation" },
+    { "name": "Medications" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Consultation"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "service": { "type": "string", "example": "complete-consultation" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/available-medications": {
+      "get": {
+        "tags": ["Medications"],
+        "summary": "Get available medications",
+        "description": "Returns medications from inventory that have quantity > 0.",
+        "responses": {
+          "200": {
+            "description": "List of available medications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "medications": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "medicationID": { "type": "string" },
+                          "name": { "type": "string" },
+                          "description": { "type": "string" },
+                          "quantity": { "type": "integer" },
+                          "price": { "type": "number" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/complete-consultation/summarise-notes": {
+      "post": {
+        "tags": ["Consultation"],
+        "summary": "Generate AI summary from consultation notes (live proxy)",
+        "description": "UI-facing proxy for live note summarisation during the consultation. Fetches patient allergy/history context, then calls the OpenAI wrapper's /openai/summarise-notes endpoint.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["notes"],
+                "properties": {
+                  "notes": { "type": "string", "example": "Patient presents with persistent headache for 3 days..." },
+                  "patientID": { "type": "string", "description": "Optional. Used to enrich AI prompt with allergy and history." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI-generated summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "notes is required" }
+        }
+      }
+    },
+    "/complete-consultation": {
+      "post": {
+        "tags": ["Consultation"],
+        "summary": "Complete a consultation",
+        "description": "Orchestrates: (1) save notes, (2) generate AI summary, (3) deduct medication stock with compensation on failure, (4) create OutSystems order, (5) optionally generate MC, (6) mark consultation complete, (7) send order-ready notification.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["apptID", "patientID", "doctorID"],
+                "properties": {
+                  "apptID": { "type": "string", "example": "appt-abc123" },
+                  "patientID": { "type": "string", "example": "patient-xyz456" },
+                  "doctorID": { "type": "string", "example": "doctor-def789" },
+                  "notes": { "type": "string", "example": "Patient has tension headache. Prescribed paracetamol." },
+                  "medications": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "medicationID": { "type": "string" },
+                        "medicationName": { "type": "string" },
+                        "qty": { "type": "integer" },
+                        "unitPrice": { "type": "number" },
+                        "instructions": { "type": "string" }
+                      }
+                    }
+                  },
+                  "issueMC": { "type": "boolean", "example": true },
+                  "mcDetails": {
+                    "type": "object",
+                    "description": "Required when issueMC is true",
+                    "properties": {
+                      "patientName": { "type": "string" },
+                      "patientNRIC": { "type": "string" },
+                      "doctorName": { "type": "string" },
+                      "diagnosis": { "type": "string" },
+                      "startDate": { "type": "string", "example": "2025-04-10" },
+                      "endDate": { "type": "string", "example": "2025-04-12" },
+                      "days": { "type": "integer", "example": 2 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Consultation completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Consultation completed" },
+                    "consultationID": { "type": "string" },
+                    "orderID": { "type": "string" },
+                    "totalAmount": { "type": "number", "example": 65.50 },
+                    "medicationSubtotal": { "type": "number", "example": 25.50 },
+                    "consultationFee": { "type": "number", "example": 40.00 },
+                    "orderItemsSynced": { "type": "boolean" },
+                    "aiSummary": { "type": "string" },
+                    "mcIssued": { "type": "boolean" },
+                    "mcDownloadUrl": { "type": "string", "nullable": true }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Insufficient stock for a prescribed medication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "Stock for Paracetamol was just taken." }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

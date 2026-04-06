@@ -1,0 +1,158 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OpenAI Wrapper",
+    "description": "Wrapper service exposing medical AI capabilities powered by GPT-4o-mini: symptom triage, consultation note summarisation, and medication recommendation.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5021", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "AI" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["AI"],
+        "summary": "Health check",
+        "responses": { "200": { "description": "Service is healthy" } }
+      }
+    },
+    "/openai/symptom-check": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "Triage patient symptoms",
+        "description": "Accepts a symptom description and optional patient context, and returns a specialisation recommendation, urgency level, reasoning, and advice. Input must contain recognisable medical keywords.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["symptoms"],
+                "properties": {
+                  "symptoms": { "type": "string", "example": "I have a severe headache and blurry vision" },
+                  "allergies": { "type": "array", "items": { "type": "string" } },
+                  "pastHistory": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Triage result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "specialisation": {
+                      "type": "string",
+                      "enum": ["General Practice", "Dermatology", "Cardiology", "Orthopaedics", "ENT", "Ophthalmology", "Gastroenterology", "Neurology", "Psychiatry", "Gynaecology", "Paediatrics"]
+                    },
+                    "urgency": { "type": "string", "enum": ["teleconsult", "visit", "emergency"] },
+                    "reasoning": { "type": "string" },
+                    "advice": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "symptoms missing or not a medical description" }
+        }
+      }
+    },
+    "/openai/summarise-notes": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "Summarise consultation notes",
+        "description": "Generates a structured clinical summary (Chief Complaint, Findings, Diagnosis, Treatment Plan) from raw doctor notes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["notes"],
+                "properties": {
+                  "notes": { "type": "string", "example": "Patient presented with 3-day headache. BP 130/85. Prescribed paracetamol." },
+                  "allergies": { "type": "array", "items": { "type": "string" } },
+                  "pastHistory": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI-generated summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "notes is required" }
+        }
+      }
+    },
+    "/openai/recommend-medications": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "Recommend medications for a diagnosis",
+        "description": "Given a diagnosis and a list of available medications, returns a recommended subset with dosage notes. Only recommends from the provided list.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["diagnosis", "availableMedications"],
+                "properties": {
+                  "diagnosis": { "type": "string", "example": "Tension headache" },
+                  "availableMedications": {
+                    "type": "array",
+                    "items": { "type": "object" },
+                    "description": "Array of medication objects from inventory"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Medication recommendations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "recommendations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string" },
+                          "dosageNote": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "diagnosis and availableMedications are required" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,276 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Rider Service",
+    "description": "Atomic service for managing delivery rider profiles in Firestore. Rider status lifecycle: available → delivering → available (or off_shift when shift is off).",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5001", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Riders" }
+  ],
+  "paths": {
+    "/rider": {
+      "post": {
+        "tags": ["Riders"],
+        "summary": "Create a rider",
+        "description": "Creates a rider profile. Set createAuth: true to also create a Firebase Auth account with a default password.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "phone"],
+                "properties": {
+                  "name": { "type": "string", "example": "Bob Rider" },
+                  "phone": { "type": "string", "example": "+6598765432" },
+                  "email": { "type": "string", "example": "bob@mediconnect.com" },
+                  "shift": { "type": "string", "enum": ["day", "night", "off"], "default": "off" },
+                  "status": { "type": "string", "enum": ["available", "delivering", "off_shift"] },
+                  "firebaseUID": { "type": "string" },
+                  "createAuth": { "type": "boolean", "default": false }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Rider created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer", "example": 201 },
+                    "data": { "$ref": "#/components/schemas/Rider" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Missing required fields" }
+        }
+      }
+    },
+    "/rider/register": {
+      "post": {
+        "tags": ["Riders"],
+        "summary": "Register a rider with Firebase Auth",
+        "description": "Same as POST /rider but always creates a Firebase Auth account. Requires email.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "phone", "email"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "email": { "type": "string" },
+                  "shift": { "type": "string", "enum": ["day", "night", "off"] },
+                  "status": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Rider registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer" },
+                    "data": { "$ref": "#/components/schemas/Rider" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rider/free": {
+      "get": {
+        "tags": ["Riders"],
+        "summary": "Get all available riders (not on shift 'off')",
+        "responses": {
+          "200": {
+            "description": "Available riders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer", "example": 200 },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Rider" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rider/list": {
+      "get": {
+        "tags": ["Riders"],
+        "summary": "List riders with optional filters",
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["available", "delivering", "off_shift"] } },
+          { "name": "shift", "in": "query", "schema": { "type": "string", "enum": ["day", "night", "off"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rider list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Rider" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rider/{riderID}": {
+      "get": {
+        "tags": ["Riders"],
+        "summary": "Get rider by ID",
+        "parameters": [
+          { "name": "riderID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rider profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer" },
+                    "data": { "$ref": "#/components/schemas/Rider" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Rider not found" }
+        }
+      },
+      "put": {
+        "tags": ["Riders"],
+        "summary": "Update rider fields (supports optimistic concurrency via expectedStatus)",
+        "description": "Generic field update. If expectedStatus is provided, the update is rejected with 409 if the current status differs — used for atomic claim during delivery assignment.",
+        "parameters": [
+          { "name": "riderID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["available", "delivering", "off_shift"] },
+                  "expectedStatus": { "type": "string", "description": "If provided, update is rejected if current status does not match", "example": "available" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated" },
+          "404": { "description": "Rider not found" },
+          "409": {
+            "description": "Status conflict — current status did not match expectedStatus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer", "example": 409 },
+                    "error": { "type": "string", "example": "Rider status conflict" },
+                    "currentStatus": { "type": "string" },
+                    "expectedStatus": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rider/{riderID}/shift": {
+      "put": {
+        "tags": ["Riders"],
+        "summary": "Update rider shift",
+        "description": "Setting shift to 'off' marks status as 'off_shift'. Setting to 'day'/'night' restores 'available' if currently off_shift.",
+        "parameters": [
+          { "name": "riderID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["shift"],
+                "properties": {
+                  "shift": { "type": "string", "enum": ["day", "night", "off"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated rider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer" },
+                    "data": { "$ref": "#/components/schemas/Rider" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Rider not found" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Rider": {
+        "type": "object",
+        "properties": {
+          "riderID": { "type": "string" },
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string" },
+          "status": { "type": "string", "enum": ["available", "delivering", "off_shift"] },
+          "shift": { "type": "string", "enum": ["day", "night", "off"] },
+          "firebaseUID": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "shiftUpdatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

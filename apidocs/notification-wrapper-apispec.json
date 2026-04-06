@@ -1,0 +1,251 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Notification Wrapper",
+    "description": "Wrapper service that sends emails and SMS via the SMU Lab Utilities API, pushes real-time SSE events to connected browser clients, and consumes RabbitMQ events for async notification delivery (including Telegram forwarding).",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5011", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Notifications" },
+    { "name": "SSE (Server-Sent Events)" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "Health check",
+        "description": "Returns service health and number of active SSE connections.",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "service": { "type": "string", "example": "notification-wrapper" },
+                    "sse_connected_users": { "type": "integer" },
+                    "sse_total_connections": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notify/send": {
+      "post": {
+        "tags": ["Notifications"],
+        "summary": "Send email and/or SMS notification",
+        "description": "Sends an email and/or SMS to the patient. Supports structured event types (appointment_booked, appointment_confirmed, appointment_cancelled, payment_successful, rider_assigned, etc.) which auto-fill subject and content. Also forwards to Telegram queue and SSE clients.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "event_type": {
+                    "type": "string",
+                    "enum": ["appointment_booked", "appointment_confirmed", "appointment_cancelled", "payment_successful", "payment_refunded", "rider_assigned", "order_delivered"],
+                    "description": "When provided, auto-populates subject, content, and message fields."
+                  },
+                  "patientID": { "type": "string" },
+                  "patientName": { "type": "string" },
+                  "receiver": { "type": "string", "description": "Recipient email address" },
+                  "subject": { "type": "string", "description": "Email subject (auto-set for known event_types)" },
+                  "content": { "type": "string", "description": "Email body (auto-set for known event_types)" },
+                  "mobile": { "type": "string", "description": "Recipient phone number for SMS" },
+                  "message": { "type": "string", "description": "SMS message text (auto-set for known event_types)" },
+                  "channel": { "type": "string", "enum": ["email", "sms", "both"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notification(s) sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "emailSent": { "type": "boolean" },
+                    "smsSent": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "No valid email or SMS payload provided" }
+        }
+      }
+    },
+    "/notify/order-ready": {
+      "post": {
+        "tags": ["Notifications"],
+        "summary": "Send order-ready notification after consultation",
+        "description": "Fetches patient email from patient-service, sends an order summary email, and publishes an order_pending_payment event to the Telegram queue.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["patientID", "orderID"],
+                "properties": {
+                  "apptID": { "type": "string" },
+                  "patientID": { "type": "string" },
+                  "orderID": { "type": "string" },
+                  "totalAmount": { "type": "number", "example": 65.50 },
+                  "medicationSubtotal": { "type": "number" },
+                  "consultationFee": { "type": "number" },
+                  "mcIssued": { "type": "boolean" },
+                  "mcDownloadUrl": { "type": "string", "nullable": true },
+                  "summary": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order-ready notification sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Order-ready notification sent" },
+                    "receiver": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "patientID and orderID are required" },
+          "404": { "description": "Patient email not found" }
+        }
+      }
+    },
+    "/notify/email": {
+      "post": {
+        "tags": ["Notifications"],
+        "summary": "Send a raw email",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["receiver", "subject", "content"],
+                "properties": {
+                  "receiver": { "type": "string" },
+                  "subject": { "type": "string" },
+                  "content": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Email sent" },
+          "400": { "description": "receiver, subject, and content are required" }
+        }
+      }
+    },
+    "/notify/sms": {
+      "post": {
+        "tags": ["Notifications"],
+        "summary": "Send a raw SMS",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mobile": { "type": "string", "description": "Recipient phone number" },
+                  "message": { "type": "string", "description": "SMS message text" },
+                  "smsPayload": { "type": "object", "description": "Alternative: pass a raw payload object directly to the SMS gateway" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "SMS sent" },
+          "400": { "description": "Provide smsPayload or mobile + message" },
+          "502": { "description": "SMS gateway error" }
+        }
+      }
+    },
+    "/sse/stream": {
+      "get": {
+        "tags": ["SSE (Server-Sent Events)"],
+        "summary": "Open a real-time SSE stream for a user",
+        "description": "Browser clients connect here to receive push events. Keeps connection alive with heartbeats every 20 seconds. Emits 'connected' event on connect.",
+        "parameters": [
+          { "name": "userID", "in": "query", "required": true, "schema": { "type": "string" }, "description": "patientID or doctorID of the connected user" }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream (text/event-stream)",
+            "content": {
+              "text/event-stream": {
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "400": { "description": "userID is required" }
+        }
+      }
+    },
+    "/sse/notify": {
+      "post": {
+        "tags": ["SSE (Server-Sent Events)"],
+        "summary": "Push a real-time event to a specific user",
+        "description": "Internal endpoint used by other services to push an event to a user's active SSE stream(s).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["userID"],
+                "properties": {
+                  "userID": { "type": "string", "description": "patientID or doctorID of the target user" },
+                  "event": { "type": "string", "default": "notification", "example": "appointment_booked" },
+                  "data": { "type": "object", "description": "Arbitrary payload delivered to the client" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event pushed to connected clients",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pushed": { "type": "boolean" },
+                    "connections": { "type": "integer", "description": "Number of active connections the event was sent to" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "userID is required" }
+        }
+      }
+    }
+  }
+}

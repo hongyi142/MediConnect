@@ -1,0 +1,251 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Appointment Service",
+    "description": "Atomic service for managing medical appointments stored in Firestore.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5032", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Appointments" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Appointments"],
+        "summary": "Health check",
+        "responses": {
+          "200": { "description": "Service is healthy" }
+        }
+      }
+    },
+    "/appointment": {
+      "post": {
+        "tags": ["Appointments"],
+        "summary": "Create an appointment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["patientID", "doctorID", "slotStart", "slotEnd"],
+                "properties": {
+                  "patientID": { "type": "string" },
+                  "doctorID": { "type": "string" },
+                  "slotStart": { "type": "string", "format": "date-time" },
+                  "slotEnd": { "type": "string", "format": "date-time" },
+                  "dateTime": { "type": "string", "format": "date-time", "description": "Alias for slotStart if slotStart is absent" },
+                  "specialisation": { "type": "string" },
+                  "reason": { "type": "string" },
+                  "doctorPreference": { "type": "string", "enum": ["preferred", "any"] },
+                  "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"], "default": "pending" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Appointment created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Appointment" }
+              }
+            }
+          },
+          "400": { "description": "Missing required fields or invalid status" }
+        }
+      }
+    },
+    "/appointment/upcoming": {
+      "get": {
+        "tags": ["Appointments"],
+        "summary": "Get upcoming appointments",
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "default": "confirmed" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of appointments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appointments": { "type": "array", "items": { "$ref": "#/components/schemas/Appointment" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/appointment/conflict": {
+      "get": {
+        "tags": ["Appointments"],
+        "summary": "Check for scheduling conflict",
+        "parameters": [
+          { "name": "doctorID", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "slotStart", "in": "query", "required": true, "schema": { "type": "string", "format": "date-time" } },
+          { "name": "slotEnd", "in": "query", "required": true, "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conflict check result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conflict": { "type": "boolean" },
+                    "appointmentID": { "type": "string", "description": "Present only when conflict is true" },
+                    "slotStart": { "type": "string", "format": "date-time" },
+                    "slotEnd": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "doctorID or slot params missing" }
+        }
+      }
+    },
+    "/appointment/{appointmentID}": {
+      "get": {
+        "tags": ["Appointments"],
+        "summary": "Get appointment by ID",
+        "parameters": [
+          { "name": "appointmentID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Appointment details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Appointment" }
+              }
+            }
+          },
+          "404": { "description": "Appointment not found" }
+        }
+      },
+      "put": {
+        "tags": ["Appointments"],
+        "summary": "Update an appointment",
+        "parameters": [
+          { "name": "appointmentID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"] },
+                  "cancellationReason": { "type": "string" },
+                  "alternativeOptions": { "type": "object" },
+                  "slotStart": { "type": "string", "format": "date-time" },
+                  "slotEnd": { "type": "string", "format": "date-time" },
+                  "doctorID": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated appointment",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Appointment" }
+              }
+            }
+          },
+          "404": { "description": "Appointment not found" }
+        }
+      }
+    },
+    "/appointment/patient/{patientID}": {
+      "get": {
+        "tags": ["Appointments"],
+        "summary": "Get all appointments for a patient",
+        "parameters": [
+          { "name": "patientID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of appointments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appointments": { "type": "array", "items": { "$ref": "#/components/schemas/Appointment" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/appointment/doctor/{doctorID}": {
+      "get": {
+        "tags": ["Appointments"],
+        "summary": "Get all appointments for a doctor",
+        "parameters": [
+          { "name": "doctorID", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of appointments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appointments": { "type": "array", "items": { "$ref": "#/components/schemas/Appointment" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Appointment": {
+        "type": "object",
+        "properties": {
+          "appointmentID": { "type": "string" },
+          "patientID": { "type": "string" },
+          "doctorID": { "type": "string" },
+          "dateTime": { "type": "string", "format": "date-time" },
+          "slotStart": { "type": "string", "format": "date-time" },
+          "slotEnd": { "type": "string", "format": "date-time" },
+          "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"] },
+          "specialisation": { "type": "string" },
+          "reason": { "type": "string" },
+          "doctorPreference": { "type": "string" },
+          "cancellationReason": { "type": "string", "nullable": true },
+          "alternativeOptions": { "type": "object", "nullable": true },
+          "confirmedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "cancelledAt": { "type": "string", "format": "date-time", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

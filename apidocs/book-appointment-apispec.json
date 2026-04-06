@@ -1,0 +1,280 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Book Appointment Service",
+    "description": "Composite service that handles appointment booking, symptom triage, doctor notifications, and appointment response.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5033", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Appointment Booking" },
+    { "name": "Symptom Check" },
+    { "name": "Doctor Notifications" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Appointment Booking"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "service": { "type": "string", "example": "book-appointment" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/book-appointment": {
+      "post": {
+        "tags": ["Appointment Booking"],
+        "summary": "Book an appointment",
+        "description": "Finds an available doctor for the requested slot, creates the appointment with status 'pending', locks the slot via Redis, and publishes a doctor notification via RabbitMQ.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["patientID", "slotStart", "slotEnd"],
+                "properties": {
+                  "patientID": { "type": "string", "example": "patient-abc123" },
+                  "slotStart": { "type": "string", "format": "date-time", "example": "2025-04-10T09:00:00" },
+                  "slotEnd": { "type": "string", "format": "date-time", "example": "2025-04-10T09:30:00" },
+                  "reason": { "type": "string", "example": "Persistent headache for 3 days" },
+                  "specialisation": { "type": "string", "example": "Neurology" },
+                  "doctorID": { "type": "string", "description": "Optional preferred doctor ID", "example": "doctor-xyz456" },
+                  "doctorPreference": {
+                    "type": "string",
+                    "enum": ["preferred", "any"],
+                    "description": "If 'preferred', returns alternatives when doctor is unavailable instead of auto-assigning another.",
+                    "example": "preferred"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Appointment booked and pending doctor confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Appointment booked and pending doctor confirmation" },
+                    "appointmentID": { "type": "string" },
+                    "status": { "type": "string", "example": "pending" },
+                    "patientID": { "type": "string" },
+                    "doctorID": { "type": "string" },
+                    "slotStart": { "type": "string", "format": "date-time" },
+                    "slotEnd": { "type": "string", "format": "date-time" },
+                    "rabbitPublished": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Patient not found" },
+          "409": {
+            "description": "No available doctor or slot conflict. Includes alternatives.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "alternatives": {
+                      "type": "object",
+                      "properties": {
+                        "sameSlotDoctors": { "type": "array", "items": { "type": "object" } },
+                        "preferredDoctorOtherTimes": { "type": "array", "items": { "type": "object" } },
+                        "otherTimeslots": { "type": "array", "items": { "type": "object" } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/book-appointment/alternatives": {
+      "post": {
+        "tags": ["Appointment Booking"],
+        "summary": "Get alternative booking options",
+        "description": "Returns alternative doctors and timeslots when the requested slot is unavailable.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["slotStart", "slotEnd"],
+                "properties": {
+                  "slotStart": { "type": "string", "format": "date-time" },
+                  "slotEnd": { "type": "string", "format": "date-time" },
+                  "specialisation": { "type": "string" },
+                  "doctorID": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Alternative options returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "alternatives": {
+                      "type": "object",
+                      "properties": {
+                        "sameSlotDoctors": { "type": "array", "items": { "type": "object" } },
+                        "preferredDoctorOtherTimes": { "type": "array", "items": { "type": "object" } },
+                        "otherTimeslots": { "type": "array", "items": { "type": "object" } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/book-appointment/respond": {
+      "post": {
+        "tags": ["Appointment Booking"],
+        "summary": "Doctor accepts or rejects an appointment",
+        "description": "Updates appointment status to confirmed or cancelled. Builds alternatives if cancelled and notifies the patient via email/SMS.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["appointmentID", "status"],
+                "properties": {
+                  "appointmentID": { "type": "string" },
+                  "status": { "type": "string", "enum": ["confirmed", "cancelled"] },
+                  "cancellationReason": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Appointment updated and patient notified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "appointment": { "type": "object" },
+                    "alternatives": { "type": "object", "nullable": true },
+                    "patientNotified": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid status or missing fields" },
+          "404": { "description": "Appointment not found" }
+        }
+      }
+    },
+    "/book-appointment/symptom-check": {
+      "post": {
+        "tags": ["Symptom Check"],
+        "summary": "AI-powered symptom triage",
+        "description": "Accepts patient symptoms, enriches with patient allergy and history from patient-service, and proxies to the OpenAI wrapper for triage recommendation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["symptoms"],
+                "properties": {
+                  "symptoms": { "type": "string", "example": "I have a severe headache and blurry vision" },
+                  "patientID": { "type": "string", "description": "Optional. Used to fetch allergy/history context." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Triage recommendation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "specialisation": { "type": "string", "example": "Neurology" },
+                    "urgency": { "type": "string", "enum": ["teleconsult", "visit", "emergency"] },
+                    "reasoning": { "type": "string" },
+                    "advice": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Symptoms missing or not a medical description" }
+        }
+      }
+    },
+    "/book-appointment/doctor-notifications/{doctorID}": {
+      "get": {
+        "tags": ["Doctor Notifications"],
+        "summary": "Get pending appointment notifications for a doctor",
+        "description": "Returns buffered AMQP messages from the doctor.appointment.request queue for the given doctor. Pass ?consume=true to clear the buffer after reading.",
+        "parameters": [
+          { "name": "doctorID", "in": "path", "required": true, "schema": { "type": "string" } },
+          {
+            "name": "consume",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "boolean" },
+            "description": "If true, clears the notification buffer after returning"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "doctorID": { "type": "string" },
+                    "count": { "type": "integer" },
+                    "notifications": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

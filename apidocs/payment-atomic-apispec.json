@@ -1,0 +1,122 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Payment Atomic Service",
+    "description": "Atomic service that maintains a payment ledger in Firestore, recording Stripe session intents and their status.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5000", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Payment" }
+  ],
+  "paths": {
+    "/payment/create": {
+      "post": {
+        "tags": ["Payment"],
+        "summary": "Create a payment record",
+        "description": "Records a new pending payment entry linked to a Stripe session.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["orderID", "stripeIntentID", "amount"],
+                "properties": {
+                  "orderID": { "type": "string", "example": "42" },
+                  "stripeIntentID": { "type": "string", "description": "Stripe checkout session ID" },
+                  "amount": { "type": "integer", "description": "Amount in cents", "example": 6550 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payment record created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Payment record created successfully" },
+                    "documentID": { "type": "string", "description": "Firestore document ID" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Missing required fields" }
+        }
+      }
+    },
+    "/payment/{paymentID}": {
+      "get": {
+        "tags": ["Payment"],
+        "summary": "Get payment record",
+        "parameters": [
+          { "name": "paymentID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "documentID": { "type": "string" },
+                    "status": { "type": "string", "enum": ["pending", "paid", "failed", "refunded"] }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Payment record not found" }
+        }
+      },
+      "put": {
+        "tags": ["Payment"],
+        "summary": "Update payment status",
+        "parameters": [
+          { "name": "paymentID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["pending", "paid", "failed", "refunded"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Payment status updated successfully" },
+                    "documentID": { "type": "string" },
+                    "status": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid status" },
+          "404": { "description": "Payment record not found" }
+        }
+      }
+    }
+  }
+}

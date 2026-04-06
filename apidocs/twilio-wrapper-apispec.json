@@ -1,0 +1,150 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Twilio Wrapper",
+    "description": "Wrapper service for Twilio Video: creates rooms, generates JWT access tokens scoped to a room, and ends rooms.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5020", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Video Rooms" },
+    { "name": "Access Tokens" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Video Rooms"],
+        "summary": "Health check",
+        "responses": { "200": { "description": "Service is healthy" } }
+      }
+    },
+    "/twilio/room": {
+      "post": {
+        "tags": ["Video Rooms"],
+        "summary": "Create or fetch a Twilio video room",
+        "description": "Creates a group video room with the given name. Idempotent: if a room with that name already exists, it returns the existing room instead of erroring.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["roomName"],
+                "properties": {
+                  "roomName": { "type": "string", "example": "consult-appt-abc123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Room created or fetched",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Room" }
+              }
+            }
+          },
+          "400": { "description": "roomName is required" }
+        }
+      }
+    },
+    "/twilio/room/{roomName}": {
+      "get": {
+        "tags": ["Video Rooms"],
+        "summary": "Get an existing room's status",
+        "parameters": [
+          { "name": "roomName", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Room details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Room" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Video Rooms"],
+        "summary": "End a video room",
+        "parameters": [
+          { "name": "roomName", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Room ended",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Room ended" },
+                    "roomName": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/twilio/token": {
+      "post": {
+        "tags": ["Access Tokens"],
+        "summary": "Generate a Twilio JWT access token",
+        "description": "Creates a JWT access token (TTL 1 hour) scoped to the given room. The identity should be prefixed: 'patient-{patientID}' or 'doctor-{doctorID}'.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["identity", "roomName"],
+                "properties": {
+                  "identity": { "type": "string", "example": "patient-xyz456", "description": "Unique participant identity. Prefix with 'patient-' or 'doctor-'." },
+                  "roomName": { "type": "string", "example": "consult-appt-abc123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Access token generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string", "description": "JWT access token for Twilio Video SDK" },
+                    "identity": { "type": "string" },
+                    "roomName": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "identity and roomName are required" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Room": {
+        "type": "object",
+        "properties": {
+          "roomName": { "type": "string" },
+          "roomSid": { "type": "string" },
+          "status": { "type": "string", "example": "in-progress" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MC Service",
+    "description": "Atomic service that generates Medical Certificate PDFs, stores them in Amazon S3, and returns a download URL.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5010", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Medical Certificates" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Medical Certificates"],
+        "summary": "Health check",
+        "responses": { "200": { "description": "Service is healthy" } }
+      }
+    },
+    "/mc/generate": {
+      "post": {
+        "tags": ["Medical Certificates"],
+        "summary": "Generate a Medical Certificate PDF",
+        "description": "Renders the MC as HTML, converts to PDF, uploads to Amazon S3, and returns the S3 key and presigned download URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["patientID", "patientName", "patientNRIC", "doctorName", "diagnosis", "startDate", "endDate", "days"],
+                "properties": {
+                  "patientID": { "type": "string" },
+                  "patientName": { "type": "string", "example": "Alice Tan" },
+                  "patientNRIC": { "type": "string", "example": "S9012345A" },
+                  "doctorName": { "type": "string", "example": "Dr. James Lim" },
+                  "diagnosis": { "type": "string", "example": "Acute Upper Respiratory Tract Infection" },
+                  "startDate": { "type": "string", "example": "2025-04-10" },
+                  "endDate": { "type": "string", "example": "2025-04-12" },
+                  "days": { "type": "integer", "example": 2 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MC generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mcKey": { "type": "string", "description": "S3 object key for the MC PDF" },
+                    "downloadUrl": { "type": "string", "description": "Presigned S3 URL to download the PDF" },
+                    "fileName": { "type": "string", "example": "MC_patient-abc123_2025-04-10.pdf" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Missing required fields" }
+        }
+      }
+    },
+    "/mc/{mcKey}": {
+      "get": {
+        "tags": ["Medical Certificates"],
+        "summary": "Get download URL for an existing MC",
+        "parameters": [
+          { "name": "mcKey", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Presigned download URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "downloadUrl": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Medical Certificates"],
+        "summary": "Delete an MC from S3",
+        "parameters": [
+          { "name": "mcKey", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "MC deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "MC deleted" },
+                    "key": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

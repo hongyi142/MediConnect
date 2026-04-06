@@ -1,0 +1,121 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Payment Wrapper",
+    "description": "Wrapper service for Stripe: creates hosted checkout sessions, retrieves payment status, and processes refunds.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5001", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Stripe Payments" }
+  ],
+  "paths": {
+    "/payment/checkout": {
+      "post": {
+        "tags": ["Stripe Payments"],
+        "summary": "Create a Stripe checkout session",
+        "description": "Creates a Stripe-hosted checkout session for a single line item. The amount must be in the smallest currency unit (cents for SGD).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["order_id", "item_name", "amount"],
+                "properties": {
+                  "order_id": { "type": "string", "example": "42" },
+                  "item_name": { "type": "string", "example": "Medical Order #42" },
+                  "amount": { "type": "integer", "description": "Amount in cents (e.g. 6550 = SGD 65.50)", "example": 6550 },
+                  "currency": { "type": "string", "default": "sgd", "example": "sgd" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Checkout session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checkout_url": { "type": "string", "description": "Stripe-hosted checkout page URL to redirect the patient to" },
+                    "session_id": { "type": "string", "description": "Stripe checkout session ID" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Missing fields, invalid amount, or Stripe error" }
+        }
+      }
+    },
+    "/payment/status/{session_id}": {
+      "get": {
+        "tags": ["Stripe Payments"],
+        "summary": "Get Stripe payment status",
+        "description": "Retrieves the payment status for a Stripe checkout session directly from Stripe.",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Stripe checkout session ID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payment_status": { "type": "string", "enum": ["paid", "unpaid", "no_payment_required"], "example": "paid" },
+                    "order_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Stripe error retrieving session" }
+        }
+      }
+    },
+    "/payment/refund": {
+      "post": {
+        "tags": ["Stripe Payments"],
+        "summary": "Refund a payment",
+        "description": "Retrieves the payment intent from the Stripe checkout session and issues a full refund.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["session_id"],
+                "properties": {
+                  "session_id": { "type": "string", "description": "Stripe checkout session ID for the payment to refund" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Refund processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Refund processed successfully" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "No payment intent found or Stripe error" }
+        }
+      }
+    }
+  }
+}
