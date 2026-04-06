@@ -9,6 +9,7 @@ serviceAccountKey.json
 **/firebase_credentials.json
 **/serviceAccountKey.json
 application_default_credentials.json
+serviceAccountKey(old).json
 
 # Python
 __pycache__/

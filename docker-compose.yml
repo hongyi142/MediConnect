@@ -320,11 +320,11 @@ services:
       # External service (not routed through Kong)
       - ORDER_SERVICE_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
       # Firebase
-      - FIREBASE_API_KEY=AIzaSyCGGxpmbhezNBNs2M_jwLr6myVpbSerBpE
-      - FIREBASE_AUTH_DOMAIN=mediconnect-b50d2.firebaseapp.com
-      - FIREBASE_PROJECT_ID=mediconnect-b50d2
-      - FIREBASE_STORAGE_BUCKET=mediconnect-b50d2.firebasestorage.app
-      - FIREBASE_MESSAGING_SENDER_ID=400332937391
-      - FIREBASE_APP_ID=1:400332937391:web:3ea04d60d579933b0c1ebb
+      - FIREBASE_API_KEY=${FIREBASE_API_KEY}
+      - FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}
+      - FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID}
+      - FIREBASE_APP_ID=${FIREBASE_APP_ID}
     depends_on:
       - kong
