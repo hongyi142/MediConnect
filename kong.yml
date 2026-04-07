@@ -75,6 +75,13 @@ services:
 
   - name: twilio-wrapper
     url: http://twilio-wrapper:5020
+    # Strict limit: each call sends a real SMS/call via Twilio — prevent billing abuse and phone spam
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 5
+          policy: local
+          error_message: "Too many notification requests. Please wait before trying again."
     routes:
       - name: twilio-routes
         paths:
@@ -83,6 +90,13 @@ services:
 
   - name: openai-wrapper
     url: http://openai-wrapper:5021
+    # Strict limit: each call hits the paid OpenAI API (symptom checker) — protect cost and prevent abuse
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 5
+          policy: local
+          error_message: "Too many AI requests. Please wait before using the symptom checker again."
     routes:
       - name: openai-routes
         paths:
@@ -127,6 +141,13 @@ services:
 
   - name: payment-atomic
     url: http://payment_atomic:5000
+    # Very strict limit: payment records are sensitive PHI — prevent enumeration and brute-force
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 10
+          policy: local
+          error_message: "Too many payment requests. Please wait before trying again."
     routes:
       - name: payment-atomic-routes
         paths:
@@ -135,6 +156,13 @@ services:
 
   - name: payment-wrapper
     url: http://payment_wrapper:5001
+    # Very strict limit: each call initiates a real payment transaction
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 5
+          policy: local
+          error_message: "Too many payment requests. Please wait before trying again."
     routes:
       - name: payment-wrapper-routes
         paths:
@@ -143,6 +171,13 @@ services:
 
   - name: process-payment
     url: http://process-payment:5002
+    # Very strict limit: orchestrates the full payment + delivery flow
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 5
+          policy: local
+          error_message: "Too many payment requests. Please wait before trying again."
     routes:
       - name: process-payment-routes
         paths:
@@ -198,6 +233,13 @@ services:
 
   - name: book-appointment
     url: http://book-appointment:5033
+    # Strict limit: prevents patients from spamming appointment booking requests
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 10
+          policy: local
+          error_message: "Too many booking requests. Please wait before trying again."
     routes:
       - name: book-appointment-routes
         paths:
@@ -206,6 +248,13 @@ services:
 
   - name: start-consultation
     url: http://start-consultation:5013
+    # Moderate limit: consultation orchestration involves multiple downstream calls
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 20
+          policy: local
+          error_message: "Too many consultation requests. Please wait before trying again."
     routes:
       - name: start-consultation-routes
         paths:
@@ -214,6 +263,13 @@ services:
 
   - name: complete-consultation
     url: http://complete-consultation:5014
+    # Moderate limit: matches start-consultation to prevent orphaned consultations
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 20
+          policy: local
+          error_message: "Too many consultation requests. Please wait before trying again."
     routes:
       - name: complete-consultation-routes
         paths:
@@ -232,6 +288,18 @@ services:
 
 # ──────────────────────────────────────────────
 #  Global Plugins
+#
+#  Rate-limiting strategy (defence-in-depth):
+#    - Sensitive services have their own stricter limits (defined above):
+#        /book-appointment  → 10 req/min   (prevent appointment spam)
+#        /openai            → 5 req/min    (protect paid AI API)
+#        /twilio            → 5 req/min    (prevent SMS/call abuse)
+#        /payment-gateway   → 5 req/min    (protect payment transactions)
+#        /api (payment)     → 5 req/min    (protect payment orchestration)
+#        /payment-svc       → 10 req/min   (protect payment records)
+#        /start-consultation→ 20 req/min   (protect consultation flow)
+#        /complete-consult  → 20 req/min   (matches start-consultation)
+#    - Global fallback: 500 req/min covers all remaining routes
 # ──────────────────────────────────────────────
 plugins:
   - name: cors
@@ -252,6 +320,7 @@ plugins:
       credentials: false
       max_age: 3600
 
+  # Fallback rate limit — applies to any route without a service-level override
   - name: rate-limiting
     config:
       minute: 500

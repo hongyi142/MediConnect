@@ -66,7 +66,7 @@
                     <div class="form-group"><label for="s-nric">NRIC</label><input id="s-nric" placeholder="S1234567A"><small class="field-err" id="err-nric"></small></div>
                     <div class="form-group"><label for="s-dob">Date of Birth</label><input type="date" id="s-dob"></div>
                 </div>
-                <div class="form-group"><label for="s-phone">Phone Number</label><input id="s-phone" placeholder="+65XXXXXXXX"><small class="field-err" id="err-phone"></small></div>
+                <div class="form-group"><label for="s-phone">Phone Number</label><input id="s-phone" placeholder="+65 XXXX XXXX" maxlength="14"><small class="field-err" id="err-phone"></small></div>
                 <div class="form-group"><label for="s-address">Address</label><input id="s-address" placeholder="Block and street"></div>
                 <div class="form-group"><label for="s-postal">Postal Code</label><input id="s-postal" placeholder="6 digits" maxlength="6"><small class="field-err" id="err-postal"></small></div>
                 <div class="form-group">
@@ -379,7 +379,7 @@
             var ok2 = true;
             if (!/^[STFG]\d{7}[A-Z]$/.test(nric)) { showField("err-nric", "Invalid NRIC format."); ok2 = false; } else hideField("err-nric");
             if (!dob) ok2 = false;
-            if (!/^\+65\d{8}$/.test(phone)) { showField("err-phone", "Format: +65XXXXXXXX"); ok2 = false; } else hideField("err-phone");
+            if (!/^\+65\d{8}$/.test(phone.replace(/\s/g, ""))) { showField("err-phone", "Format: +65 XXXX XXXX"); ok2 = false; } else hideField("err-phone");
             if (!addr) ok2 = false;
             if (!/^\d{6}$/.test(postal)) { showField("err-postal", "6 digits required."); ok2 = false; } else hideField("err-postal");
             return ok2;
@@ -401,6 +401,17 @@
         } else {
             fill.style.width = "66%"; fill.style.background = "var(--warning)"; txt.textContent = "Fair"; txt.style.color = "var(--warning)";
         }
+    });
+
+    // Phone number auto-formatting
+    document.getElementById("s-phone").addEventListener("input", function() {
+        var raw = this.value.replace(/[^\d]/g, "");
+        if (raw.startsWith("65")) raw = raw.slice(2);
+        else if (raw.startsWith("6")) raw = raw.slice(1);
+        var out = "+65";
+        if (raw.length > 0) out += " " + raw.slice(0, 4);
+        if (raw.length > 4) out += " " + raw.slice(4, 8);
+        this.value = out;
     });
 
     // Set max DOB
@@ -431,7 +442,7 @@
                 body: JSON.stringify({
                     name: name,
                     email: email,
-                    phone: document.getElementById("s-phone").value.trim(),
+                    phone: document.getElementById("s-phone").value.replace(/\s/g, "").trim(),
                     NRIC: document.getElementById("s-nric").value.trim(),
                     address: document.getElementById("s-address").value.trim(),
                     postalCode: document.getElementById("s-postal").value.trim(),

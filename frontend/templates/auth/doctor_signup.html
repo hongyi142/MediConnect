@@ -45,7 +45,7 @@
                     <small class="field-err" id="err-pw"></small>
                 </div>
                 <div class="form-group"><label for="s-confirm">Confirm Password</label><input type="password" id="s-confirm" required placeholder="Re-enter password"><small class="field-err" id="err-confirm"></small></div>
-                <div class="form-group"><label for="s-phone">Phone Number</label><input id="s-phone" placeholder="+65XXXXXXXX"><small class="field-err" id="err-phone"></small></div>
+                <div class="form-group"><label for="s-phone">Phone Number</label><input id="s-phone" placeholder="+65 XXXX XXXX" maxlength="14"><small class="field-err" id="err-phone"></small></div>
                 <div class="form-group">
                     <label for="s-spec">Specialisation</label>
                     <select id="s-spec" class="form-select">
@@ -197,6 +197,17 @@
 (function() {
     var cfg = document.getElementById("svc-config").dataset;
 
+    // Phone number auto-formatting
+    document.getElementById("s-phone").addEventListener("input", function() {
+        var raw = this.value.replace(/[^\d]/g, "");
+        if (raw.startsWith("65")) raw = raw.slice(2);
+        else if (raw.startsWith("6")) raw = raw.slice(1);
+        var out = "+65";
+        if (raw.length > 0) out += " " + raw.slice(0, 4);
+        if (raw.length > 4) out += " " + raw.slice(4, 8);
+        this.value = out;
+    });
+
     function showErr(id, msg) { var e = document.getElementById(id); e.textContent = msg; e.style.display = "block"; }
     function hideErr(id) { document.getElementById(id).style.display = "none"; }
 
@@ -210,7 +221,7 @@
         var email = document.getElementById("s-email").value.trim();
         var pw = document.getElementById("s-password").value;
         var confirm = document.getElementById("s-confirm").value;
-        var phone = document.getElementById("s-phone").value.trim();
+        var phone = document.getElementById("s-phone").value.replace(/\s/g, "").trim();
         var spec = document.getElementById("s-spec").value;
 
         // Validate
@@ -219,7 +230,7 @@
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showErr("err-email", "Valid email required."); ok = false; }
         if (pw.length < 8) { showErr("err-pw", "Min 8 characters."); ok = false; }
         if (pw !== confirm) { showErr("err-confirm", "Passwords do not match."); ok = false; }
-        if (!/^\+65\d{8}$/.test(phone)) { showErr("err-phone", "Format: +65XXXXXXXX"); ok = false; }
+        if (!/^\+65\d{8}$/.test(phone.replace(/\s/g, ""))) { showErr("err-phone", "Format: +65 XXXX XXXX"); ok = false; }
         if (!spec) { showErr("err-spec", "Please select a specialisation."); ok = false; }
         if (!ok) return;
 

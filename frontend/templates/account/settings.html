@@ -139,6 +139,25 @@
     var allergies = [];
     var pastHistory = [];
 
+    function fmtPhoneDisplay(phone) {
+        var raw = phone.replace(/\s/g, "");
+        if (/^\+65\d{8}$/.test(raw)) {
+            return "+65 " + raw.slice(3, 7) + " " + raw.slice(7);
+        }
+        return phone;
+    }
+
+    // Phone auto-formatting
+    document.getElementById("field-phone").addEventListener("input", function() {
+        var raw = this.value.replace(/[^\d]/g, "");
+        if (raw.startsWith("65")) raw = raw.slice(2);
+        else if (raw.startsWith("6")) raw = raw.slice(1);
+        var out = "+65";
+        if (raw.length > 0) out += " " + raw.slice(0, 4);
+        if (raw.length > 4) out += " " + raw.slice(4, 8);
+        this.value = out;
+    });
+
     fbAuth.onAuthStateChanged(async function(u) {
         if (!u) { location.href = "/auth/login"; return; }
         var snap = await (window._userDocPromise || fbDb.collection("users").doc(u.uid).get());
@@ -162,7 +181,7 @@
                 });
                 if (res.ok) {
                     patientData = await res.json();
-                    document.getElementById("field-phone").value = patientData.phone || "";
+                    document.getElementById("field-phone").value = fmtPhoneDisplay(patientData.phone || "");
                     document.getElementById("field-address").value = patientData.address || "";
                     document.getElementById("field-postal").value = patientData.postalCode || "";
                     allergies = patientData.allergies || [];
@@ -178,7 +197,7 @@
                 });
                 if (res.ok) {
                     var d = await res.json();
-                    document.getElementById("field-phone").value = d.phone || "";
+                    document.getElementById("field-phone").value = fmtPhoneDisplay(d.phone || "");
                 }
             } catch(_) {}
         } else if (currentUser.role === "rider") {
@@ -188,7 +207,7 @@
                 });
                 if (res.ok) {
                     var r = await res.json();
-                    document.getElementById("field-phone").value = r.phone || "";
+                    document.getElementById("field-phone").value = fmtPhoneDisplay(r.phone || "");
                 }
             } catch(_) {}
         }
@@ -243,7 +262,7 @@
     }
 
     async function savePhone() {
-        var phone = document.getElementById("field-phone").value.trim();
+        var phone = document.getElementById("field-phone").value.replace(/\s/g, "").trim();
         if (!phone) { showToast("Please enter a phone number.", "error"); return; }
         var cfg = document.getElementById("svc-config").dataset;
         var token = await fbAuth.currentUser.getIdToken();

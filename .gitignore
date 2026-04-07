@@ -10,6 +10,7 @@ serviceAccountKey.json
 **/serviceAccountKey.json
 application_default_credentials.json
 serviceAccountKey(old).json
+serviceAccountKey(new).json
 
 # Python
 __pycache__/

@@ -184,7 +184,7 @@ def _format_slot_display(value, fallback="your scheduled time"):
     dt = _parse_iso_datetime(value)
     if not dt:
         return fallback
-    return dt.strftime("%d %b %Y %I:%M %p").lower()
+    return dt.strftime("%d %b %Y %I:%M %p")
 
 
 def _normalize_message(message):
