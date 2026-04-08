@@ -1,0 +1,75 @@
+# Machine D – Person 4
+# Services: doctor-service, complete-consultation, mc-service,
+#           inventory-service, amazon-s3-wrapper, openai-wrapper
+#
+# Setup:
+#   1. Copy this file to the project root
+#   2. Copy .env.template to the project root as: .env  (fill in all IPs)
+#   3. From the project root run: docker compose -f machine-D-compose.yml up -d --build
+
+services:
+  amazon-s3-wrapper:
+    build: ./backend/amazon-s3-wrapper
+    container_name: amazon-s3-wrapper
+    env_file: ./backend/amazon-s3-wrapper/.env
+    ports:
+      - "5022:5022"
+    restart: on-failure
+
+  openai-wrapper:
+    build: ./backend/openai-wrapper
+    container_name: openai-wrapper
+    env_file: ./backend/openai-wrapper/.env
+    ports:
+      - "5021:5021"
+    restart: on-failure
+
+  doctor-service:
+    build: ./backend/doctor-service
+    container_name: doctor-service
+    ports:
+      - "5031:5031"
+    restart: on-failure
+
+  mc-service:
+    build: ./backend/mc-service
+    container_name: mc-service
+    env_file: ./backend/mc-service/.env
+    ports:
+      - "5010:5010"
+    environment:
+      - S3_WRAPPER_URL=http://amazon-s3-wrapper:5022
+    depends_on:
+      - amazon-s3-wrapper
+    restart: on-failure
+
+  inventory-service:
+    build: ./backend/inventory
+    container_name: inventory-service
+    env_file: ./backend/inventory/.env
+    ports:
+      - "5005:5005"
+    environment:
+      - S3_WRAPPER_URL=http://amazon-s3-wrapper:5022
+    depends_on:
+      - amazon-s3-wrapper
+    restart: on-failure
+
+  complete-consultation:
+    build: ./backend/complete-consultation-composite
+    container_name: complete-consultation
+    env_file: ./backend/complete-consultation-composite/.env
+    ports:
+      - "5014:5014"
+    environment:
+      - CONSULTATION_SERVICE_URL=http://${MACHINE_C}:5004
+      - OPENAI_WRAPPER_URL=http://openai-wrapper:5021
+      - INVENTORY_SERVICE_URL=http://inventory-service:5005
+      - MC_SERVICE_URL=http://mc-service:5010
+      - NOTIFICATION_WRAPPER_URL=http://${MACHINE_B}:5011
+      - PATIENT_SERVICE_URL=http://${MACHINE_C}:5030
+    depends_on:
+      - openai-wrapper
+      - mc-service
+      - inventory-service
+    restart: on-failure

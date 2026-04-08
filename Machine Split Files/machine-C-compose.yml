@@ -1,0 +1,65 @@
+# Machine C – Person 3
+# Services: patient-service, appointment-service, book-appointment,
+#           consultation-service, start-consultation
+#
+# Setup:
+#   1. Copy this file to the project root
+#   2. Copy .env.template to the project root as: .env  (fill in all IPs)
+#   3. From the project root run: docker compose -f machine-C-compose.yml up -d --build
+
+services:
+  patient-service:
+    build: ./backend/patient-service
+    container_name: patient-service
+    ports:
+      - "5030:5030"
+    restart: on-failure
+
+  appointment-service:
+    build: ./backend/appointment-service
+    container_name: appointment-service
+    ports:
+      - "5032:5032"
+    restart: on-failure
+
+  consultation-service:
+    build: ./backend/consultation-service
+    container_name: consultation-service
+    env_file: ./backend/consultation-service/.env
+    ports:
+      - "5004:5004"
+    restart: on-failure
+
+  book-appointment:
+    build: ./backend/book-appointment
+    container_name: book-appointment
+    ports:
+      - "5033:5033"
+    environment:
+      - PATIENT_SERVICE_URL=http://patient-service:5030
+      - DOCTOR_SERVICE_URL=http://${MACHINE_D}:5031
+      - APPOINTMENT_SERVICE_URL=http://appointment-service:5032
+      - NOTIFICATION_WRAPPER_URL=http://${MACHINE_B}:5011
+      - RABBITMQ_URL=amqp://guest:guest@${MACHINE_A}:5673/
+      - REDIS_URL=redis://${MACHINE_A}:6379/0
+      - SSE_SERVICE_URL=http://${MACHINE_B}:5011
+      - OPENAI_WRAPPER_URL=http://${MACHINE_D}:5021
+    depends_on:
+      - patient-service
+      - appointment-service
+    restart: on-failure
+
+  start-consultation:
+    build: ./backend/start-consultation-composite
+    container_name: start-consultation
+    env_file: ./backend/start-consultation-composite/.env
+    ports:
+      - "5013:5013"
+    environment:
+      - CONSULTATION_SERVICE_URL=http://consultation-service:5004
+      - APPOINTMENT_SERVICE_URL=http://appointment-service:5032
+      - TWILIO_WRAPPER_URL=http://${MACHINE_B}:5020
+    depends_on:
+      - consultation-service
+      - appointment-service
+    restart: on-failure

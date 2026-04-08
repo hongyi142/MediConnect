@@ -1,0 +1,100 @@
+# Machine A – Person 1
+# Services: Kong (API Gateway), RabbitMQ, Redis, Frontend
+#
+# Setup:
+#   1. Copy this file to the project root
+#   2. Copy .env.template to the project root as: .env  (fill in all IPs)
+#   3. Copy kong-machine-split.yml to the project root
+#   4. From the project root run: docker compose -f machine-A-compose.yml up -d --build
+
+# 
+
+services:
+  kong:
+    image: kong:3.9
+    container_name: mediconnect-kong
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /tmp/kong.generated.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_PROXY_LISTEN: "0.0.0.0:8000"
+      # Pass machine IPs so kong-machine-split.yml can interpolate ${MACHINE_X}
+      MACHINE_B: ${MACHINE_B}
+      MACHINE_C: ${MACHINE_C}
+      MACHINE_D: ${MACHINE_D}
+      MACHINE_E: ${MACHINE_E}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+    volumes:
+      - ./kong-machine-split.yml:/kong/declarative/kong.yml:ro
+    command:
+      - /bin/sh
+      - -c
+      - sed "s|__FIREBASE_PROJECT_ID__|${FIREBASE_PROJECT_ID:-mediconnect-b50d2}|g" /kong/declarative/kong.yml > /tmp/kong.generated.yml && exec /docker-entrypoint.sh kong docker-start
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    restart: on-failure
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: mediconnect-rabbitmq
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mediconnect-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build: ./frontend
+    container_name: mediconnect-frontend
+    ports:
+      - "8080:8080"
+    environment:
+      # All API traffic through Kong – use Machine A's real IP so browsers can reach it
+      - PATIENT_SERVICE_URL=http://${MACHINE_A}:8000
+      - DOCTOR_SERVICE_URL=http://${MACHINE_A}:8000
+      - APPT_SERVICE_URL=http://${MACHINE_A}:8000
+      - BOOK_APPOINTMENT_URL=http://${MACHINE_A}:8000
+      - CONSULTATION_SERVICE_URL=http://${MACHINE_A}:8000
+      - START_CONSULTATION_URL=http://${MACHINE_A}:8000
+      - COMPLETE_CONSULTATION_URL=http://${MACHINE_A}:8000
+      - INV_SERVICE_URL=http://${MACHINE_A}:8000
+      - MC_SERVICE_URL=http://${MACHINE_A}:8000
+      - TWILIO_WRAPPER_URL=http://${MACHINE_A}:8000
+      - OPENAI_WRAPPER_URL=http://${MACHINE_A}:8000
+      - NOTIFICATION_WRAPPER_URL=http://${MACHINE_A}:8000
+      - SSE_SERVICE_URL=http://${MACHINE_A}:8000
+      - PAYMENT_SERVICE_URL=http://${MACHINE_A}:8000/payment-svc
+      - PAYMENT_WRAPPER_URL=http://${MACHINE_A}:8000/payment-gateway
+      - PROCESS_PAYMENT_URL=http://${MACHINE_A}:8000
+      - DELIVERY_SERVICE_URL=http://${MACHINE_A}:8000
+      - RIDER_SERVICE_URL=http://${MACHINE_A}:8000
+      - ASSIGN_DELIVERY_URL=http://${MACHINE_A}:8000
+      - COMPLETE_DELIVERY_URL=http://${MACHINE_A}:8000
+      - ORDER_SERVICE_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
+      - FIREBASE_API_KEY=${FIREBASE_API_KEY}
+      - FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}
+      - FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID}
+      - FIREBASE_APP_ID=${FIREBASE_APP_ID}
+    depends_on:
+      - kong

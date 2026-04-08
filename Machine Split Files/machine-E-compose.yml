@@ -1,0 +1,150 @@
+# Machine E – Person 5
+# Services: delivery-service, rider-service, assign-delivery, complete-delivery,
+#           payment_atomic, payment_wrapper, process_payment, process_payment_worker,
+#           tracking-service, distance-matrix-wrapper
+#
+# Setup:
+#   1. Copy this file to the project root
+#   2. Copy .env.template to the project root as: .env  (fill in all IPs)
+#   3. From the project root run: docker compose -f machine-E-compose.yml up -d --build
+
+services:
+  delivery-service:
+    build: ./backend/delivery-service
+    container_name: delivery-service
+    ports:
+      - "5000:5000"
+    restart: on-failure
+
+  rider-service:
+    build: ./backend/rider-service
+    container_name: rider-service
+    ports:
+      - "5001:5001"
+    restart: on-failure
+
+  distance-matrix-wrapper:
+    build: ./backend/distance-matrix-wrapper
+    container_name: distance-matrix-wrapper
+    env_file:
+      - ./backend/distance-matrix-wrapper/.env
+    ports:
+      - "5063:5063"
+    restart: on-failure
+
+  assign-delivery:
+    build: ./backend/assign-delivery-service
+    container_name: assign-delivery
+    ports:
+      - "5002:5002"
+    environment:
+      - DELIVERY_URL=http://delivery-service:5000
+      - RIDER_URL=http://rider-service:5001
+      - TRACKING_URL=http://tracking-service:5050
+      - DISTANCE_MATRIX_WRAPPER_URL=http://distance-matrix-wrapper:5063
+      - RABBITMQ_URL=amqp://guest:guest@${MACHINE_A}:5673/
+    depends_on:
+      - delivery-service
+      - rider-service
+      - tracking-service
+      - distance-matrix-wrapper
+    restart: on-failure
+
+  complete-delivery:
+    build: ./backend/complete-delivery-service
+    container_name: complete-delivery
+    ports:
+      - "5004:5004"
+    environment:
+      - DELIVERY_URL=http://delivery-service:5000
+      - RIDER_URL=http://rider-service:5001
+      - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
+      - RABBITMQ_URL=amqp://guest:guest@${MACHINE_A}:5673/
+    depends_on:
+      - delivery-service
+    restart: on-failure
+
+  tracking-service:
+    build: ./backend/tracking-service
+    container_name: tracking-service
+    ports:
+      - "5050:5050"
+    environment:
+      - DELIVERY_SERVICE_URL=http://delivery-service:5000
+      - RIDER_SERVICE_URL=http://rider-service:5001
+      - RABBITMQ_URL=amqp://guest:guest@${MACHINE_A}:5673/
+    depends_on:
+      - delivery-service
+      - rider-service
+    restart: on-failure
+
+  payment_atomic:
+    build:
+      context: ./backend/payment_atomic
+    container_name: payment_atomic_api
+    ports:
+      - "5060:5000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FIREBASE_CRED_PATH=./serviceAccountKey.json
+    networks:
+      default:
+        aliases:
+          - payment-atomic
+    restart: on-failure
+
+  payment_wrapper:
+    build:
+      context: ./backend/payment_wrapper
+    container_name: payment_wrapper_api
+    ports:
+      - "5061:5001"
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - ./backend/payment_wrapper/.env
+    networks:
+      default:
+        aliases:
+          - payment-wrapper
+    restart: on-failure
+
+  process_payment:
+    build:
+      context: ./backend/process_payment_composite
+    container_name: process_payment_api
+    ports:
+      - "5062:5002"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RABBITMQ_URL=amqp://guest:guest@${MACHINE_A}:5673/
+      - PAYMENT_WRAPPER_URL=http://payment-wrapper:5001
+      - PAYMENT_ATOMIC_URL=http://payment-atomic:5000
+      - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
+      - PATIENT_URL=http://${MACHINE_C}:5030
+    depends_on:
+      - payment_atomic
+      - payment_wrapper
+    networks:
+      default:
+        aliases:
+          - process-payment
+    restart: on-failure
+
+  process_payment_worker:
+    build:
+      context: ./backend/process_payment_composite
+    container_name: process_payment_worker
+    command: ["python", "refund_worker.py"]
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RABBITMQ_URL=amqp://guest:guest@${MACHINE_A}:5673/
+      - PAYMENT_WRAPPER_URL=http://payment-wrapper:5001
+      - PAYMENT_ATOMIC_URL=http://payment-atomic:5000
+      - ORDER_URL=https://personal-wi9fn0qz.outsystemscloud.com/Order_Service/rest/OrderAPI
+      - PATIENT_URL=http://${MACHINE_C}:5030
+      - DELIVERY_SERVICE_URL=http://delivery-service:5000
+    depends_on:
+      - payment_atomic
+      - payment_wrapper
+    restart: on-failure

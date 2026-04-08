@@ -1,0 +1,40 @@
+# Machine B – Person 2
+# Services: notification-wrapper, telegram-wrapper, twilio-wrapper
+#
+# Setup:
+#   1. Copy this file to the project root
+#   2. Copy .env.template to the project root as: .env  (fill in all IPs)
+#   3. From the project root run: docker compose -f machine-B-compose.yml up -d --build
+
+services:
+  notification-wrapper:
+    build: ./backend/notification_wrapper
+    container_name: notification-wrapper
+    env_file: ./backend/notification_wrapper/.env
+    ports:
+      - "5011:5011"
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@${MACHINE_A}:5673/
+      - APPOINTMENT_SERVICE_URL=http://${MACHINE_C}:5032
+      - PATIENT_SERVICE_URL=http://${MACHINE_C}:5030
+      - REDIS_URL=redis://${MACHINE_A}:6379/0
+    restart: on-failure
+
+  telegram-wrapper:
+    build: ./backend/telegram_wrapper
+    container_name: telegram-wrapper
+    env_file: ./backend/telegram_wrapper/.env
+    ports:
+      - "5012:5012"
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@${MACHINE_A}:5673/
+      - PATIENT_SERVICE_URL=http://${MACHINE_C}:5030
+    restart: on-failure
+
+  twilio-wrapper:
+    build: ./backend/twilio-wrapper
+    container_name: twilio-wrapper
+    env_file: ./backend/twilio-wrapper/.env
+    ports:
+      - "5020:5020"
+    restart: on-failure
