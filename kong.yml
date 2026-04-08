@@ -135,8 +135,6 @@ services:
 
   # ──────────────────────────────────────────────
   #  Payment Services
-  #  payment_atomic and payment_wrapper both expose /payment/* routes,
-  #  so we use unique Kong prefixes with strip_path to resolve conflicts.
   # ──────────────────────────────────────────────
 
   - name: payment-atomic
@@ -186,11 +184,6 @@ services:
 
   # ──────────────────────────────────────────────
   #  Delivery Services
-  #  Internal ports differ from previously-exposed host ports:
-  #    delivery-service  → internal 5000
-  #    rider-service     → internal 5001
-  #    assign-delivery   → internal 5002
-  #    complete-delivery → internal 5004
   # ──────────────────────────────────────────────
 
   - name: delivery-service
@@ -302,6 +295,77 @@ services:
 #    - Global fallback: 500 req/min covers all remaining routes
 # ──────────────────────────────────────────────
 plugins:
+  # ── Firebase JWT Claim Validator ──────────────────────────────────
+  # Runs before every request reaches a backend service.
+  # Validates that the Bearer token is a valid, unexpired Firebase JWT
+  # issued for this project. Cryptographic signature verification is
+  # still performed by Firebase Admin SDK inside each service — this
+  # layer enforces a zero-trust perimeter at the gateway boundary,
+  # rejecting missing/malformed/expired/wrong-project tokens before
+  # they consume any backend resource.
+  #
+  # Exemptions (no auth header required):
+  #   OPTIONS  – CORS preflight (browsers send these without auth)
+  #   /socket.io – WebSocket upgrade (auth handled in tracking-service)
+  #
+  # FIREBASE_PROJECT_ID is injected from the Kong container environment.
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function b64url_decode(s)
+            s = s:gsub('-', '+'):gsub('_', '/')
+            local pad = (4 - #s % 4) % 4
+            return ngx.decode_base64(s .. string.rep('=', pad))
+          end
+
+          local method = ngx.req.get_method()
+          local path   = ngx.var.uri or ""
+
+          if method == "OPTIONS" then return end
+          if path:find("^/socket%.io") then return end
+
+          local auth = ngx.req.get_headers()["Authorization"]
+          if not auth then
+            return kong.response.exit(401, { message = "Missing Authorization header" })
+          end
+
+          local token = auth:match("^[Bb]earer%s+(.+)$")
+          if not token then
+            return kong.response.exit(401, { message = "Invalid Authorization header format. Expected: Bearer <token>" })
+          end
+
+          local _, payload_b64 = token:match("^([^.]+)%.([^.]+)%.([^.]+)$")
+          if not payload_b64 then
+            return kong.response.exit(401, { message = "Malformed JWT: expected header.payload.signature" })
+          end
+
+          local payload_json = b64url_decode(payload_b64)
+          if not payload_json then
+            return kong.response.exit(401, { message = "JWT payload could not be decoded" })
+          end
+
+          local ok, claims = pcall(require("cjson.safe").decode, payload_json)
+          if not ok or type(claims) ~= "table" then
+            return kong.response.exit(401, { message = "JWT payload is not valid JSON" })
+          end
+
+          if not claims.exp or ngx.time() >= claims.exp then
+            return kong.response.exit(401, { message = "Token has expired" })
+          end
+
+          local project_id = os.getenv("FIREBASE_PROJECT_ID") or "mediconnect-new-d38db"
+
+          if claims.iss ~= "https://securetoken.google.com/" .. project_id then
+            return kong.response.exit(401, { message = "Invalid token issuer" })
+          end
+
+          if claims.aud ~= project_id then
+            return kong.response.exit(401, { message = "Invalid token audience" })
+          end
+
+          kong.service.request.set_header("X-Firebase-UID", claims.sub or "")
+
   - name: cors
     config:
       origins:
