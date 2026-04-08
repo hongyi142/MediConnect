@@ -1,0 +1,78 @@
+﻿{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Telegram Wrapper",
+    "description": "Wrapper service that sends Telegram bot notifications directly and via RabbitMQ worker consumption.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5012", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Telegram" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Telegram"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service health",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "service": { "type": "string", "example": "telegram-wrapper" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notify/telegram": {
+      "post": {
+        "tags": ["Telegram"],
+        "summary": "Send a Telegram message",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "telegramChatID": { "type": "string", "example": "123456789" },
+                  "chat_id": { "type": "string", "example": "123456789" },
+                  "text": { "type": "string", "example": "Your appointment has been confirmed." },
+                  "message": { "type": "string", "example": "Your appointment has been confirmed." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Message sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Telegram message sent" },
+                    "chat_id": { "type": "string", "example": "123456789" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Missing chat ID or text" },
+          "500": { "description": "Telegram API/send failure" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,67 @@
+﻿{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Assign Delivery Service",
+    "description": "Composite service that selects/assigns riders for paid orders and exposes fallback endpoints.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5002", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Delivery Assignment" }
+  ],
+  "paths": {
+    "/nearest-rider": {
+      "post": {
+        "tags": ["Delivery Assignment"],
+        "summary": "Find nearest available rider",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["address"],
+                "properties": {
+                  "address": { "type": "string", "example": "123 Orchard Road, Singapore" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Nearest rider found" },
+          "404": { "description": "No riders within 1km" }
+        }
+      }
+    },
+    "/accept-delivery": {
+      "post": {
+        "tags": ["Delivery Assignment"],
+        "summary": "Manual fallback rider acceptance",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["deliveryID", "riderID"],
+                "properties": {
+                  "deliveryID": { "type": "string", "example": "DEL-001" },
+                  "riderID": { "type": "string", "example": "R001" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Rider assigned" },
+          "400": { "description": "Missing deliveryID or riderID" },
+          "404": { "description": "Rider not found" },
+          "409": { "description": "Rider unavailable or assignment failed" }
+        }
+      }
+    }
+  }
+}

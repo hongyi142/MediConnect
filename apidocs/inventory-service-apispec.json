@@ -168,7 +168,7 @@
                 "type": "object",
                 "required": ["qty"],
                 "properties": {
-                  "qty": { "type": "integer", "example": 2, "description": "Quantity to deduct (use negative to reverse)" }
+                  "qty": { "type": "integer", "example": 2, "description": "Quantity to deduct. Must be greater than 0." }
                 }
               }
             }
@@ -177,6 +177,34 @@
         "responses": {
           "200": { "description": "Stock deducted successfully" },
           "400": { "description": "Insufficient stock" },
+          "404": { "description": "Medication not found" }
+        }
+      }
+    },
+    "/inventory/{medicationID}/image": {
+      "put": {
+        "tags": ["Inventory"],
+        "summary": "Update medication image only",
+        "parameters": [
+          { "name": "medicationID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["image"],
+                "properties": {
+                  "image": { "type": "string", "format": "binary", "description": "Medication image (JPG/PNG/WEBP)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Medication image updated successfully" },
+          "400": { "description": "Invalid or missing image" },
           "404": { "description": "Medication not found" }
         }
       }

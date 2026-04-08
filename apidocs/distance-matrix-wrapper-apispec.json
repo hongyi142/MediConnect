@@ -1,0 +1,116 @@
+﻿{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Distance Matrix Wrapper",
+    "description": "Wrapper service for Google Maps geocoding and distance matrix operations.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5063", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Maps" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Maps"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service health",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "service": { "type": "string", "example": "distance-matrix-wrapper" },
+                    "google_maps_configured": { "type": "boolean", "example": true }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/geocode": {
+      "post": {
+        "tags": ["Maps"],
+        "summary": "Geocode an address",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["address"],
+                "properties": {
+                  "address": { "type": "string", "example": "123 Orchard Road, Singapore" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Coordinates found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lat": { "type": "number", "example": 1.3048 },
+                    "lng": { "type": "number", "example": 103.8318 }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Missing address" },
+          "404": { "description": "Address could not be geocoded" },
+          "503": { "description": "Google Maps API key missing" },
+          "502": { "description": "Upstream Google Maps error" }
+        }
+      }
+    },
+    "/distance-matrix": {
+      "post": {
+        "tags": ["Maps"],
+        "summary": "Get distances from origins to destination",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["origins", "destination_address"],
+                "properties": {
+                  "origins": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "latitude": { "type": "number", "example": 1.3000 },
+                        "longitude": { "type": "number", "example": 103.8000 }
+                      }
+                    }
+                  },
+                  "destination_address": { "type": "string", "example": "123 Orchard Road, Singapore" },
+                  "mode": { "type": "string", "example": "driving", "default": "driving" },
+                  "units": { "type": "string", "example": "metric", "default": "metric" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Distance matrix result" },
+          "400": { "description": "Missing/invalid origins or destination" },
+          "503": { "description": "Google Maps API key missing" },
+          "502": { "description": "Upstream Google Maps error" }
+        }
+      }
+    }
+  }
+}

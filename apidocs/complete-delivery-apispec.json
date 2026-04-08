@@ -1,0 +1,81 @@
+﻿{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Complete Delivery Service",
+    "description": "Composite service for QR-based delivery completion and downstream status/notification updates.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:5004", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Delivery Completion" }
+  ],
+  "paths": {
+    "/prepare-delivery": {
+      "post": {
+        "tags": ["Delivery Completion"],
+        "summary": "Generate QR payload for delivery completion",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["deliveryID", "patientID"],
+                "properties": {
+                  "deliveryID": { "type": "string", "example": "DEL-001" },
+                  "patientID": { "type": "string", "example": "P001" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "QR code generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer", "example": 200 },
+                    "qrCode": { "type": "string", "description": "Base64-encoded PNG" },
+                    "deliveryID": { "type": "string", "example": "DEL-001" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/complete-delivery": {
+      "post": {
+        "tags": ["Delivery Completion"],
+        "summary": "Complete delivery after QR verification",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["deliveryID", "riderID"],
+                "properties": {
+                  "deliveryID": { "type": "string", "example": "DEL-001" },
+                  "riderID": { "type": "string", "example": "R001" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Delivery completed" },
+          "400": { "description": "Missing deliveryID or riderID" },
+          "404": { "description": "Delivery not found" },
+          "502": { "description": "Upstream delivery/order/rider service error" }
+        }
+      }
+    }
+  }
+}
