@@ -100,12 +100,12 @@ Download these from the [Firebase Console](https://console.firebase.google.com/)
 
 | Credential | Where to get it |
 |------------|----------------|
-| OpenAI API key | [platform.openai.com](https://platform.openai.com/) → API keys |
-| Stripe secret key | [dashboard.stripe.com](https://dashboard.stripe.com/) → Developers → API keys |
+| OpenAI API Key | [platform.openai.com](https://platform.openai.com/) → API keys |
+| Stripe Secret Key | [dashboard.stripe.com](https://dashboard.stripe.com/) → Developers → API keys |
 | Twilio SID / Auth Token | [console.twilio.com](https://console.twilio.com/) → Account Info |
-| Telegram Bot token | Talk to [@BotFather](https://t.me/BotFather) on Telegram |
-| Google Maps API key | [console.cloud.google.com](https://console.cloud.google.com/) → APIs & Services → Credentials |
-| SMU Lab Utilities Amazon S3 & Notification API | [smuedu-dev.outsystemsenterprise.com/SMULabUtilities](https://smuedu-dev.outsystemsenterprise.com/SMULabUtilities/) → API Keys |
+| Telegram Bot Token | Talk to [@BotFather](https://t.me/BotFather) on Telegram |
+| Google Maps API Key | [console.cloud.google.com](https://console.cloud.google.com/) → APIs & Services → Credentials |
+| SMU Lab Utilities Amazon S3 & Notification API Key | [smuedu-dev.outsystemsenterprise.com/SMULabUtilities](https://smuedu-dev.outsystemsenterprise.com/SMULabUtilities/) → API Keys |
 
 ## Main Features
 
