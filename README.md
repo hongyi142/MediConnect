@@ -24,7 +24,8 @@ MediConnect is an online teleconsultation platform that connects patients with d
 | Delivery | 5000 | Tracks delivery orders and status |
 | Doctor | 5031 | Manages doctor profiles and schedules |
 | Inventory | 5005 | Manages medication stock |
-| MC | 5010 | Generates medical certificates via Amazon S3 |
+| MC | 5010 | Generates medical certificates and stores in AWS S3 |
+| Order | OutSystems | Manages and stores orders (prescriptions) and order items |
 | Patient | 5030 | Manages patient profiles |
 | Payment | 5000/5001 | Handles payment transactions (atomic + wrapper) |
 | Rider | 5001 | Manages rider profiles and availability |
@@ -68,21 +69,17 @@ The following services each have a `.env.example`:
 
 | Service | Credentials required |
 |---------|----------------------|
-| `amazon-s3-wrapper` | AWS access key, secret, region, bucket name |
-| `openai-wrapper` | OpenAI API key |
+| `amazon-s3-wrapper` | SMU Lab Utilities API Key |
+| `openai-wrapper` | OpenAI API Key |
 | `twilio-wrapper` | Twilio Account SID, Auth Token, API Key SID & Secret |
-| `payment_wrapper` | Stripe secret key, webhook secret |
-| `payment_atomic` | Stripe secret key, frontend URL |
-| `notification_wrapper` | SMU Lab Notification API URL & key, RabbitMQ URL |
-| `telegram_wrapper` | Telegram Bot token, RabbitMQ URL |
-| `distance-matrix-wrapper` | Google Maps API key |
-| `process_payment_composite` | Internal service URLs, OutSystems base URL, RabbitMQ URL |
-| `complete-consultation-composite` | Internal service URLs, OutSystems base URL |
-| `start-consultation-composite` | Internal service URLs |
-| `book-appointment` | Internal service URLs, RabbitMQ URL, Redis URL |
-| `consultation-service` | Firebase credential paths |
-| `inventory` | S3 wrapper URL, folder/subfolder paths |
-| `mc-service` | S3 wrapper URL, folder/subfolder paths |
+| `payment_wrapper` | Stripe Secret Key |
+| `notification_wrapper` | SMU Lab Utilities API Key |
+| `telegram_wrapper` | Telegram Bot Token |
+| `distance-matrix-wrapper` | Google Maps API Key |
+| `process_payment_composite` | Consultation Fee Pricing (Currently set at $40) |
+| `complete-consultation-composite` | Consultation Fee Pricing (Currently set at $40) |
+| `inventory` | SMU Lab Utilities AWS S3 folder/subfolder paths |
+| `mc-service` | SMU Lab Utilities AWS S3 folder/subfolder paths |
 
 ### Firebase service account keys
 
@@ -95,7 +92,7 @@ Several atomic services connect directly to Firebase Firestore. Place the approp
 | `patient-service` | `serviceAccountKey.json` |
 | `rider-service` | `serviceAccountKey.json` |
 | `delivery-service` | `serviceAccountKey.json` |
-| `consultation-service` | `serviceAccountKey.json` **and** `firebase_credentials.json` |
+| `consultation-service` | `serviceAccountKey.json` |
 
 Download these from the [Firebase Console](https://console.firebase.google.com/) under **Project Settings → Service Accounts → Generate new private key** and rename the downloaded file accordingly.
 
@@ -116,11 +113,11 @@ Download these from the [Firebase Console](https://console.firebase.google.com/)
 - Video consultations via Twilio Video
 - AI-generated consultation summaries via OpenAI
 - Prescription management with medication selection from live inventory
-- Medical certificate (MC) generation stored on AWS S3
+- Medical certificate (MC) generation and storage on AWS S3
 - Medication order creation via OutSystems Order API
 - Delivery assignment to nearest available rider via Google Maps Distance Matrix
 - Real-time delivery tracking via WebSocket
-- Stripe payment processing with test mode support
+- Stripe payment processing
 - Telegram bot and SSE push notifications
 - Firebase JWT validation and rate limiting at the Kong API gateway
 
@@ -250,7 +247,7 @@ Use the following card on the payment screen (Stripe test mode):
 frontend/                          - Jinja2 + Vanilla JS web application
 backend/
   appointment-service/             - Appointment records and status
-  consultation-service/            - Consultation notes, prescriptions, summaries
+  consultation-service/            - Consultation notes and prescription
   doctor-service/                  - Doctor profiles and schedules
   patient-service/                 - Patient profiles
   rider-service/                   - Rider profiles and availability
@@ -260,14 +257,14 @@ backend/
   payment_atomic/                  - Payment transaction records
   amazon-s3-wrapper/               - AWS S3 file upload and retrieval
   twilio-wrapper/                  - Twilio Video room management
-  openai-wrapper/                  - OpenAI consultation summary generation
+  openai-wrapper/                  - OpenAI symptom checker and consultation summary generation
   payment_wrapper/                 - Stripe payment processing
   notification_wrapper/            - RabbitMQ consumer + SSE push notifications
   telegram_wrapper/                - Telegram bot notifications
   distance-matrix-wrapper/         - Google Maps geocoding and distance calculations
   book-appointment/                - Composite: appointment booking orchestration
-  start-consultation-composite/    - Composite: Twilio room creation + consultation init
-  complete-consultation-composite/ - Composite: prescription, MC, order, notifications
+  start-consultation-composite/    - Composite: Twilio room creation + consultation initialisation
+  complete-consultation-composite/ - Composite: prescription, MC, order
   complete-delivery-composite/     - Composite: delivery completion + payment events
   assign-delivery-composite/       - Composite: nearest rider assignment
   process_payment_composite/       - Composite: Stripe payment + refund handling
@@ -284,7 +281,7 @@ Machine Split Files/               - Docker Compose configs for multi-machine de
 | MC download button does nothing | Check AWS S3 credentials and bucket/folder config in `amazon-s3-wrapper` |
 | Payment screen shows an error | Ensure `STRIPE_SECRET_KEY` is a valid test key (starts with `sk_test_`) |
 | Rider assignment never triggers | Verify the Google Maps API key has Distance Matrix and Geocoding APIs enabled |
-| Notifications not delivered | Check RabbitMQ is running and `TELEGRAM_BOT_TOKEN` is valid |
+| Notifications not delivered | Check RabbitMQ is running and `TELEGRAM_BOT_TOKEN` or `SMU_X_CONTACTS_KEY` is valid |
 | Prescriptions/orders missing | The OutSystems Order API must be reachable; check `ORDER_SERVICE_URL` in the composite service env |
 | SSE push notifications not showing | Ensure the frontend has a valid Firebase JWT; SSE exemption is configured in Kong |
 | Services start but Firestore reads fail | Confirm each service has its `serviceAccountKey.json` in the correct directory |

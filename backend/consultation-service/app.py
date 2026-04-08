@@ -14,10 +14,12 @@ CORS(app, origins=["http://localhost:8080", "http://frontend:8080", "*"])
 
 
 def init_firestore():
-    path = os.environ.get("FIREBASE_CRED_PATH", "./firebase_credentials.json")
+    path = os.environ.get("FIREBASE_CRED_PATH", "./serviceAccountKey.json")
     with open(path, encoding="utf-8") as f:
         config = json.load(f)
-    return firestore.Client(project=config["projectId"])
+    # serviceAccountKey.json uses "project_id"; legacy firebase_credentials.json used "projectId"
+    project = config.get("project_id") or config.get("projectId")
+    return firestore.Client(project=project)
 
 
 def to_json(data):
