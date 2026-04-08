@@ -110,6 +110,38 @@ Download these from the [Firebase Console](https://console.firebase.google.com/)
 | Google Maps API key | [console.cloud.google.com](https://console.cloud.google.com/) → APIs & Services → Credentials |
 | SMU Lab Utilities Amazon S3 & Notification API | [smuedu-dev.outsystemsenterprise.com/SMULabUtilities](https://smuedu-dev.outsystemsenterprise.com/SMULabUtilities/) → API Keys |
 
+## Main Features
+
+- Patient appointment booking with specialisation and doctor selection
+- Video consultations via Twilio Video
+- AI-generated consultation summaries via OpenAI
+- Prescription management with medication selection from live inventory
+- Medical certificate (MC) generation stored on AWS S3
+- Medication order creation via OutSystems Order API
+- Delivery assignment to nearest available rider via Google Maps Distance Matrix
+- Real-time delivery tracking via WebSocket
+- Stripe payment processing with test mode support
+- Telegram bot and SSE push notifications
+- Firebase JWT validation and rate limiting at the Kong API gateway
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Jinja2 templates, Vanilla JS, Firebase JS SDK |
+| Backend | Python Flask (atomic + composite microservices) |
+| API Gateway | Kong (DB-less declarative mode) |
+| Database | Firebase Firestore |
+| Authentication | Firebase Authentication |
+| Video | Twilio Video |
+| Messaging | RabbitMQ (async notification events) |
+| Payments | Stripe |
+| Storage | AWS S3 via SMU Lab Utilities wrapper |
+| AI | OpenAI GPT (consultation summaries) |
+| Maps | Google Maps Distance Matrix API |
+| Notifications | SMS and Email via SMU Lab Utilities wrapper, Telegram Bot, Server-Sent Events (SSE) |
+| Containerisation | Docker Compose |
+
 ## Usage
 
 ### Prerequisites
@@ -138,8 +170,6 @@ From the project root:
 docker compose up --build
 ```
 
-The website will be available at [http://localhost:8080](http://localhost:8080).
-
 To stop all services:
 
 ```bash
@@ -150,12 +180,128 @@ docker compose down
 
 See [`Machine Split Files/SETUP.md`](Machine%20Split%20Files/SETUP.md) for instructions on splitting services across multiple devices on the same network.
 
+### Service URLs
+
+After startup, the following are available:
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:8080 |
+| Kong API Gateway | http://localhost:8000 |
+| Kong Admin API | http://localhost:8001 |
+| RabbitMQ Management | http://localhost:15672 (guest / guest) |
+
+## Using the Application
+
+### Test Accounts
+
+Pre-created accounts are available for the doctor and rider roles:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Doctor | testdoctor@mediconnect.com | MediConnect |
+| Rider | testrider@mediconnect.com | MediConnect |
+
+For the patient role, sign up for a new account.
+
+### As a Patient
+
+1. Sign up for a patient account and complete your profile.
+2. Go to **AI Symptom Checker** and describe your symptoms - the AI will suggest a relevant specialisation.
+3. Go to **Book** and select a specialisation (or use the one suggested) and an available doctor.
+4. Choose a time slot and confirm the booking.
+5. Wait for the doctor to confirm, then join the video consultation from **Appointments**.
+6. After the consultation, go to **Appointments → Past → Prescription** to view prescribed medications and download your MC.
+7. Complete payment via Stripe on the **Payment** screen.
+8. Track your medication delivery from **Order Status**.
+9. Present the delivery QR code to the rider to acknowledge receipt of medication delivery.
+
+### As a Doctor
+
+Use the test account above or sign up for a new doctor account.
+
+1. View and confirm pending appointments from the **Dashboard**.
+2. Start a consultation room when the patient joins.
+3. During the consultation, you may take consultation notes and try out the AI summariser feature.
+4. End the consultation to prescribe medcication (order creation) and generate an MC.
+5. Add or update the medication inventory.
+
+### As a Delivery Rider
+
+Use the test account above or sign up for a new rider account.
+
+1. Set your status to **Available** from the **Dashboard**.
+2. Accept delivery assignments that appear on the **Dashboard**.
+3. Navigate to the patient's address and scan the patient's delivery QR code to mark delivery as complete.
+
+### Stripe Test Card
+
+Use the following card on the payment screen (Stripe test mode):
+
+| Field | Value |
+|-------|-------|
+| Card number | `4242 4242 4242 4242` |
+| Expiry date | Any future date |
+| CVC | Any 3 digits |
+
+## Repository Structure
+
+```
+frontend/                          - Jinja2 + Vanilla JS web application
+backend/
+  appointment-service/             - Appointment records and status
+  consultation-service/            - Consultation notes, prescriptions, summaries
+  doctor-service/                  - Doctor profiles and schedules
+  patient-service/                 - Patient profiles
+  rider-service/                   - Rider profiles and availability
+  delivery-service/                - Delivery tracking
+  inventory/                       - Medication stock management
+  mc-service/                      - Medical certificate generation
+  payment_atomic/                  - Payment transaction records
+  amazon-s3-wrapper/               - AWS S3 file upload and retrieval
+  twilio-wrapper/                  - Twilio Video room management
+  openai-wrapper/                  - OpenAI consultation summary generation
+  payment_wrapper/                 - Stripe payment processing
+  notification_wrapper/            - RabbitMQ consumer + SSE push notifications
+  telegram_wrapper/                - Telegram bot notifications
+  distance-matrix-wrapper/         - Google Maps geocoding and distance calculations
+  book-appointment/                - Composite: appointment booking orchestration
+  start-consultation-composite/    - Composite: Twilio room creation + consultation init
+  complete-consultation-composite/ - Composite: prescription, MC, order, notifications
+  complete-delivery-composite/     - Composite: delivery completion + payment events
+  assign-delivery-composite/       - Composite: nearest rider assignment
+  process_payment_composite/       - Composite: Stripe payment + refund handling
+Machine Split Files/               - Docker Compose configs for multi-machine deployment
+```
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| All API calls return `401` | Check `FIREBASE_PROJECT_ID` is set correctly in `.env` and matches the Firebase project |
+| Kong returns `502 Bad Gateway` | Restart Kong after rebuilding: `docker compose restart kong` |
+| Video call fails to connect | Verify Twilio Account SID, Auth Token, API Key SID, and API Key Secret |
+| MC download button does nothing | Check AWS S3 credentials and bucket/folder config in `amazon-s3-wrapper` |
+| Payment screen shows an error | Ensure `STRIPE_SECRET_KEY` is a valid test key (starts with `sk_test_`) |
+| Rider assignment never triggers | Verify the Google Maps API key has Distance Matrix and Geocoding APIs enabled |
+| Notifications not delivered | Check RabbitMQ is running and `TELEGRAM_BOT_TOKEN` is valid |
+| Prescriptions/orders missing | The OutSystems Order API must be reachable; check `ORDER_SERVICE_URL` in the composite service env |
+| SSE push notifications not showing | Ensure the frontend has a valid Firebase JWT; SSE exemption is configured in Kong |
+| Services start but Firestore reads fail | Confirm each service has its `serviceAccountKey.json` in the correct directory |
+
+## Assumptions
+
+- Deployment is Singapore-based; the Distance Matrix wrapper geocodes addresses using Singapore as the default region.
+- All external services (Twilio, Stripe, OpenAI, Google Maps, S3, Telegram, OutSystems) must be reachable. Most features degrade gracefully if a wrapper is unavailable, but prescription and order creation requires the OutSystems Order API.
+- The Firebase project is shared across the team. All services pointing to the same Firestore instance and using the same service account key is the expected configuration.
+- RabbitMQ is required for asynchronous notification events. If unavailable, notifications are silently skipped but core flows (booking, consultation, payment) still complete.
+
 ## Contributors
 
 **ESD Section G11 Team 2**
 
 - Cheung Kele Paolo
+- Lee Hong Yi
 - Lichelle Weasley
 - Jeniffer Joyce
-- Lee Hong Yi
 - Seann Khoo
