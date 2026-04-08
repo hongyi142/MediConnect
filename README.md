@@ -269,6 +269,7 @@ backend/
   assign-delivery-composite/       - Composite: nearest rider assignment
   process_payment_composite/       - Composite: Stripe payment + refund handling
 Machine Split Files/               - Docker Compose configs for multi-machine deployment
+apidocs/                           - API documentation
 ```
 
 ## Troubleshooting
