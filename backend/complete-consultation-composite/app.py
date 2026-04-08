@@ -313,8 +313,8 @@ def complete_consultation():
             for item in deducted:
                 call(
                     "PUT",
-                    f"{inventory_url}/inventory/{item['medicationID']}/deduct",
-                    json={"qty": -int(item['qty'])},
+                    f"{inventory_url}/inventory/{item['medicationID']}",
+                    json={"quantity": int(item["qty"])},
                 )
             return jsonify({"error": f"Stock for {name} was just taken."}), 409
         deducted.append(med)
