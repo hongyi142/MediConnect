@@ -1,11 +1,11 @@
 services:
-  # ──── API Gateway ────────────────────────────────────────
+  # API Gateway
   kong:
     image: kong:3.9
     container_name: mediconnect-kong
     environment:
       KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_DECLARATIVE_CONFIG: /tmp/kong.generated.yml
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
@@ -15,12 +15,16 @@ services:
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
     volumes:
       - ./kong.yml:/kong/declarative/kong.yml:ro
+    command:
+      - /bin/sh
+      - -c
+      - sed "s|__FIREBASE_PROJECT_ID__|${FIREBASE_PROJECT_ID:-mediconnect-b50d2}|g" /kong/declarative/kong.yml > /tmp/kong.generated.yml && exec /docker-entrypoint.sh kong docker-start
     ports:
-      - "8000:8000"   # Proxy – all API traffic
+      - "8000:8000"   # Proxy - all API traffic
       - "8001:8001"   # Admin API
     restart: on-failure
 
-  # ──── Core Services (no host ports – routed through Kong) ─
+  # Core Services (no host ports - routed through Kong)
   consultation-service:
     build: ./backend/consultation-service
     env_file: ./backend/consultation-service/.env
@@ -85,7 +89,7 @@ services:
       - notification-wrapper
       - patient-service
 
-  # ──── Message Queue ──────────────────────────────────────
+  # Message Queue
   rabbitmq:
     image: rabbitmq:3-management
     container_name: mediconnect-rabbitmq
@@ -109,7 +113,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ──── Payment Services ───────────────────────────────────
+  # Payment Services
   payment_atomic:
     build:
       context: ./backend/payment_atomic
@@ -184,7 +188,7 @@ services:
     networks:
       - default
 
-  # ──── Domain Services ────────────────────────────────────
+  # Domain Services
   patient-service:
     build: ./backend/patient-service
     container_name: patient-service
@@ -239,7 +243,7 @@ services:
     depends_on:
       - amazon-s3-wrapper
 
-  # ──── Delivery Services ──────────────────────────────────
+  # Delivery Services
   delivery-service:
     build: ./backend/delivery-service
     container_name: delivery-service
@@ -289,7 +293,7 @@ services:
       rider-service:
         condition: service_started
 
-  # ──── Frontend ───────────────────────────────────────────
+  # Frontend
   frontend:
     build: ./frontend
     container_name: mediconnect-frontend

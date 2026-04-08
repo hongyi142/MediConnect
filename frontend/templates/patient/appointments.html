@@ -395,7 +395,8 @@
         var token = await fbAuth.currentUser.getIdToken();
         var html = "";
 
-        // Step 1: Check consultation for MC download
+        // Step 1: Fetch consultation — provides MC key AND stored medication list (with names + instructions)
+        var consultMeds = [];
         try {
             var consultRes = await fetch(cfg.consultationUrl + "/consultation/" + encodeURIComponent(apptId), {
                 headers: { "Authorization": "Bearer " + token }
@@ -403,42 +404,87 @@
             if (consultRes.ok) {
                 var cData = await consultRes.json();
                 var consult = cData.consultation || cData;
+                consultMeds = consult.medications || [];
                 if (consult.mcIssued && consult.mcKey) {
-                    try {
-                        var mcRes = await fetch(cfg.mcUrl + "/mc/" + encodeURIComponent(consult.mcKey), {
-                            headers: { "Authorization": "Bearer " + token }
-                        });
-                        if (mcRes.ok) {
-                            var mcJson = await mcRes.json();
-                            if (mcJson.downloadUrl) {
-                                html += '<div style="margin-bottom:.625rem"><a class="btn-rx" href="' + mcJson.downloadUrl + '" target="_blank" rel="noopener">' +
-                                    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px;vertical-align:-1px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>' +
-                                    'Download MC</a></div>';
-                            }
-                        }
-                    } catch (_) {}
+                    var mcKey = consult.mcKey;
+                    html += '<div style="margin-bottom:.625rem">' +
+                        '<button class="btn-rx" onclick="downloadMC(\'' + mcKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')">' +
+                        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px;vertical-align:-1px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>' +
+                        'Download MC</button></div>';
                 }
             }
         } catch (_) {}
 
-        // Step 2: Pull prescribed items from the order service
-        var patientId = window.currentUser && window.currentUser.linkedID;
-        var items = await fetchOrderItems(cfg, patientId, apptId);
-
-        if (items.length) {
+        // Step 2: Render medications — prefer consultation record (has names + instructions),
+        //         fall back to order service + inventory lookup for older records.
+        if (consultMeds.length) {
             html += '<div class="rx-title">Prescribed Medications</div>';
-            items.forEach(function(item) {
-                var name = item.MedicationName || item.MedicationId || item.medicationName || item.medicationID || "—";
-                var qty = Number(item.Quantity || item.qty || 1);
-                var price = Number(item.UnitPrice || item.unitPrice || 0);
-                html += '<div class="rx-item"><span><strong>' + name + '</strong> &times;' + qty + '</span>' +
-                    '<span>$' + (qty * price).toFixed(2) + '</span></div>';
+            consultMeds.forEach(function(med) {
+                var name = med.medicationName || med.name || "Unknown Medication";
+                var id = med.medicationID || "";
+                var qty = Number(med.qty || med.Quantity || 1);
+                var price = Number(med.unitPrice || med.UnitPrice || 0);
+                var instructions = med.instructions || "";
+                var displayName = id ? (name + ' (' + id + ')') : name;
+                html += '<div class="rx-item"><div><strong>' + displayName + '</strong> &times;' + qty +
+                    (instructions ? '<div class="rx-instr">' + instructions + '</div>' : '') +
+                    '</div><span>$' + (qty * price).toFixed(2) + '</span></div>';
             });
         } else {
-            html += '<p class="text-muted rx-instr">No medications prescribed for this visit.</p>';
+            var patientId = window.currentUser && window.currentUser.linkedID;
+            var items = await fetchOrderItems(cfg, patientId, apptId);
+            if (items.length) {
+                // Enrich with inventory names in parallel (order items only store IDs)
+                var enriched = await Promise.all(items.map(async function(item) {
+                    var medId = item.MedicationId || item.medicationId || item.medicationID || "";
+                    var name = item.MedicationName || item.medicationName || "";
+                    if (!name && medId) {
+                        try {
+                            var invRes = await fetch(cfg.invUrl + "/inventory/" + encodeURIComponent(medId), {
+                                headers: { "Authorization": "Bearer " + token }
+                            });
+                            if (invRes.ok) {
+                                var invData = await invRes.json();
+                                name = (invData.data && invData.data.name) || name;
+                            }
+                        } catch (_) {}
+                    }
+                    return {
+                        medId: medId,
+                        name: name,
+                        qty: Number(item.Quantity || item.qty || 1),
+                        price: Number(item.UnitPrice || item.unitPrice || 0),
+                        instructions: item.instructions || item.Instructions || ""
+                    };
+                }));
+                html += '<div class="rx-title">Prescribed Medications</div>';
+                enriched.forEach(function(med) {
+                    var displayName = med.medId ? ((med.name || med.medId) + ' (' + med.medId + ')') : (med.name || "—");
+                    html += '<div class="rx-item"><div><strong>' + displayName + '</strong> &times;' + med.qty +
+                        (med.instructions ? '<div class="rx-instr">' + med.instructions + '</div>' : '') +
+                        '</div><span>$' + (med.qty * med.price).toFixed(2) + '</span></div>';
+                });
+            } else {
+                html += '<p class="text-muted rx-instr">No medications prescribed for this visit.</p>';
+            }
         }
 
         panel.innerHTML = html;
+    }
+
+    async function downloadMC(mcKey) {
+        var cfg = document.getElementById("svc-config").dataset;
+        var token = await fbAuth.currentUser.getIdToken();
+        try {
+            var res = await fetch(cfg.mcUrl + "/mc/" + encodeURIComponent(mcKey), {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            if (!res.ok) throw new Error();
+            var data = await res.json();
+            if (data.downloadUrl) window.open(data.downloadUrl, "_blank");
+        } catch(_) {
+            showToast("Failed to download MC. Please try again.", "error");
+        }
     }
 </script>
 {% endblock %}

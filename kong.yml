@@ -324,6 +324,7 @@ plugins:
 
           if method == "OPTIONS" then return end
           if path:find("^/socket%.io") then return end
+          if path:find("^/sse") then return end
 
           local auth = ngx.req.get_headers()["Authorization"]
           if not auth then
@@ -345,26 +346,28 @@ plugins:
             return kong.response.exit(401, { message = "JWT payload could not be decoded" })
           end
 
-          local ok, claims = pcall(require("cjson.safe").decode, payload_json)
-          if not ok or type(claims) ~= "table" then
-            return kong.response.exit(401, { message = "JWT payload is not valid JSON" })
-          end
+          local exp = tonumber(payload_json:match('"exp"%s*:%s*(%d+)'))
+          local iss = payload_json:match('"iss"%s*:%s*"([^"]+)"')
+          local aud = payload_json:match('"aud"%s*:%s*"([^"]+)"')
+          local sub = payload_json:match('"sub"%s*:%s*"([^"]+)"')
 
-          if not claims.exp or ngx.time() >= claims.exp then
+          if not exp or ngx.time() >= exp then
             return kong.response.exit(401, { message = "Token has expired" })
           end
 
-          local project_id = os.getenv("FIREBASE_PROJECT_ID") or "mediconnect-new-d38db"
+          -- Injected at container startup from FIREBASE_PROJECT_ID via compose command.
+          -- This avoids `os.getenv` (blocked in Kong pre-function sandbox).
+          local project_id = "__FIREBASE_PROJECT_ID__"
 
-          if claims.iss ~= "https://securetoken.google.com/" .. project_id then
+          if iss ~= "https://securetoken.google.com/" .. project_id then
             return kong.response.exit(401, { message = "Invalid token issuer" })
           end
 
-          if claims.aud ~= project_id then
+          if aud ~= project_id then
             return kong.response.exit(401, { message = "Invalid token audience" })
           end
 
-          kong.service.request.set_header("X-Firebase-UID", claims.sub or "")
+          kong.service.request.set_header("X-Firebase-UID", sub or "")
 
   - name: cors
     config:
