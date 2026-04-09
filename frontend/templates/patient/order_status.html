@@ -360,9 +360,10 @@
             (fbAuth.currentUser && fbAuth.currentUser.uid) ||
             "";
         try {
+            var token = await fbAuth.currentUser.getIdToken();
             var res = await fetch(cfg.completeDeliveryUrl + "/prepare-delivery", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
                 body: JSON.stringify({ deliveryID: deliveryID, patientID: patientID })
             });
             if (!res.ok) return;
