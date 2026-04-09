@@ -1,0 +1,386 @@
+_format_version: "3.0"
+_transform: true
+
+# ──────────────────────────────────────────────────────────
+#  Kong Declarative Config – Machine Split Version
+#
+#  Service URLs use environment variable substitution:
+#    ${MACHINE_X} is replaced at Kong startup from the
+#    environment variables passed via machine-A-compose.yml.
+# ──────────────────────────────────────────────────────────
+
+services:
+  # ──── Machine C ──────────────────────────────────────────
+  - name: patient-service
+    url: http://${MACHINE_C}:5030
+    routes:
+      - name: patient-routes
+        paths:
+          - /patient
+        strip_path: false
+
+  - name: appointment-service
+    url: http://${MACHINE_C}:5032
+    routes:
+      - name: appointment-routes
+        paths:
+          - /appointment
+        strip_path: false
+
+  - name: consultation-service
+    url: http://${MACHINE_C}:5004
+    routes:
+      - name: consultation-routes
+        paths:
+          - /consultation
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+
+  - name: book-appointment
+    url: http://${MACHINE_C}:5033
+    # Strict limit: prevents patients from spamming appointment booking requests
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 10
+          policy: local
+          error_message: "Too many booking requests. Please wait before trying again."
+    routes:
+      - name: book-appointment-routes
+        paths:
+          - /book-appointment
+        strip_path: false
+
+  - name: start-consultation
+    url: http://${MACHINE_C}:5013
+    # Moderate limit: consultation orchestration involves multiple downstream calls
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 20
+          policy: local
+          error_message: "Too many consultation requests. Please wait before trying again."
+    routes:
+      - name: start-consultation-routes
+        paths:
+          - /start-consultation
+        strip_path: false
+
+  # ──── Machine D ──────────────────────────────────────────
+  - name: doctor-service
+    url: http://${MACHINE_D}:5031
+    routes:
+      - name: doctor-routes
+        paths:
+          - /doctor
+          - /doctor-schedule
+        strip_path: false
+
+  - name: inventory-service
+    url: http://${MACHINE_D}:5005
+    routes:
+      - name: inventory-routes
+        paths:
+          - /inventory
+        strip_path: false
+
+  - name: mc-service
+    url: http://${MACHINE_D}:5010
+    routes:
+      - name: mc-routes
+        paths:
+          - /mc
+        strip_path: false
+
+  - name: amazon-s3-wrapper
+    url: http://${MACHINE_D}:5022
+    routes:
+      - name: amazon-s3-wrapper-routes
+        paths:
+          - /s3
+        strip_path: true
+
+  - name: openai-wrapper
+    url: http://${MACHINE_D}:5021
+    # Strict limit: each call hits the paid OpenAI API (symptom checker) — protect cost and prevent abuse
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 5
+          policy: local
+          error_message: "Too many AI requests. Please wait before using the symptom checker again."
+    routes:
+      - name: openai-routes
+        paths:
+          - /openai
+        strip_path: false
+
+  - name: complete-consultation
+    url: http://${MACHINE_D}:5014
+    # Moderate limit: matches start-consultation to prevent orphaned consultations
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 20
+          policy: local
+          error_message: "Too many consultation requests. Please wait before trying again."
+    routes:
+      - name: complete-consultation-routes
+        paths:
+          - /complete-consultation
+          - /available-medications
+        strip_path: false
+
+  # ──── Machine B ──────────────────────────────────────────
+  - name: twilio-wrapper
+    url: http://${MACHINE_B}:5020
+    # Strict limit: each call sends a real SMS/call via Twilio — prevent billing abuse and phone spam
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 5
+          policy: local
+          error_message: "Too many notification requests. Please wait before trying again."
+    routes:
+      - name: twilio-routes
+        paths:
+          - /twilio
+        strip_path: false
+
+  - name: notification-wrapper
+    url: http://${MACHINE_B}:5011
+    connect_timeout: 10000
+    write_timeout: 600000
+    read_timeout: 600000
+    routes:
+      - name: notification-routes
+        paths:
+          - /notify
+          - /sse
+        strip_path: false
+
+  - name: telegram-wrapper
+    url: http://${MACHINE_B}:5012
+    routes:
+      - name: telegram-routes
+        paths:
+          - /telegram-notify
+        strip_path: true
+
+  # ──── Machine E ──────────────────────────────────────────
+  # payment_atomic and delivery-service both use internal port 5000 –
+  # on Machine E they are remapped to different host ports.
+  - name: payment-atomic
+    url: http://${MACHINE_E}:5060
+    # Very strict limit: payment records are sensitive PHI — prevent enumeration and brute-force
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 10
+          policy: local
+          error_message: "Too many payment requests. Please wait before trying again."
+    routes:
+      - name: payment-atomic-routes
+        paths:
+          - /payment-svc
+        strip_path: true
+
+  - name: payment-wrapper
+    url: http://${MACHINE_E}:5061
+    # Very strict limit: each call initiates a real payment transaction
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 5
+          policy: local
+          error_message: "Too many payment requests. Please wait before trying again."
+    routes:
+      - name: payment-wrapper-routes
+        paths:
+          - /payment-gateway
+        strip_path: true
+
+  - name: process-payment
+    url: http://${MACHINE_E}:5062
+    # Very strict limit: orchestrates the full payment + delivery flow
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 5
+          policy: local
+          error_message: "Too many payment requests. Please wait before trying again."
+    routes:
+      - name: process-payment-routes
+        paths:
+          - /api
+        strip_path: false
+
+  - name: delivery-service
+    url: http://${MACHINE_E}:5000
+    routes:
+      - name: delivery-routes
+        paths:
+          - /delivery
+        strip_path: false
+
+  - name: rider-service
+    url: http://${MACHINE_E}:5001
+    routes:
+      - name: rider-routes
+        paths:
+          - /rider
+        strip_path: false
+
+  - name: assign-delivery
+    url: http://${MACHINE_E}:5002
+    routes:
+      - name: assign-delivery-routes
+        paths:
+          - /accept-delivery
+          - /nearest-rider
+        strip_path: false
+
+  - name: complete-delivery
+    url: http://${MACHINE_E}:5004
+    routes:
+      - name: complete-delivery-routes
+        paths:
+          - /complete-delivery
+          - /prepare-delivery
+        strip_path: false
+
+  - name: tracking-service
+    url: http://${MACHINE_E}:5050
+    routes:
+      - name: tracking-routes
+        paths:
+          - /socket.io
+          - /rider-location
+        strip_path: false
+
+  - name: distance-matrix-wrapper
+    url: http://${MACHINE_E}:5063
+    routes:
+      - name: distance-matrix-routes
+        paths:
+          - /distance-matrix
+          - /geocode
+        strip_path: false
+
+# ──────────────────────────────────────────────
+#  Global Plugins
+#
+#  Rate-limiting strategy (defence-in-depth):
+#    - Sensitive services have their own stricter limits (defined above):
+#        /book-appointment  → 10 req/min   (prevent appointment spam)
+#        /openai            → 5 req/min    (protect paid AI API)
+#        /twilio            → 5 req/min    (prevent SMS/call abuse)
+#        /payment-gateway   → 5 req/min    (protect payment transactions)
+#        /api (payment)     → 5 req/min    (protect payment orchestration)
+#        /payment-svc       → 10 req/min   (protect payment records)
+#        /start-consultation→ 20 req/min   (protect consultation flow)
+#        /complete-consult  → 20 req/min   (matches start-consultation)
+#    - Global fallback: 500 req/min covers all remaining routes
+# ──────────────────────────────────────────────
+plugins:
+  # ── Firebase JWT Claim Validator ──────────────────────────────────
+  # Runs before every request reaches a backend service.
+  # Validates that the Bearer token is a valid, unexpired Firebase JWT
+  # issued for this project. Cryptographic signature verification is
+  # still performed by Firebase Admin SDK inside each service — this
+  # layer enforces a zero-trust perimeter at the gateway boundary,
+  # rejecting missing/malformed/expired/wrong-project tokens before
+  # they consume any backend resource.
+  #
+  # Exemptions (no auth header required):
+  #   OPTIONS  – CORS preflight (browsers send these without auth)
+  #   /socket.io – WebSocket upgrade (auth handled in tracking-service)
+  #
+  # FIREBASE_PROJECT_ID is injected from the Kong container environment.
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function b64url_decode(s)
+            s = s:gsub('-', '+'):gsub('_', '/')
+            local pad = (4 - #s % 4) % 4
+            return ngx.decode_base64(s .. string.rep('=', pad))
+          end
+
+          local method = ngx.req.get_method()
+          local path   = ngx.var.uri or ""
+
+          if method == "OPTIONS" then return end
+          if path:find("^/socket%.io") then return end
+          if path:find("^/sse") then return end
+
+          local auth = ngx.req.get_headers()["Authorization"]
+          if not auth then
+            return kong.response.exit(401, { message = "Missing Authorization header" })
+          end
+
+          local token = auth:match("^[Bb]earer%s+(.+)$")
+          if not token then
+            return kong.response.exit(401, { message = "Invalid Authorization header format. Expected: Bearer <token>" })
+          end
+
+          local _, payload_b64 = token:match("^([^.]+)%.([^.]+)%.([^.]+)$")
+          if not payload_b64 then
+            return kong.response.exit(401, { message = "Malformed JWT: expected header.payload.signature" })
+          end
+
+          local payload_json = b64url_decode(payload_b64)
+          if not payload_json then
+            return kong.response.exit(401, { message = "JWT payload could not be decoded" })
+          end
+
+          local exp = tonumber(payload_json:match('"exp"%s*:%s*(%d+)'))
+          local iss = payload_json:match('"iss"%s*:%s*"([^"]+)"')
+          local aud = payload_json:match('"aud"%s*:%s*"([^"]+)"')
+          local sub = payload_json:match('"sub"%s*:%s*"([^"]+)"')
+
+          if not exp or ngx.time() >= exp then
+            return kong.response.exit(401, { message = "Token has expired" })
+          end
+
+          -- Injected at container startup from FIREBASE_PROJECT_ID via compose command.
+          -- This avoids `os.getenv` (blocked in Kong pre-function sandbox).
+          local project_id = "__FIREBASE_PROJECT_ID__"
+
+          if iss ~= "https://securetoken.google.com/" .. project_id then
+            return kong.response.exit(401, { message = "Invalid token issuer" })
+          end
+
+          if aud ~= project_id then
+            return kong.response.exit(401, { message = "Invalid token audience" })
+          end
+
+          kong.service.request.set_header("X-Firebase-UID", sub or "")
+
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        - OPTIONS
+      headers:
+        - Content-Type
+        - Authorization
+        - Accept
+      credentials: false
+      max_age: 3600
+
+  - name: rate-limiting
+    config:
+      minute: 500
+      policy: local
