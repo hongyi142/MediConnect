@@ -225,6 +225,8 @@
     .rx-instr { font-size: var(--text-xs); color: var(--text-muted); font-style: italic; margin-top: .1rem; }
     .btn-rx { background: rgba(255,255,255,0.7); border: 1px solid rgba(226,232,240,0.8); border-radius: var(--radius-md); padding: .25rem .6rem; font-size: var(--text-xs); font-weight: 600; cursor: pointer; color: var(--text); transition: all .15s; }
     .btn-rx:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-mc { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.4); color: #065f46; }
+    .btn-mc:hover { background: rgba(16,185,129,0.2); border-color: #10b981; color: #065f46; }
 </style>
 
 <script>
@@ -263,6 +265,31 @@
 
         document.getElementById("upcoming-tab").innerHTML = upcoming.length ? upcoming.map(function(a) { return renderCard(a, months, true); }).join("") : '<div class="empty-state">No upcoming appointments.</div>';
         document.getElementById("past-tab").innerHTML = past.length ? past.map(function(a) { return renderCard(a, months, false); }).join("") : '<div class="empty-state">No past appointments.</div>';
+        if (past.length) loadMCButtons(past);
+    }
+
+    async function loadMCButtons(pastAppts) {
+        var cfg = document.getElementById("svc-config").dataset;
+        var token = await fbAuth.currentUser.getIdToken();
+        await Promise.all(pastAppts.filter(function(a) { return a.status !== "cancelled"; }).map(async function(a) {
+            var id = a.appointmentID || a.id;
+            var slot = document.getElementById("mc-slot-" + id);
+            if (!slot) return;
+            try {
+                var res = await fetch(cfg.consultationUrl + "/consultation/" + encodeURIComponent(id), {
+                    headers: { "Authorization": "Bearer " + token }
+                });
+                if (!res.ok) return;
+                var cData = await res.json();
+                var consult = cData.consultation || cData;
+                if (consult.mcIssued && consult.mcKey) {
+                    var mcKey = consult.mcKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    slot.innerHTML = '<button class="btn-rx btn-mc" onclick="downloadMC(\'' + mcKey + '\')">' +
+                        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px;vertical-align:-1px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>' +
+                        'Download MC</button>';
+                }
+            } catch (_) {}
+        }));
     }
 
     function renderCard(a, months, showActions) {
@@ -282,16 +309,18 @@
         // Show prescription button for completed past appointments
         var rxBtn = "";
         var rxPanel = "";
+        var mcSlot = "";
         if (!showActions && a.status !== "cancelled") {
             rxBtn = '<button class="btn-rx" onclick="togglePrescription(\'' + id + '\')">Prescription</button>';
             rxPanel = '<div class="prescription-panel" id="rx-' + id + '"><p class="text-muted" style="font-size:var(--text-xs)">Loading...</p></div>';
+            mcSlot = '<span id="mc-slot-' + id + '"></span>';
         }
         return '<div class="appt-card" style="flex-direction:column;align-items:stretch">' +
             '<div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem">' +
               '<div class="appt-left"><div class="date-block ' + a.status + '"><span class="day">' + d.getDate() + '</span><span>' + months[d.getMonth()] + '</span></div>' +
               '<div class="appt-details"><div class="time">' + d.toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" }) + '</div>' +
               '<div class="meta"><span class="status-badge status-' + a.status + '">' + a.status + '</span></div>' + reason + altHtml + '</div></div>' +
-              '<div style="display:flex;gap:.5rem;flex-shrink:0">' + rxBtn + action + '</div>' +
+              '<div style="display:flex;gap:.5rem;flex-shrink:0;align-items:center">' + mcSlot + rxBtn + action + '</div>' +
             '</div>' + rxPanel + '</div>';
     }
 
