@@ -101,6 +101,8 @@ services:
       - "5061:5001"
     environment:
       - PYTHONUNBUFFERED=1
+      - CLIENT_SUCCESS_URL=http://${MACHINE_A}:8080/patient/payment
+      - CLIENT_CANCEL_URL=http://${MACHINE_A}:8080/patient/dashboard
     env_file:
       - ./backend/payment_wrapper/.env
     networks:
