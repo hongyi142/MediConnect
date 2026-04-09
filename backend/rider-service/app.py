@@ -47,6 +47,21 @@ def rider_doc_by_id(rider_id):
     docs = db.collection("Rider").where("firebaseUID", "==", rider_id).limit(1).stream()
     for doc in docs:
         return doc
+    # Extra fallback: rider_id may be Firebase UID. Resolve via users/{uid}.linkedID.
+    try:
+        user_snap = db.collection("users").document(rider_id).get()
+        if user_snap.exists:
+            user_data = user_snap.to_dict() or {}
+            linked_id = str(user_data.get("linkedID") or "").strip()
+            if linked_id:
+                linked_direct = db.collection("Rider").document(linked_id).get()
+                if linked_direct.exists:
+                    return linked_direct
+                docs = db.collection("Rider").where("riderID", "==", linked_id).limit(1).stream()
+                for doc in docs:
+                    return doc
+    except Exception:
+        pass
     return None
 
 
