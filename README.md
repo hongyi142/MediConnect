@@ -57,15 +57,34 @@ MediConnect is an online teleconsultation platform that connects patients with d
 
 Most services require environment variables and/or Firebase credentials.
 
+### Setup checklist (do this before running `docker compose up`)
+
+Complete these steps in order:
+
+1. **Root `.env`** — copy the root template and fill in your Firebase credentials:
+   ```bash
+   cp .env.example .env
+   ```
+   Open `.env` and replace the placeholder values with your Firebase project's config (see [Firebase Console](https://console.firebase.google.com/) → Project Settings → General → Your apps). This is required for the frontend and Kong JWT validation to work.
+
+2. **Service `.env` files** — copy each service template and fill in credentials:
+   ```bash
+   cp backend/<service-name>/.env.example backend/<service-name>/.env
+   ```
+   See the table below for which services need credentials and what they are.
+
+3. **Firebase service account keys** — place `serviceAccountKey.json` in each service directory listed in the Firebase keys table below.
+
+4. **Run**:
+   ```bash
+   docker compose up --build
+   ```
+
+---
+
 ### `.env` files
 
-Each service that needs configuration ships with a `.env.example` template. Copy it and fill in your own credentials before starting:
-
-```bash
-cp backend/<service-name>/.env.example backend/<service-name>/.env
-```
-
-The following services each have a `.env.example`:
+Each service that needs configuration ships with a `.env.example` template.
 
 | Service | Credentials required |
 |---------|----------------------|
@@ -80,10 +99,11 @@ The following services each have a `.env.example`:
 | `complete-consultation-composite` | Consultation Fee Pricing (Currently set at $40) |
 | `inventory` | SMU Lab Utilities AWS S3 folder/subfolder paths |
 | `mc-service` | SMU Lab Utilities AWS S3 folder/subfolder paths |
+| `start-consultation-composite` | No external credentials — copy `.env.example` as-is |
 
 ### Firebase service account keys
 
-Several atomic services connect directly to Firebase Firestore. Place the appropriate JSON key file in the service directory before running:
+Several services connect directly to Firebase Firestore. Place the appropriate JSON key file in each service directory before running:
 
 | Service | Key file expected |
 |---------|-------------------|
@@ -93,6 +113,7 @@ Several atomic services connect directly to Firebase Firestore. Place the approp
 | `rider-service` | `serviceAccountKey.json` |
 | `delivery-service` | `serviceAccountKey.json` |
 | `consultation-service` | `serviceAccountKey.json` |
+| `payment_atomic` | `serviceAccountKey.json` |
 
 Download these from the [Firebase Console](https://console.firebase.google.com/) under **Project Settings → Service Accounts → Generate new private key** and rename the downloaded file accordingly.
 
