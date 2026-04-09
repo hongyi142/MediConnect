@@ -42,6 +42,11 @@ def rider_doc_by_id(rider_id):
     docs = db.collection("Rider").where("riderID", "==", rider_id).limit(1).stream()
     for doc in docs:
         return doc
+    # Backward-compat for split-deployment data where users.linkedID
+    # was stored as Firebase UID instead of riderID.
+    docs = db.collection("Rider").where("firebaseUID", "==", rider_id).limit(1).stream()
+    for doc in docs:
+        return doc
     return None
 
 
