@@ -190,31 +190,40 @@
         navbar.style.display = "";
       }
 
-      // Cache the Firestore read as a promise so page scripts can share it.
-      if (!window._userDocPromise) {
-        window._userDocPromise = fbDb.collection("users").doc(firebaseUser.uid).get();
-      }
-      var snap = await window._userDocPromise;
-      if (!snap.exists) return;
-      var user = snap.data();
-      window.currentUser = user;
+      try {
+        // Cache the Firestore read as a promise so page scripts can share it.
+        if (!window._userDocPromise) {
+          window._userDocPromise = fbDb.collection("users").doc(firebaseUser.uid).get();
+        }
+        var snap = await window._userDocPromise;
+        if (!snap.exists) return;
+        var user = snap.data();
+        window.currentUser = user;
 
-      if (navName) navName.textContent = user.name;
-      if (navAvatar) {
-        var initials = (user.name || "U").split(" ").map(function(w){ return w[0]; }).join("").toUpperCase().slice(0, 2);
-        navAvatar.textContent = initials;
+        if (navName) navName.textContent = user.name;
+        if (navAvatar) {
+          var initials = (user.name || "U").split(" ").map(function(w){ return w[0]; }).join("").toUpperCase().slice(0, 2);
+          navAvatar.textContent = initials;
+        }
+        if (navRole) {
+          navRole.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
+          navRole.className = "role-badge role-" + user.role;
+        }
+        if (navBrand) navBrand.setAttribute("href", roleHomePath(user.role));
+        renderNavLinks(user.role);
+      } catch (err) {
+        // Avoid uncaught promise errors on pages that intentionally hide navbar
+        // or when Firestore is blocked by client extensions/network policy.
+        window.currentUser = null;
       }
-      if (navRole) {
-        navRole.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
-        navRole.className = "role-badge role-" + user.role;
-      }
-      if (navBrand) navBrand.setAttribute("href", roleHomePath(user.role));
-      renderNavLinks(user.role);
     });
 
-    document.getElementById("nav-logout").addEventListener("click", function() {
-      fbAuth.signOut().then(function() { window.location.href = "/"; });
-    });
+    var logoutBtn = document.getElementById("nav-logout");
+    if (logoutBtn) {
+      logoutBtn.addEventListener("click", function() {
+        fbAuth.signOut().then(function() { window.location.href = "/"; });
+      });
+    }
   </script>
 
   <!-- Utility JS helpers -->

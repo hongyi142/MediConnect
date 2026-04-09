@@ -318,6 +318,8 @@ plugins:
           if method == "OPTIONS" then return end
           if path:find("^/socket%.io") then return end
           if path:find("^/sse") then return end
+          -- Public registration endpoints (must remain unauthenticated).
+          if method == "POST" and (path == "/patient" or path == "/doctor") then return end
 
           local auth = ngx.req.get_headers()["Authorization"]
           if not auth then
